@@ -557,12 +557,21 @@ async function deleteItem(id) {
 async function tmdbSearch(query, type) {
   const endpoint = type === 'multi' ? 'search/multi' :
                    type === 'movie' ? 'search/movie' : 'search/tv';
-  const res = await fetch(
-    `https://api.themoviedb.org/3/${endpoint}?query=${encodeURIComponent(query)}&language=es-AR&page=1`,
-    { headers: { Authorization: `Bearer ${TMDB_TOKEN}` } }
-  );
-  const d = await res.json();
-  return (d.results || []).filter(r => r.media_type !== 'person').slice(0, 10);
+  // Try Spanish first, then English if no results
+  const trySearch = async (q, lang) => {
+    const res = await fetch(
+      `https://api.themoviedb.org/3/${endpoint}?query=${encodeURIComponent(q)}&language=${lang}&page=1`,
+      { headers: { Authorization: `Bearer ${TMDB_TOKEN}` } }
+    );
+    const d = await res.json();
+    return (d.results || []).filter(r => r.media_type !== 'person');
+  };
+  let results = await trySearch(query, 'es-AR');
+  // If no results or only poor matches, try without language (uses original titles)
+  if (!results.length) {
+    results = await trySearch(query, 'en-US');
+  }
+  return results.slice(0, 10);
 }
 
 async function tmdbDetail(id, type) {
@@ -1030,12 +1039,12 @@ function handleImportFile(event) {
       const obj = {};
       headers.forEach((h, i) => { obj[h] = (cols[i] || '').replace(/"/g, '').trim(); });
       return obj;
-    }).filter(r => r.title || r.titulo || r.nombre);
+    }).filter(r => r.title || r.titulo || r.nombre || r.name || Object.values(r)[0]);
 
     const preview = document.getElementById('import-preview');
     preview.innerHTML = `<p style="font-size:13px;color:var(--text2);margin-bottom:8px">${importRows.length} títulos encontrados:</p>` +
       importRows.slice(0, 10).map(r => {
-        const title = r.title || r.titulo || r.nombre;
+        const title = r.title || r.titulo || r.nombre || r.name || Object.values(r)[0];
         return `<div class="import-row"><span class="ir-status">🎬</span><span>${title}</span>${r.year ? `<span style="color:var(--text3);margin-left:auto">${r.year}</span>` : ''}</div>`;
       }).join('') +
       (importRows.length > 10 ? `<div style="padding:8px;font-size:12px;color:var(--text3)">... y ${importRows.length-10} más</div>` : '');
@@ -1045,27 +1054,68 @@ function handleImportFile(event) {
   reader.readAsText(file);
 }
 
+// Normalize Spanish titles for better TMDB matching
+function normalizeTitle(title) {
+  return title
+    .replace(/^(el|la|los|las|un|una|unos|unas)\s+/i, '') // remove leading articles
+    .replace(/\s+\d+$/, '')           // remove trailing numbers (sequels)
+    .replace(/\s+(1|2|3|4|5|6|7|8|9)(\s|$)/, ' ')  // remove standalone sequel numbers
+    .replace(/\s+(vol\.|parte|part|capitulo)\s+\d+/i, '') // remove "vol. 2" etc
+    .trim();
+}
+
+async function tmdbSearchWithFallback(title, type) {
+  // 1. Try exact title in Spanish
+  let results = await tmdbSearch(title, type);
+  if (results.length) return results;
+
+  // 2. Try normalized title (remove articles, sequel numbers)
+  const normalized = normalizeTitle(title);
+  if (normalized !== title) {
+    results = await tmdbSearch(normalized, type);
+    if (results.length) return results;
+  }
+
+  // 3. Try first 3 words (handles very long translated titles)
+  const short = title.split(' ').slice(0, 3).join(' ');
+  if (short !== title && short.length > 4) {
+    results = await tmdbSearch(short, type);
+    if (results.length) return results;
+  }
+
+  return [];
+}
+
 async function runImport() {
   const btn = document.getElementById('import-btn');
   btn.textContent = 'Importando...';
   btn.disabled = true;
-  let ok = 0, fail = 0;
+  let ok = 0, skip = 0, fail = 0;
 
-  for (const row of importRows) {
-    const title = row.title || row.titulo || row.nombre;
+  // Update preview to show progress
+  const preview = document.getElementById('import-preview');
+
+  for (let idx = 0; idx < importRows.length; idx++) {
+    const row = importRows[idx];
+    const title = row.title || row.titulo || row.nombre || row.name || row[''] || Object.values(row)[0];
+    if (!title) { fail++; continue; }
+
+    btn.textContent = `Importando ${idx + 1}/${importRows.length}...`;
+
     try {
-      // Search TMDB
-      const type = (row.type || row.tipo || '').toLowerCase().includes('tv') || (row.type||'').toLowerCase().includes('serie') ? 'tv' : 'movie';
-      const results = await tmdbSearch(title, type === 'tv' ? 'tv' : 'movie');
+      const type = (row.type || row.tipo || '').toLowerCase().includes('tv') ||
+                   (row.type || row.tipo || '').toLowerCase().includes('serie') ? 'tv' : 'movie';
+
+      const results = await tmdbSearchWithFallback(title.trim(), type === 'tv' ? 'tv' : 'movie');
       if (!results.length) { fail++; continue; }
+
       const r = results[0];
-      const rtype = r.media_type || type;
-      const rntype = rtype === 'movie' ? 'movie' : 'tv';
+      const rtype = (r.media_type || type) === 'movie' ? 'movie' : 'tv';
 
-      // Skip if already exists
-      if (items.find(i => i.tmdb_id === r.id && i.type === rntype)) { ok++; continue; }
+      // Skip duplicates silently
+      if (items.find(i => i.tmdb_id === r.id && i.type === rtype)) { skip++; ok++; continue; }
 
-      const detail = await tmdbDetail(r.id, rntype);
+      const detail = await tmdbDetail(r.id, rtype);
       const ytitle = detail.title || detail.name;
       const year = (detail.release_date || detail.first_air_date || '').slice(0, 4);
       const omdb = await omdbGetRatings(ytitle, year);
@@ -1075,7 +1125,7 @@ async function runImport() {
         body: JSON.stringify({
           tmdb_id: r.id,
           imdb_id: omdb.imdb_id || null,
-          type: rntype,
+          type: rtype,
           title: ytitle,
           original_title: detail.original_title || detail.original_name || null,
           poster_path: detail.poster_path || null,
@@ -1093,12 +1143,14 @@ async function runImport() {
       });
       ok++;
     } catch { fail++; }
-    await new Promise(r => setTimeout(r, 300)); // rate limit
+
+    await new Promise(r => setTimeout(r, 350)); // respect rate limits
   }
 
   await loadItems();
   closeModal('modal-import');
-  showToast(`✓ Importados ${ok} títulos${fail ? ` · ${fail} errores` : ''}`, 'success');
+  const msg = `✓ ${ok} importadas${skip ? ` (${skip} ya existían)` : ''}${fail ? ` · ${fail} no encontradas` : ''}`;
+  showToast(msg, 'success');
   btn.textContent = 'Importar';
   btn.disabled = false;
   importRows = [];
