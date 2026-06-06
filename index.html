@@ -724,9 +724,210 @@ select option { background: var(--bg2); color: var(--text); }
 @media (max-width: 360px) {
   #grid { gap: 8px; }
 }
+
+/* ===================== AUTH SCREEN ===================== */
+#auth-screen {
+  display: none; position: fixed; inset: 0; z-index: 500;
+  background: var(--bg); align-items: center; justify-content: center; padding: 24px;
+}
+#auth-screen.visible { display: flex; }
+.auth-card {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 20px; padding: 40px 36px; width: 100%; max-width: 400px;
+  box-shadow: var(--shadow-lg); text-align: center;
+}
+.auth-logo { font-size: 28px; font-weight: 900; color: var(--accent); letter-spacing: -1px; font-style: italic; text-transform: uppercase; margin-bottom: 6px; }
+.auth-subtitle { font-size: 13px; color: var(--text3); margin-bottom: 32px; }
+.auth-step { display: none; }
+.auth-step.active { display: block; }
+.auth-step h2 { font-size: 18px; font-weight: 700; margin-bottom: 6px; }
+.auth-step p { font-size: 13px; color: var(--text3); margin-bottom: 20px; line-height: 1.5; }
+.auth-input {
+  width: 100%; padding: 12px 16px; font-size: 15px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border); background: var(--bg3); margin-bottom: 12px;
+  text-align: center;
+}
+.auth-input:focus { border-color: rgba(45,106,79,.5); background: var(--bg2); outline: none; box-shadow: 0 0 0 3px rgba(45,106,79,.1); }
+.auth-btn {
+  width: 100%; padding: 13px; background: var(--accent); color: #fff;
+  border-radius: var(--radius-sm); font-size: 15px; font-weight: 700;
+  cursor: pointer; border: none; transition: background .15s;
+  margin-bottom: 10px;
+}
+.auth-btn:hover { background: var(--accent2); }
+.auth-btn:disabled { opacity: .6; cursor: not-allowed; }
+.auth-btn-secondary {
+  width: 100%; padding: 11px; background: transparent; color: var(--text2);
+  border-radius: var(--radius-sm); font-size: 13px; font-weight: 500;
+  cursor: pointer; border: 1px solid var(--border); transition: all .15s;
+}
+.auth-btn-secondary:hover { background: var(--bg3); }
+.auth-msg { font-size: 13px; color: var(--text3); margin-top: 8px; min-height: 18px; }
+.auth-msg.error { color: var(--rt-fresh); }
+.auth-msg.success { color: var(--green); }
+
+/* Avatar color picker */
+.avatar-picker { display: flex; gap: 8px; justify-content: center; margin-bottom: 16px; flex-wrap: wrap; }
+.av-swatch {
+  width: 32px; height: 32px; border-radius: 50%; cursor: pointer;
+  border: 3px solid transparent; transition: transform .15s;
+}
+.av-swatch:hover, .av-swatch.selected { transform: scale(1.2); border-color: var(--text); }
+
+/* User menu */
+#user-menu-wrap { position: relative; }
+.user-avatar {
+  width: 30px; height: 30px; border-radius: 50%; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700; color: #fff; flex-shrink: 0;
+  border: 2px solid transparent; transition: border-color .15s;
+}
+.user-avatar:hover { border-color: var(--accent); }
+#user-dropdown {
+  position: absolute; top: calc(100% + 8px); right: 0;
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow-lg);
+  min-width: 200px; padding: 6px 0; display: none; z-index: 200;
+}
+#user-dropdown.open { display: block; animation: dropIn .15s ease; }
+.ud-header { padding: 12px 16px 8px; border-bottom: 1px solid var(--border); margin-bottom: 4px; }
+.ud-name { font-size: 14px; font-weight: 700; }
+.ud-email { font-size: 11px; color: var(--text3); margin-top: 2px; }
+.ud-item {
+  padding: 8px 16px; font-size: 13px; cursor: pointer;
+  transition: background .12s; display: flex; align-items: center; gap: 8px;
+}
+.ud-item:hover { background: rgba(45,106,79,.06); }
+.ud-item.danger { color: var(--rt-fresh); }
+.ud-item.danger:hover { background: rgba(192,57,43,.06); }
+.ud-sep { height: 1px; background: var(--border); margin: 4px 0; }
+
+/* GROUP MODAL */
+#modal-group .modal-body { padding: 24px; }
+#modal-group h2 { font-size: 18px; font-weight: 700; margin-bottom: 6px; }
+#modal-group p { font-size: 13px; color: var(--text2); margin-bottom: 20px; }
+.group-tabs { display: flex; gap: 6px; margin-bottom: 20px; }
+.group-tab { flex: 1; padding: 8px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 600; text-align: center; cursor: pointer; border: 1px solid var(--border); color: var(--text2); transition: all .15s; }
+.group-tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.group-panel { display: none; }
+.group-panel.active { display: block; }
+.invite-code-display {
+  background: var(--bg3); border-radius: var(--radius-sm);
+  padding: 16px; text-align: center; margin-bottom: 16px;
+  border: 2px dashed var(--border);
+}
+.invite-code-display .code {
+  font-size: 32px; font-weight: 900; letter-spacing: 6px; color: var(--accent);
+  font-family: monospace;
+}
+.invite-code-display .code-hint { font-size: 11px; color: var(--text3); margin-top: 4px; }
+.member-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+.member-item {
+  display: flex; align-items: center; gap: 10px; padding: 8px;
+  background: var(--bg3); border-radius: var(--radius-sm);
+}
+.member-avatar { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #fff; flex-shrink: 0; }
+.member-name { font-size: 13px; font-weight: 600; flex: 1; }
+.member-count { font-size: 11px; color: var(--text3); }
+.member-you { font-size: 10px; color: var(--accent); font-weight: 700; background: rgba(45,106,79,.1); padding: 2px 6px; border-radius: 4px; }
+
+/* FRIENDS RATINGS in detail modal */
+.friends-ratings { margin-bottom: 20px; }
+.friends-ratings h4 { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: .8px; font-weight: 700; margin-bottom: 10px; }
+.friend-rating-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.friend-rating-row .fav { width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: #fff; }
+.friend-rating-row .fname { font-size: 13px; flex: 1; }
+.friend-rating-row .frating { font-size: 13px; font-weight: 700; color: var(--accent); }
+.friend-rating-row .fstars { font-size: 11px; color: var(--gold); }
+
+/* COMPARE TAB */
+.compare-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+.compare-card {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 14px; display: flex; gap: 12px;
+  cursor: pointer; transition: box-shadow .2s;
+}
+.compare-card:hover { box-shadow: var(--shadow-md); }
+.compare-card img { width: 48px; height: 72px; object-fit: cover; border-radius: 6px; background: var(--bg3); flex-shrink: 0; }
+.compare-info { flex: 1; min-width: 0; }
+.compare-title { font-size: 13px; font-weight: 700; margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.compare-ratings { display: flex; flex-direction: column; gap: 4px; }
+.cr-row { display: flex; align-items: center; gap: 6px; }
+.cr-av { width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: 700; color: #fff; }
+.cr-name { font-size: 11px; color: var(--text3); flex: 1; }
+.cr-val { font-size: 12px; font-weight: 700; color: var(--accent); }
+.cr-diff-badge { font-size: 10px; padding: 1px 5px; border-radius: 4px; font-weight: 700; }
+.cr-diff-pos { background: rgba(45,106,79,.15); color: var(--green); }
+.cr-diff-neg { background: rgba(192,57,43,.12); color: var(--rt-fresh); }
+.compare-card.big-diff { border-color: rgba(231,76,60,.3); background: rgba(231,76,60,.04); }
+.compare-card.med-diff { border-color: rgba(243,156,18,.3); }
+.compare-empty { text-align: center; padding: 60px 20px; color: var(--text3); font-size: 14px; }
+.compare-empty p { margin-bottom: 8px; line-height: 1.5; }
+.compare-filter { display: flex; gap: 8px; margin-bottom: 20px; align-items: center; flex-wrap: wrap; }
+.compare-filter select { padding: 7px 28px 7px 11px; font-size: 12px; }
 </style>
 </head>
 <body>
+
+<!-- AUTH SCREEN -->
+<div id="auth-screen">
+  <div class="auth-card">
+    <div class="auth-logo">CineLog</div>
+    <div class="auth-subtitle">Tu historial de películas y series</div>
+
+    <!-- Step 1: email -->
+    <div class="auth-step active" id="auth-step-email">
+      <h2>Ingresá tu email</h2>
+      <p>Te mandamos un link mágico para entrar — sin contraseña.</p>
+      <input class="auth-input" type="email" id="auth-email" placeholder="tucorreo@email.com" autocomplete="email" />
+      <button class="auth-btn" onclick="sendMagicLink()">Continuar →</button>
+      <div class="auth-msg" id="auth-msg-email"></div>
+    </div>
+
+    <!-- Step 2: check email -->
+    <div class="auth-step" id="auth-step-check">
+      <h2>¡Revisá tu email!</h2>
+      <p>Te mandamos un link. Hacé click ahí y volvés directo a CineLog.<br><br>
+      <span style="font-size:12px;color:var(--text3)">Si no llega, revisá spam.</span></p>
+      <button class="auth-btn-secondary" onclick="showStep('email')">← Volver</button>
+    </div>
+
+    <!-- Step 3: create profile (first time) -->
+    <div class="auth-step" id="auth-step-profile">
+      <h2>¡Bienvenido!</h2>
+      <p>Elegí cómo te van a ver tus amigos en el grupo.</p>
+      <input class="auth-input" type="text" id="auth-username" placeholder="Tu nombre o apodo" maxlength="20" />
+      <div class="avatar-picker" id="avatar-picker"></div>
+      <button class="auth-btn" onclick="createProfile()">Entrar a CineLog →</button>
+      <div class="auth-msg" id="auth-msg-profile"></div>
+    </div>
+  </div>
+</div>
+
+<!-- GROUP MODAL -->
+<div class="modal-overlay" id="modal-group">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-group')">✕</button>
+    <div class="modal-body">
+      <h2>👥 Mi grupo</h2>
+      <p>Compartí el código con tus amigos para que se unan y puedan ver y comparar calificaciones.</p>
+      <div class="group-tabs">
+        <div class="group-tab active" onclick="switchGroupTab('members')">Miembros</div>
+        <div class="group-tab" onclick="switchGroupTab('join')">Unirse a grupo</div>
+      </div>
+      <div class="group-panel active" id="group-panel-members">
+        <div id="group-members-content"><div style="text-align:center;padding:20px;color:var(--text3)">Cargando...</div></div>
+      </div>
+      <div class="group-panel" id="group-panel-join">
+        <p style="font-size:13px;color:var(--text2);margin-bottom:12px">Pedile el código de 6 letras a alguien del grupo:</p>
+        <input class="auth-input" type="text" id="join-code-input" placeholder="ABC123" maxlength="6" style="text-transform:uppercase;letter-spacing:4px;font-size:20px;font-weight:700" />
+        <button class="auth-btn" onclick="joinGroup()">Unirse</button>
+        <div class="auth-msg" id="join-msg"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="app">
 
   <!-- NAV PRINCIPAL -->
@@ -738,6 +939,7 @@ select option { background: var(--bg2); color: var(--text); }
       <div class="nav-tab" data-tab="tv">Series</div>
       <div class="nav-tab" data-tab="watchlist">Ver después</div>
       <div class="nav-tab" data-tab="discover">Descubrí</div>
+      <div class="nav-tab" data-tab="compare">Grupo 👥</div>
     </div>
     <div id="omnisearch-wrap">
       <div id="omnisearch-bar">
@@ -749,6 +951,18 @@ select option { background: var(--bg2); color: var(--text); }
     </div>
     <div class="nav-actions">
       <button class="btn-add" onclick="openSearchModal()">+ Agregar</button>
+      <div id="user-menu-wrap">
+        <div class="user-avatar" id="user-avatar-btn" onclick="toggleUserMenu()"></div>
+        <div id="user-dropdown">
+          <div class="ud-header">
+            <div class="ud-name" id="ud-name">—</div>
+            <div class="ud-email" id="ud-email">—</div>
+          </div>
+          <div class="ud-item" onclick="openGroupModal()">👥 Mi grupo</div>
+          <div class="ud-sep"></div>
+          <div class="ud-item danger" onclick="signOut()">↩ Cerrar sesión</div>
+        </div>
+      </div>
     </div>
   </nav>
 
@@ -802,6 +1016,10 @@ select option { background: var(--bg2); color: var(--text); }
       <div class="insights-grid" id="insights-content" style="margin-bottom:40px"></div>
       <div id="recs-content"></div>
     </div>
+
+    <div id="tab-compare" style="display:none">
+      <div id="compare-content"></div>
+    </div>
   </main>
 
 </div>
@@ -828,6 +1046,10 @@ select option { background: var(--bg2); color: var(--text); }
     <div class="mn-tab nav-tab" data-tab="discover">
       <svg class="mn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
       <span class="mn-label">Descubrí</span>
+    </div>
+    <div class="mn-tab nav-tab" data-tab="compare">
+      <svg class="mn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      <span class="mn-label">Grupo</span>
     </div>
   </div>
 </nav>
@@ -909,11 +1131,13 @@ let importData = [];
 
 // ===================== SUPABASE =====================
 async function sbFetch(path, opts = {}) {
+  // Use user's JWT when signed in so RLS policies apply correctly
+  const token = (typeof currentSession !== 'undefined' && currentSession?.access_token) ? currentSession.access_token : SUPABASE_ANON;
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
     ...opts,
     headers: {
       'apikey': SUPABASE_ANON,
-      'Authorization': `Bearer ${SUPABASE_ANON}`,
+      'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',
       'Prefer': opts.prefer || 'return=representation',
       ...(opts.headers || {})
@@ -944,7 +1168,11 @@ async function saveItem(data) {
       method: 'PATCH', body: JSON.stringify(rest), prefer: 'return=representation'
     });
   } else {
-    await sbFetch('watchlist', { method: 'POST', body: JSON.stringify(data) });
+    // Attach user_id if signed in
+    const payload = (typeof currentUser !== 'undefined' && currentUser?.id)
+      ? { ...data, user_id: currentUser.id }
+      : data;
+    await sbFetch('watchlist', { method: 'POST', body: JSON.stringify(payload) });
   }
   await loadItems();
 }
@@ -1604,11 +1832,14 @@ document.querySelectorAll('.nav-tab').forEach(tab => {
     tab.classList.add('active');
     filterTab = tab.dataset.tab;
     const isDiscover = filterTab === 'discover';
-    const isList = !isDiscover;
+    const isCompare = filterTab === 'compare';
+    const isList = !isDiscover && !isCompare;
     document.getElementById('tab-list').style.display = isList ? 'block' : 'none';
     document.getElementById('tab-discover').style.display = isDiscover ? 'block' : 'none';
+    document.getElementById('tab-compare').style.display = isCompare ? 'block' : 'none';
     document.getElementById('filters').style.display = isList ? 'flex' : 'none';
-    renderAll();
+    if (isCompare) renderCompare();
+    else renderAll();
   });
 });
 
@@ -2037,8 +2268,485 @@ async function openRecDetail(e, tmdbId, type) {
   openDetailModal(pendingItem, false);
 }
 
+// ===================== AUTH =====================
+let currentUser = null;
+let currentSession = null;
+
+function getAuthHeaders() {
+  const token = currentSession?.access_token || SUPABASE_ANON;
+  return {
+    'apikey': SUPABASE_ANON,
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json'
+  };
+}
+
+async function initAuth() {
+  // Handle magic link redirect (hash contains access_token)
+  const hash = window.location.hash;
+  if (hash.includes('access_token')) {
+    const params = new URLSearchParams(hash.slice(1));
+    const access_token = params.get('access_token');
+    const refresh_token = params.get('refresh_token');
+    if (access_token) {
+      try {
+        const resp = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+          headers: { 'apikey': SUPABASE_ANON, 'Authorization': `Bearer ${access_token}` }
+        });
+        if (resp.ok) {
+          currentUser = await resp.json();
+          currentSession = { access_token, refresh_token };
+          localStorage.setItem('cinelog_session', JSON.stringify({ access_token, refresh_token, user: currentUser }));
+          window.history.replaceState(null, '', window.location.pathname);
+        }
+      } catch(e) {}
+    }
+  }
+
+  // Check stored session
+  if (!currentUser) {
+    const stored = localStorage.getItem('cinelog_session');
+    if (stored) {
+      try {
+        const { access_token, refresh_token, user } = JSON.parse(stored);
+        const resp = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+          headers: { 'apikey': SUPABASE_ANON, 'Authorization': `Bearer ${access_token}` }
+        });
+        if (resp.ok) {
+          currentUser = user;
+          currentSession = { access_token, refresh_token };
+        } else {
+          localStorage.removeItem('cinelog_session');
+        }
+      } catch(e) { localStorage.removeItem('cinelog_session'); }
+    }
+  }
+
+  if (currentUser) {
+    await onSignedIn();
+  } else {
+    document.getElementById('auth-screen').classList.add('visible');
+  }
+}
+
+async function onSignedIn() {
+  document.getElementById('auth-screen').classList.remove('visible');
+  const profile = await loadProfile();
+  if (profile) {
+    currentUser._profile = profile;
+    updateUserAvatar(profile);
+  }
+  await claimNullItems();
+}
+
+async function loadProfile() {
+  try {
+    const resp = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${currentUser.id}&select=*`, {
+      headers: getAuthHeaders()
+    });
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    if (data.length > 0) return data[0];
+    // First time — show create profile step
+    document.getElementById('auth-screen').classList.add('visible');
+    showAuthStep('profile');
+    return null;
+  } catch(e) { return null; }
+}
+
+async function claimNullItems() {
+  // Assign items with no user_id to current user (Diego's existing library)
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/watchlist?user_id=is.null`, {
+      method: 'PATCH',
+      headers: { ...getAuthHeaders(), 'Prefer': 'return=minimal' },
+      body: JSON.stringify({ user_id: currentUser.id })
+    });
+  } catch(e) {}
+}
+
+function updateUserAvatar(profile) {
+  const btn = document.getElementById('user-avatar-btn');
+  if (!btn) return;
+  const name = profile.display_name || currentUser.email || '?';
+  btn.textContent = name.charAt(0).toUpperCase();
+  btn.style.display = 'flex';
+  const nameEl = document.getElementById('ud-name');
+  const emailEl = document.getElementById('ud-email');
+  if (nameEl) nameEl.textContent = name;
+  if (emailEl) emailEl.textContent = currentUser.email || '';
+}
+
+function showAuthStep(step) {
+  document.querySelectorAll('.auth-step').forEach(s => s.classList.remove('active'));
+  const el = document.getElementById(`auth-step-${step}`);
+  if (el) el.classList.add('active');
+}
+
+async function sendMagicLink() {
+  const email = document.getElementById('auth-email').value.trim();
+  if (!email || !email.includes('@')) { showToast('Ingresá un email válido', 'error'); return; }
+  const btn = document.querySelector('#auth-step-email .auth-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Enviando...'; }
+  try {
+    const resp = await fetch(`${SUPABASE_URL}/auth/v1/otp`, {
+      method: 'POST',
+      headers: { 'apikey': SUPABASE_ANON, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, create_user: true })
+    });
+    if (resp.ok || resp.status === 200) {
+      const sentEl = document.getElementById('auth-sent-email');
+      if (sentEl) sentEl.textContent = email;
+      showAuthStep('check');
+    } else {
+      const err = await resp.json().catch(() => ({}));
+      showToast(err.msg || err.error_description || 'Error al enviar el email', 'error');
+    }
+  } catch(e) {
+    showToast('Error de red', 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Continuar →'; }
+  }
+}
+
+async function createProfile() {
+  const name = document.getElementById('auth-username').value.trim();
+  if (!name) { showToast('Ingresá tu nombre', 'error'); return; }
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/profiles`, {
+      method: 'POST',
+      headers: { ...getAuthHeaders(), 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify({ id: currentUser.id, display_name: name, email: currentUser.email })
+    });
+    currentUser._profile = { display_name: name, email: currentUser.email };
+    updateUserAvatar(currentUser._profile);
+    document.getElementById('auth-screen').classList.remove('visible');
+    await claimNullItems();
+    await loadItems();
+    showToast(`¡Bienvenido, ${name}!`, 'success');
+  } catch(e) {
+    showToast('Error al guardar perfil', 'error');
+  }
+}
+
+function toggleUserMenu() {
+  const dd = document.getElementById('user-dropdown');
+  if (!dd) return;
+  dd.classList.toggle('open');
+}
+
+function signOut() {
+  localStorage.removeItem('cinelog_session');
+  currentUser = null;
+  currentSession = null;
+  window.location.reload();
+}
+
+// Cerrar menú al hacer click afuera
+document.addEventListener('click', e => {
+  const dd = document.getElementById('user-dropdown');
+  const btn = document.getElementById('user-avatar-btn');
+  if (dd && btn && !dd.contains(e.target) && !btn.contains(e.target)) {
+    dd.classList.remove('open');
+  }
+});
+
+// ===================== GRUPO =====================
+let currentGroup = null;
+let currentGroupTab = 'members';
+
+async function openGroupModal() {
+  const dd = document.getElementById('user-dropdown');
+  if (dd) dd.classList.remove('open');
+  if (!currentUser) { showToast('Iniciá sesión primero', 'error'); return; }
+  document.getElementById('modal-group').style.display = 'flex';
+  await loadCurrentGroup();
+}
+
+async function loadCurrentGroup() {
+  try {
+    const resp = await fetch(
+      `${SUPABASE_URL}/rest/v1/group_members?user_id=eq.${currentUser.id}&select=group_id,groups(*)`,
+      { headers: getAuthHeaders() }
+    );
+    if (!resp.ok) return;
+    const data = await resp.json();
+    if (data.length > 0 && data[0].groups) {
+      currentGroup = data[0].groups;
+    }
+  } catch(e) {}
+  switchGroupTab(currentGroup ? 'members' : 'join');
+}
+
+function switchGroupTab(tab) {
+  currentGroupTab = tab;
+  document.querySelectorAll('.group-tab').forEach(b => {
+    b.classList.toggle('active', b.getAttribute('onclick')?.includes(`'${tab}'`));
+  });
+  document.querySelectorAll('.group-panel').forEach(p => p.classList.remove('active'));
+  const panel = document.getElementById(`group-panel-${tab}`);
+  if (panel) panel.classList.add('active');
+  if (tab === 'members') renderGroupMembers();
+}
+
+async function renderGroupMembers() {
+  const el = document.getElementById('group-members-content');
+  if (!el) return;
+
+  if (!currentGroup) {
+    el.innerHTML = `
+      <div style="text-align:center;padding:20px;color:var(--text3)">
+        <p style="margin-bottom:16px">No estás en ningún grupo todavía.</p>
+        <p style="font-size:12px">Pedile el código a alguien o creá uno nuevo.</p>
+        <div style="margin-top:16px;display:flex;gap:8px;justify-content:center">
+          <button class="auth-btn" style="flex:1" onclick="switchGroupTab('join')">Unirme →</button>
+          <button class="auth-btn-secondary" style="flex:1" onclick="showCreateGroup()">Crear grupo</button>
+        </div>
+      </div>`;
+    return;
+  }
+
+  el.innerHTML = `<div style="text-align:center;padding:20px;color:var(--text3)">Cargando...</div>`;
+
+  try {
+    const resp = await fetch(
+      `${SUPABASE_URL}/rest/v1/group_members?group_id=eq.${currentGroup.id}&select=user_id,role,profiles(display_name,email)`,
+      { headers: getAuthHeaders() }
+    );
+    const members = await resp.json();
+
+    const code = currentGroup.invite_code || '—';
+    el.innerHTML = `
+      <div style="background:var(--bg2);border-radius:10px;padding:14px;margin-bottom:16px;text-align:center">
+        <div style="font-weight:700;font-size:15px;margin-bottom:4px">${currentGroup.name}</div>
+        <div style="font-size:12px;color:var(--text3);margin-bottom:8px">Compartí este código para que se unan:</div>
+        <div style="font-size:24px;font-weight:900;letter-spacing:6px;color:var(--accent);cursor:pointer" onclick="navigator.clipboard.writeText('${code}');showToast('Código copiado!','success')">${code}</div>
+        <div style="font-size:10px;color:var(--text3);margin-top:4px">Tap para copiar</div>
+      </div>
+      <div class="member-list">
+        ${members.map(m => {
+          const p = m.profiles || {};
+          const name = p.display_name || p.email || 'Anónimo';
+          const isMe = m.user_id === currentUser.id;
+          return `<div class="member-item">
+            <div class="member-avatar" style="background:var(--accent)">${name.charAt(0).toUpperCase()}</div>
+            <div class="member-name">${name}</div>
+            ${isMe ? '<span class="member-you">vos</span>' : ''}
+            ${m.role === 'owner' ? '<span style="font-size:10px;color:var(--text3)">admin</span>' : ''}
+          </div>`;
+        }).join('')}
+      </div>`;
+  } catch(e) {
+    el.innerHTML = `<div style="color:var(--text3);text-align:center;padding:20px">Error al cargar miembros</div>`;
+  }
+}
+
+function showCreateGroup() {
+  const panel = document.getElementById('group-panel-join');
+  if (!panel) return;
+  panel.innerHTML = `
+    <p style="font-size:13px;color:var(--text2);margin-bottom:12px">Creá tu grupo y compartí el código con tus amigos:</p>
+    <input class="auth-input" type="text" id="create-group-name" placeholder="Nombre del grupo (ej: Los del cine)" maxlength="30" />
+    <button class="auth-btn" onclick="createGroup()">Crear grupo →</button>
+    <div style="margin-top:10px;text-align:center">
+      <a href="#" onclick="resetJoinPanel();return false" style="font-size:12px;color:var(--text3)">← Tengo un código</a>
+    </div>
+    <div class="auth-msg" id="create-group-msg"></div>`;
+  switchGroupTab('join');
+}
+
+function resetJoinPanel() {
+  const panel = document.getElementById('group-panel-join');
+  if (panel) panel.innerHTML = `
+    <p style="font-size:13px;color:var(--text2);margin-bottom:12px">Pedile el código de 6 letras a alguien del grupo:</p>
+    <input class="auth-input" type="text" id="join-code-input" placeholder="ABC123" maxlength="6" style="text-transform:uppercase;letter-spacing:4px;font-size:20px;font-weight:700" />
+    <button class="auth-btn" onclick="joinGroup()">Unirse</button>
+    <div class="auth-msg" id="join-msg"></div>`;
+}
+
+async function joinGroup() {
+  const input = document.getElementById('join-code-input');
+  if (!input) return;
+  const code = input.value.trim().toUpperCase();
+  if (code.length < 4) { showToast('Ingresá el código del grupo', 'error'); return; }
+
+  try {
+    const resp = await fetch(`${SUPABASE_URL}/rest/v1/groups?invite_code=eq.${code}&select=*`, {
+      headers: getAuthHeaders()
+    });
+    const groups = await resp.json();
+    if (!groups.length) { showToast('Código inválido — verificá con tu amigo', 'error'); return; }
+
+    const group = groups[0];
+    await fetch(`${SUPABASE_URL}/rest/v1/group_members`, {
+      method: 'POST',
+      headers: { ...getAuthHeaders(), 'Prefer': 'resolution=ignore-duplicates,return=minimal' },
+      body: JSON.stringify({ group_id: group.id, user_id: currentUser.id, role: 'member' })
+    });
+    currentGroup = group;
+    showToast(`¡Te uniste a "${group.name}"!`, 'success');
+    switchGroupTab('members');
+  } catch(e) {
+    showToast('Error al unirse al grupo', 'error');
+  }
+}
+
+async function createGroup() {
+  const nameInput = document.getElementById('create-group-name');
+  if (!nameInput) return;
+  const name = nameInput.value.trim();
+  if (!name) { showToast('Ingresá un nombre para el grupo', 'error'); return; }
+
+  const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+
+  try {
+    const resp = await fetch(`${SUPABASE_URL}/rest/v1/groups`, {
+      method: 'POST',
+      headers: { ...getAuthHeaders(), 'Prefer': 'return=representation' },
+      body: JSON.stringify({ name, invite_code: code, owner_id: currentUser.id })
+    });
+    if (!resp.ok) { showToast('Error al crear grupo', 'error'); return; }
+    const groups = await resp.json();
+    const group = Array.isArray(groups) ? groups[0] : groups;
+    if (!group?.id) { showToast('Error al crear grupo', 'error'); return; }
+
+    await fetch(`${SUPABASE_URL}/rest/v1/group_members`, {
+      method: 'POST',
+      headers: { ...getAuthHeaders(), 'Prefer': 'return=minimal' },
+      body: JSON.stringify({ group_id: group.id, user_id: currentUser.id, role: 'owner' })
+    });
+    currentGroup = group;
+    showToast(`Grupo "${name}" creado! Código: ${code}`, 'success');
+    switchGroupTab('members');
+  } catch(e) {
+    showToast('Error al crear grupo', 'error');
+  }
+}
+
+// ===================== COMPARATIVA =====================
+async function renderCompare() {
+  const container = document.getElementById('compare-content');
+  if (!container) return;
+
+  if (!currentUser) {
+    container.innerHTML = `<div class="compare-empty">Iniciá sesión para ver las comparativas con tu grupo.</div>`;
+    return;
+  }
+
+  if (!currentGroup) {
+    container.innerHTML = `
+      <div class="compare-empty">
+        <div style="font-size:40px;margin-bottom:12px">👥</div>
+        <p style="margin-bottom:16px">Todavía no estás en ningún grupo.</p>
+        <button class="btn-add" onclick="openGroupModal()">Unirme a un grupo</button>
+      </div>`;
+    return;
+  }
+
+  container.innerHTML = `<div class="compare-empty">Cargando comparativa...</div>`;
+
+  try {
+    // Get all group members
+    const respM = await fetch(
+      `${SUPABASE_URL}/rest/v1/group_members?group_id=eq.${currentGroup.id}&select=user_id,profiles(display_name,email)`,
+      { headers: getAuthHeaders() }
+    );
+    const members = await respM.json();
+    const otherMembers = members.filter(m => m.user_id !== currentUser.id);
+
+    if (!otherMembers.length) {
+      container.innerHTML = `
+        <div class="compare-empty">
+          <div style="font-size:40px;margin-bottom:12px">🎬</div>
+          <p>Todavía sos el único en el grupo.</p>
+          <p style="margin-top:8px;font-size:12px">Compartí el código <b style="color:var(--accent)">${currentGroup.invite_code}</b> con tus amigos.</p>
+        </div>`;
+      return;
+    }
+
+    // Get all watchlist items for group members
+    const memberIds = members.map(m => `"${m.user_id}"`).join(',');
+    const respW = await fetch(
+      `${SUPABASE_URL}/rest/v1/watchlist?user_id=in.(${memberIds})&select=tmdb_id,title,type,poster_path,my_rating,user_id,release_year`,
+      { headers: getAuthHeaders() }
+    );
+    const allItems = await respW.json();
+
+    // Index by tmdb_id
+    const byTmdb = {};
+    allItems.forEach(item => {
+      if (!byTmdb[item.tmdb_id]) {
+        byTmdb[item.tmdb_id] = { title: item.title, poster: item.poster_path, year: item.release_year, ratings: {}, type: item.type };
+      }
+      if (item.my_rating != null) byTmdb[item.tmdb_id].ratings[item.user_id] = item.my_rating;
+    });
+
+    const myId = currentUser.id;
+    const myName = (currentUser._profile?.display_name || currentUser.email || 'Yo').split(' ')[0];
+
+    // Only items where me + at least one other member both rated
+    const compared = Object.entries(byTmdb)
+      .filter(([, v]) => v.ratings[myId] != null && otherMembers.some(m => v.ratings[m.user_id] != null))
+      .map(([tmdb_id, v]) => {
+        const myRating = v.ratings[myId];
+        const others = otherMembers
+          .map(m => ({ name: (m.profiles?.display_name || m.profiles?.email || '?').split(' ')[0], rating: v.ratings[m.user_id] }))
+          .filter(o => o.rating != null);
+        const maxDiff = others.length ? Math.max(...others.map(o => Math.abs(myRating - o.rating))) : 0;
+        return { tmdb_id, ...v, myRating, others, maxDiff };
+      })
+      .sort((a, b) => b.maxDiff - a.maxDiff);
+
+    if (!compared.length) {
+      // Show all movies in common even if not both rated
+      const inCommon = Object.entries(byTmdb)
+        .filter(([, v]) => v.ratings[myId] != null || otherMembers.some(m => v.ratings[m.user_id] != null))
+        .length;
+      container.innerHTML = `
+        <div class="compare-empty">
+          <div style="font-size:40px;margin-bottom:12px">⭐</div>
+          <p>Hay ${inCommon} película${inCommon !== 1 ? 's' : ''} en común pero ninguna calificada por todos.</p>
+          <p style="margin-top:8px;font-size:12px;color:var(--text3)">Califiquen sus películas y acá van a aparecer las comparativas.</p>
+        </div>`;
+      return;
+    }
+
+    // Summary stats
+    const bigDiffs = compared.filter(c => c.maxDiff >= 3).length;
+    const avgDiff = (compared.reduce((s, c) => s + c.maxDiff, 0) / compared.length).toFixed(1);
+
+    container.innerHTML = `
+      <div class="compare-filter">
+        <div style="font-weight:700;font-size:15px">${compared.length} en común calificadas</div>
+        <div style="font-size:12px;color:var(--text3);margin-left:auto">${bigDiffs} con gran diferencia · Diferencia promedio: ${avgDiff}⭐</div>
+      </div>
+      <div class="compare-grid">
+        ${compared.map(item => {
+          const posterUrl = item.poster ? `https://image.tmdb.org/t/p/w200${item.poster}` : '';
+          const diffClass = item.maxDiff >= 3 ? 'big-diff' : item.maxDiff >= 2 ? 'med-diff' : '';
+          return `<div class="compare-card ${diffClass}">
+            ${posterUrl ? `<img src="${posterUrl}" alt="${item.title}" loading="lazy">` : '<div style="width:48px;height:72px;background:var(--bg3);border-radius:6px;flex-shrink:0"></div>'}
+            <div class="compare-info">
+              <div class="compare-title">${item.title}${item.year ? ` <span style="font-size:11px;color:var(--text3);font-weight:400">${item.year}</span>` : ''}</div>
+              <div class="compare-ratings">
+                <span style="font-size:12px;font-weight:700;color:var(--accent)">⭐ ${myName}: ${item.myRating}</span>
+                ${item.others.map(o => `<span style="font-size:12px;color:var(--text2)">⭐ ${o.name}: ${o.rating}</span>`).join('')}
+              </div>
+              ${item.maxDiff >= 3 ? `<div style="font-size:10px;font-weight:700;color:#e74c3c;margin-top:4px">¡Diferencia de ${item.maxDiff}⭐!</div>` : ''}
+            </div>
+          </div>`;
+        }).join('')}
+      </div>`;
+  } catch(e) {
+    container.innerHTML = `<div class="compare-empty">Error al cargar comparativa</div>`;
+  }
+}
+
 // ===================== INIT =====================
-loadItems();
+(async () => {
+  await initAuth();
+  if (currentUser) await loadItems();
+})();
 </script>
 </body>
 </html>
