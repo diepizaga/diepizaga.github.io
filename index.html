@@ -60,15 +60,72 @@
     transition: background .2s;
   }
   #nav .btn-add:hover { background: var(--accent2); }
-  #nav .search-bar {
+  /* OMNISEARCH */
+  #omnisearch-wrap {
+    position: relative; width: 320px;
+  }
+  #omnisearch-bar {
     display: flex; align-items: center; gap: 8px;
     background: var(--bg3); border: 1px solid var(--border);
-    border-radius: 4px; padding: 6px 12px; width: 220px;
+    border-radius: 4px; padding: 6px 12px; width: 100%;
+    transition: border-color .2s;
   }
-  #nav .search-bar input {
+  #omnisearch-bar:focus-within { border-color: var(--accent); }
+  #omnisearch-bar input {
     background: none; border: none; padding: 0; width: 100%; font-size: 13px;
   }
-  #nav .search-bar .icon { color: var(--text3); font-size: 14px; }
+  #omnisearch-bar .icon { color: var(--text3); font-size: 14px; flex-shrink: 0; }
+  #omnisearch-bar .clear-btn {
+    color: var(--text3); font-size: 16px; line-height: 1; cursor: pointer;
+    display: none; flex-shrink: 0;
+  }
+  #omnisearch-bar .clear-btn:hover { color: var(--text); }
+
+  #omni-dropdown {
+    position: absolute; top: calc(100% + 6px); left: 0; right: 0;
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: var(--radius); box-shadow: var(--shadow);
+    z-index: 200; display: none; max-height: 480px; overflow-y: auto;
+  }
+  #omni-dropdown.open { display: block; }
+  .omni-section-label {
+    padding: 8px 14px 4px; font-size: 11px; text-transform: uppercase;
+    letter-spacing: .6px; color: var(--text3); font-weight: 600;
+  }
+  .omni-item {
+    display: flex; gap: 10px; padding: 8px 14px;
+    align-items: center; cursor: pointer; transition: background .15s;
+  }
+  .omni-item:hover { background: var(--bg3); }
+  .omni-item img, .omni-item .omni-thumb {
+    width: 36px; height: 54px; object-fit: cover;
+    border-radius: 3px; background: var(--bg4); flex-shrink: 0;
+  }
+  .omni-item .omni-info { flex: 1; min-width: 0; }
+  .omni-item .omni-title {
+    font-size: 13px; font-weight: 600;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .omni-item .omni-meta { font-size: 11px; color: var(--text3); margin-top: 2px; }
+  .omni-item .omni-actions { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
+  .omni-item .omni-rating { color: var(--accent); font-size: 12px; white-space: nowrap; }
+  .omni-item .btn-omni-add {
+    background: var(--accent); color: #fff; border-radius: 3px;
+    padding: 4px 10px; font-size: 11px; font-weight: 600; white-space: nowrap;
+  }
+  .omni-item .btn-omni-add:hover { background: var(--accent2); }
+  .omni-item .in-list-badge {
+    font-size: 11px; color: var(--green); white-space: nowrap;
+  }
+
+  /* Quick-rate stars inside dropdown */
+  .quick-stars { display: flex; gap: 2px; }
+  .quick-stars .qs { font-size: 16px; color: var(--border); cursor: pointer; transition: color .1s; }
+  .quick-stars .qs:hover, .quick-stars .qs.on { color: var(--accent); }
+
+  .omni-divider { height: 1px; background: var(--border); margin: 4px 0; }
+  .omni-empty { padding: 20px 14px; text-align: center; color: var(--text3); font-size: 13px; }
+  .omni-spinner { padding: 16px; text-align: center; }
 
   /* MAIN */
   #main { flex: 1; overflow-y: auto; padding: 24px; }
@@ -371,11 +428,14 @@
       <div class="nav-tab" data-tab="insights">Insights</div>
     </div>
     <div class="nav-actions">
-      <div class="search-bar">
-        <span class="icon">🔍</span>
-        <input type="text" id="filter-search" placeholder="Buscar en mi lista..." />
+      <div id="omnisearch-wrap">
+        <div id="omnisearch-bar">
+          <span class="icon">🔍</span>
+          <input type="text" id="omni-input" placeholder="Buscar película o serie..." autocomplete="off" />
+          <span class="clear-btn" id="omni-clear" onclick="clearOmni()">✕</span>
+        </div>
+        <div id="omni-dropdown"></div>
       </div>
-      <button class="btn-add" onclick="openSearchModal()">+ Agregar</button>
     </div>
   </nav>
 
@@ -1187,10 +1247,188 @@ document.querySelectorAll('.nav-tab').forEach(tab => {
   });
 });
 
-document.getElementById('filter-search').addEventListener('input', e => {
-  filterSearch = e.target.value;
-  renderGrid();
+// ===================== OMNISEARCH =====================
+let omniTimeout = null;
+let omniTmdbResults = [];
+
+const omniInput = document.getElementById('omni-input');
+const omniDropdown = document.getElementById('omni-dropdown');
+const omniClear = document.getElementById('omni-clear');
+
+omniInput.addEventListener('input', e => {
+  const q = e.target.value.trim();
+  omniClear.style.display = q ? 'block' : 'none';
+  clearTimeout(omniTimeout);
+  if (!q) { closeOmni(); return; }
+  omniTimeout = setTimeout(() => runOmniSearch(q), 350);
 });
+
+omniInput.addEventListener('focus', () => {
+  if (omniInput.value.trim()) runOmniSearch(omniInput.value.trim());
+});
+
+document.addEventListener('click', e => {
+  if (!document.getElementById('omnisearch-wrap').contains(e.target)) closeOmni();
+});
+
+function closeOmni() {
+  omniDropdown.classList.remove('open');
+  omniDropdown.innerHTML = '';
+}
+
+function clearOmni() {
+  omniInput.value = '';
+  omniClear.style.display = 'none';
+  closeOmni();
+}
+
+async function runOmniSearch(q) {
+  omniDropdown.innerHTML = '<div class="omni-spinner"><div class="spinner"></div></div>';
+  omniDropdown.classList.add('open');
+
+  // Local matches (instant)
+  const localMatches = items.filter(i =>
+    i.title.toLowerCase().includes(q.toLowerCase()) ||
+    (i.original_title || '').toLowerCase().includes(q.toLowerCase())
+  ).slice(0, 4);
+
+  // TMDB search (async)
+  let tmdbResults = [];
+  try {
+    tmdbResults = await tmdbSearch(q, 'multi');
+    // Filter out items already in local list
+    omniTmdbResults = tmdbResults.filter(r =>
+      !items.find(i => i.tmdb_id === r.id && i.type === (r.media_type === 'movie' ? 'movie' : 'tv'))
+    ).slice(0, 6);
+  } catch {}
+
+  renderOmniDropdown(localMatches, omniTmdbResults, q);
+}
+
+function renderOmniDropdown(local, tmdb, q) {
+  if (!local.length && !tmdb.length) {
+    omniDropdown.innerHTML = '<div class="omni-empty">Sin resultados para "' + q + '"</div>';
+    return;
+  }
+
+  let html = '';
+
+  if (local.length) {
+    html += '<div class="omni-section-label">En tu lista</div>';
+    html += local.map(item => {
+      const poster = item.poster_path
+        ? `<img src="${TMDB_IMG}w92${item.poster_path}" alt="" />`
+        : `<div class="omni-thumb"></div>`;
+      const stars = item.my_rating
+        ? `<span class="omni-rating">${'★'.repeat(Math.round(item.my_rating/2))} ${item.my_rating}</span>`
+        : `<span class="omni-rating" style="color:var(--text3)">Sin calificar</span>`;
+      return `<div class="omni-item" onclick="openDetail('${item.id}'); clearOmni();">
+        ${poster}
+        <div class="omni-info">
+          <div class="omni-title">${item.title}</div>
+          <div class="omni-meta">${item.type === 'movie' ? '🎬' : '📺'} ${item.release_year || ''}</div>
+        </div>
+        <div class="omni-actions">${stars}</div>
+      </div>`;
+    }).join('');
+  }
+
+  if (tmdb.length) {
+    if (local.length) html += '<div class="omni-divider"></div>';
+    html += '<div class="omni-section-label">Agregar a tu lista</div>';
+    html += tmdb.map((r, idx) => {
+      const type = r.media_type === 'movie' ? 'movie' : 'tv';
+      const title = r.title || r.name;
+      const year = (r.release_date || r.first_air_date || '').slice(0, 4);
+      const poster = r.poster_path
+        ? `<img src="${TMDB_IMG}w92${r.poster_path}" alt="" />`
+        : `<div class="omni-thumb"></div>`;
+      const starsHtml = Array.from({length: 5}, (_, i) =>
+        `<span class="qs" data-idx="${idx}" data-val="${(i+1)*2}"
+          onmouseenter="hoverQuickStars(this)" onmouseleave="resetQuickStars(${idx})"
+          onclick="quickAdd(event, ${r.id}, '${type}', ${(i+1)*2})">★</span>`
+      ).join('');
+      return `<div class="omni-item" id="omni-tmdb-${idx}">
+        ${poster}
+        <div class="omni-info">
+          <div class="omni-title">${title}</div>
+          <div class="omni-meta">${type === 'movie' ? '🎬' : '📺'} ${year}</div>
+        </div>
+        <div class="omni-actions">
+          <div class="quick-stars" id="qs-${idx}">${starsHtml}</div>
+          <button class="btn-omni-add" onclick="quickAdd(event, ${r.id}, '${type}', null)">+ Agregar</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  omniDropdown.innerHTML = html;
+  omniDropdown.classList.add('open');
+}
+
+function hoverQuickStars(el) {
+  const idx = el.dataset.idx;
+  const val = parseInt(el.dataset.val);
+  document.querySelectorAll(`#qs-${idx} .qs`).forEach(s => {
+    s.classList.toggle('on', parseInt(s.dataset.val) <= val);
+  });
+}
+
+function resetQuickStars(idx) {
+  document.querySelectorAll(`#qs-${idx} .qs`).forEach(s => s.classList.remove('on'));
+}
+
+async function quickAdd(e, tmdbId, type, rating) {
+  e.stopPropagation();
+  // If no rating, open full detail modal
+  if (rating === null) {
+    closeOmni();
+    const detail = await tmdbDetail(tmdbId, type);
+    const title = detail.title || detail.name;
+    const year = (detail.release_date || detail.first_air_date || '').slice(0, 4);
+    const genres = (detail.genres || []).map(g => g.name);
+    const omdb = await omdbGetRatings(title, year);
+    pendingItem = {
+      tmdb_id: tmdbId, imdb_id: omdb.imdb_id || null, type,
+      title, original_title: detail.original_title || detail.original_name || null,
+      poster_path: detail.poster_path || null, backdrop_path: detail.backdrop_path || null,
+      overview: detail.overview || null, release_year: year ? parseInt(year) : null,
+      genres, runtime: detail.runtime || (detail.episode_run_time?.[0]) || null,
+      tmdb_rating: detail.vote_average ? parseFloat(detail.vote_average.toFixed(1)) : null,
+      imdb_rating: omdb.imdb_rating || null, rt_score: omdb.rt_score || null,
+      metacritic_score: omdb.metacritic_score || null, status: 'watched', my_rating: null
+    };
+    openDetailModal(pendingItem, false);
+    return;
+  }
+
+  // Quick add with rating — save directly
+  const btn = e.target.closest('.omni-item');
+  if (btn) btn.style.opacity = '0.5';
+  try {
+    const detail = await tmdbDetail(tmdbId, type);
+    const title = detail.title || detail.name;
+    const year = (detail.release_date || detail.first_air_date || '').slice(0, 4);
+    const omdb = await omdbGetRatings(title, year);
+    await saveItem({
+      tmdb_id: tmdbId, imdb_id: omdb.imdb_id || null, type,
+      title, original_title: detail.original_title || detail.original_name || null,
+      poster_path: detail.poster_path || null, backdrop_path: detail.backdrop_path || null,
+      overview: detail.overview || null, release_year: year ? parseInt(year) : null,
+      genres: (detail.genres || []).map(g => g.name),
+      runtime: detail.runtime || (detail.episode_run_time?.[0]) || null,
+      tmdb_rating: detail.vote_average ? parseFloat(detail.vote_average.toFixed(1)) : null,
+      imdb_rating: omdb.imdb_rating || null, rt_score: omdb.rt_score || null,
+      metacritic_score: omdb.metacritic_score || null,
+      status: 'watched', my_rating: rating
+    });
+    clearOmni();
+    showToast(`✓ ${title} agregada (${rating}/10)`, 'success');
+  } catch(err) {
+    showToast('Error: ' + err.message, 'error');
+    if (btn) btn.style.opacity = '1';
+  }
+}
 
 document.getElementById('filter-sort').addEventListener('change', e => {
   filterSort = e.target.value;
