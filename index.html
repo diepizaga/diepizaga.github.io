@@ -599,7 +599,7 @@ select option { background: var(--bg-2); color: var(--t-1); }
 .insight-sub { font-size: 12.5px; color: var(--t-2); margin-top: 5px; }
 
 /* ── ADN ─────────────────────────────────────────────────── */
-#pane-adn { padding: 40px 28px; max-width: 800px; }
+#pane-adn { padding: 40px 28px 60px; max-width: 900px; }
 
 .adn-header { margin-bottom: 48px; }
 .adn-eyebrow { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--gold); margin-bottom: 12px; }
@@ -1016,7 +1016,7 @@ select option { background: var(--bg-2); color: var(--t-1); }
 <body>
 
 <!-- AUTH -->
-<div id="auth-screen" style="display:none!important">
+<div id="auth-screen">
   <div class="auth-card">
     <span class="auth-logo">Archivo</span>
     <div class="auth-sub">Tu archivo cultural</div>
@@ -1474,7 +1474,7 @@ function renderInicio() {
   const _rated = items.filter(i=>i.my_rating);
   const _avg = _rated.length ? (_rated.reduce((s,i)=>s+parseFloat(i.my_rating),0)/_rated.length).toFixed(1) : null;
   const _totalMins = items.filter(i=>i.runtime&&i.type!=='book').reduce((s,i)=>s+(parseInt(i.runtime)||0),0);
-  const _horas = _totalMins>=60 ? Math.round(_totalMins/60)+'h' : (_totalMins>0?_totalMins+'m':'—');
+  const _horas = _totalMins>=60 ? Math.round(_totalMins/60).toLocaleString() : (_totalMins>0?_totalMins+'m':'—');
   const _last = items[0];
   const _lastDate = _last?.created_at ? new Date(_last.created_at) : null;
   const _daysAgo = _lastDate ? Math.floor((Date.now()-_lastDate)/864e5) : null;
@@ -2579,19 +2579,51 @@ function clearOmni() { omniInput.value=''; omniClear.style.display='none'; close
 async function runOmniSearch(q) {
   omniDrop.innerHTML='<div style="padding:16px;text-align:center"><div class="spinner"></div></div>';
   omniDrop.classList.add('open');
-  const isBookTab = currentTab==='biblioteca' && libType==='book';
-  const localMatches = items.filter(i=>{
-    const mt = isBookTab?i.type==='book':true;
-    return mt&&(i.title.toLowerCase().includes(q.toLowerCase())||(i.original_title||'').toLowerCase().includes(q.toLowerCase())||(i.author||'').toLowerCase().includes(q.toLowerCase()));
-  }).slice(0,4);
+  const localMatches = items.filter(i=>(i.title.toLowerCase().includes(q.toLowerCase())||(i.original_title||'').toLowerCase().includes(q.toLowerCase())||(i.author||'').toLowerCase().includes(q.toLowerCase()))).slice(0,4);
 
-  if (isBookTab) {
-    let br=[]; try{br=await booksSearch(q);}catch{}
-    renderOmniBooks(localMatches,br,q);
-  } else {
-    let tr=[]; try{const res=await tmdbSearch(q,'multi');tr=res.map(r=>({...r,_type:r.media_type==='movie'?'movie':r.media_type==='tv'?'tv':'movie'})).slice(0,8);}catch{}
-    renderOmniDropdown(localMatches,tr,q);
+  let tr=[], br=[];
+  await Promise.all([
+    (async()=>{try{const res=await tmdbSearch(q,'multi');tr=res.map(r=>({...r,_type:r.media_type==='movie'?'movie':r.media_type==='tv'?'tv':'movie'})).slice(0,6);}catch{}})(),
+    (async()=>{try{br=await booksSearch(q);}catch{}})()
+  ]);
+  renderOmniAll(localMatches,tr,br,q);
+}
+
+function renderOmniAll(local,tmdb,books,q) {
+  const tmdbToAdd=tmdb.filter(r=>!items.find(i=>i.tmdb_id===r.id&&i.type===r._type));
+  const booksToAdd=books.filter(b=>!items.find(i=>i.google_books_id===b.id)).slice(0,4);
+  if(!local.length&&!tmdbToAdd.length&&!booksToAdd.length){omniDrop.innerHTML=`<div class="omni-empty">Sin resultados para "${q}"</div>`;return;}
+  let html='',idx=0,bidx=0;
+  if(local.length){
+    html+='<div class="omni-section-lbl">En tu lista</div>';
+    html+=local.map(item=>{
+      const isB=item.type==='book';
+      const thumb=isB?(item.poster_path?`<img src="${item.poster_path}" alt="" style="width:30px;height:44px;object-fit:cover;border-radius:3px">`:`<div style="width:30px;height:44px;background:${bookColor(item.title)};border-radius:3px;flex-shrink:0"></div>`):(item.poster_path?`<img src="${TMDB_IMG}w92${item.poster_path}" alt="">`:`<div class="omni-thumb"></div>`);
+      const meta=isB?(item.author||''):(item.type==='movie'?'Película':'Serie')+' · '+(item.release_year||'');
+      const rating=item.my_rating?`<span class="omni-rating">${item.my_rating}</span>`:`<span class="omni-rating" style="color:var(--t-4)">—</span>`;
+      return `<div class="omni-item" onclick="openDetail('${item.id}');clearOmni()">${thumb}<div class="omni-info"><div class="omni-title">${item.title}</div><div class="omni-meta">${meta}</div></div><div class="omni-actions">${rating}</div></div>`;
+    }).join('');
   }
+  if(tmdbToAdd.length){
+    if(local.length)html+='<div class="omni-divider"></div>';
+    html+='<div class="omni-section-lbl">Películas y Series</div>';
+    html+=tmdbToAdd.map(r=>{
+      const i=idx++,type=r._type,title=r.title||r.name,year=(r.release_date||r.first_air_date||'').slice(0,4);
+      const poster=r.poster_path?`<img src="${TMDB_IMG}w92${r.poster_path}" alt="">`:`<div class="omni-thumb"></div>`;
+      const stars=Array.from({length:5},(_,si)=>`<span class="qs" data-idx="${i}" data-val="${(si+1)*2}" onmouseenter="hvrQS(this)" onmouseleave="rstQS(${i})" onclick="qAdd(event,${r.id},'${type}',${(si+1)*2})">★</span>`).join('');
+      return `<div class="omni-item" id="otmdb-${i}">${poster}<div class="omni-info"><div class="omni-title">${title}</div><div class="omni-meta">${type==='movie'?'Película':'Serie'} · ${year}</div></div><div class="omni-actions"><div class="quick-stars" id="qs-${i}">${stars}</div><button class="omni-add-btn" onclick="qAdd(event,${r.id},'${type}',null)">Agregar</button></div></div>`;
+    }).join('');
+  }
+  if(booksToAdd.length){
+    html+='<div class="omni-divider"></div><div class="omni-section-lbl">Libros</div>';
+    html+=booksToAdd.map(b=>{
+      const bi=bidx++,col=bookColor(b.title);
+      const cover=b.cover?`<img src="${b.cover}" alt="" style="width:30px;height:44px;object-fit:cover;border-radius:3px">`:`<div style="width:30px;height:44px;background:${col};border-radius:3px;flex-shrink:0"></div>`;
+      const stars=Array.from({length:5},(_,si)=>`<span class="qs" data-idx="b${bi}" data-val="${(si+1)*2}" onmouseenter="hvrQS(this)" onmouseleave="rstQS('b${bi}')" onclick="qAddB(event,'${b.id}',${(si+1)*2})">★</span>`).join('');
+      return `<div class="omni-item" id="obook-${bi}">${cover}<div class="omni-info"><div class="omni-title">${b.title}</div><div class="omni-meta">${b.author||''}</div></div><div class="omni-actions"><div class="quick-stars" id="qs-b${bi}">${stars}</div><button class="omni-add-btn" onclick="qAddB(event,'${b.id}',null)">Agregar</button></div></div>`;
+    }).join('');
+  }
+  omniDrop.innerHTML=html; omniDrop.classList.add('open');
 }
 
 function renderOmniDropdown(local,tmdb,q) {
