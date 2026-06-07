@@ -948,10 +948,11 @@ select option { background: var(--bg-2); color: var(--t-1); }
 #mobile-nav {
   display: none; position: fixed; bottom: 0; left: 0; right: 0; z-index: 150;
   background: rgba(11,11,11,.97); backdrop-filter: blur(32px);
-  border-top: 1px solid var(--b-1); height: var(--mob-nav);
+  border-top: 1px solid var(--b-1);
+  height: calc(var(--mob-nav) + env(safe-area-inset-bottom, 0px));
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
-#mobile-nav-inner { display: flex; height: 100%; align-items: stretch; position: relative; }
+#mobile-nav-inner { display: flex; height: var(--mob-nav); align-items: stretch; position: relative; }
 
 .mn-tab {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -1004,11 +1005,11 @@ select option { background: var(--bg-2); color: var(--t-1); }
   .btn-add-nav { display: none; }
   #omnisearch-wrap { order: 3; flex: 0 0 100%; max-width: none; }
   #mobile-nav { display: flex; }
-  #app { padding-top: calc(56px + 38px); }
-  #pane-inicio { padding-bottom: calc(var(--mob-nav) + 12px); }
-  #pane-biblioteca { padding: 16px 14px calc(var(--mob-nav) + 24px); }
-  #pane-adn { padding: 24px 14px calc(var(--mob-nav) + 24px); }
-  #pane-descubri { padding: 16px 14px calc(var(--mob-nav) + 24px); }
+  #app { padding-top: var(--top-nav-h, 94px); }
+  #pane-inicio { padding-bottom: calc(var(--mob-nav) + env(safe-area-inset-bottom,0px) + 12px); }
+  #pane-biblioteca { padding: 16px 14px calc(var(--mob-nav) + env(safe-area-inset-bottom,0px) + 24px); }
+  #pane-adn { padding: 24px 14px calc(var(--mob-nav) + env(safe-area-inset-bottom,0px) + 24px); }
+  #pane-descubri { padding: 16px 14px calc(var(--mob-nav) + env(safe-area-inset-bottom,0px) + 24px); }
   .inicio-body { padding: 20px 14px; }
   .hero-body { padding: 20px 16px 20px; }
   .hero-actions { display: none; }
@@ -3268,6 +3269,21 @@ const dropArea = document.getElementById('import-drop');
 dropArea.addEventListener('dragover',e=>{e.preventDefault();dropArea.style.borderColor='var(--gold)';});
 dropArea.addEventListener('dragleave',()=>{dropArea.style.borderColor='';});
 dropArea.addEventListener('drop',e=>{e.preventDefault();dropArea.style.borderColor='';const file=e.dataTransfer.files[0];if(file){const dt=new DataTransfer();dt.items.add(file);document.getElementById('import-file').files=dt.files;handleImportFile({target:{files:[file]}});}});
+
+// ============================================================
+// ============================================================
+// MOBILE NAV HEIGHT — mide el nav real y ajusta el padding del app
+// ============================================================
+function fixMobileLayout() {
+  if (window.innerWidth > 760) return;
+  const nav = document.getElementById('nav');
+  if (!nav) return;
+  const h = nav.getBoundingClientRect().height;
+  document.documentElement.style.setProperty('--top-nav-h', h + 'px');
+}
+window.addEventListener('DOMContentLoaded', fixMobileLayout);
+window.addEventListener('resize', fixMobileLayout);
+setTimeout(fixMobileLayout, 200); // fonts/layout settled
 
 // ============================================================
 // INIT
