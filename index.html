@@ -2791,15 +2791,29 @@ async function initAuth() {
   else document.getElementById('auth-screen').classList.add('visible');
 }
 
+function hideAuthScreen(){const as=document.getElementById('auth-screen');as.classList.remove('visible');as.style.display='';}
 async function onSignedIn(){
-  document.getElementById('auth-screen').classList.remove('visible');
+  hideAuthScreen();
   const profile=await loadProfile();
   if(profile){currentUser._profile=profile;updateUserAvatar(profile);}
   await claimNullItems();
 }
 
 async function loadProfile(){
-  try{const r=await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${currentUser.id}&select=*`,{headers:getAuthHeaders()});if(!r.ok)return null;const d=await r.json();if(d.length>0)return d[0];document.getElementById('auth-screen').classList.add('visible');showAuthStep('profile');return null;}catch{return null;}
+  try{
+    const r=await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${currentUser.id}&select=*`,{headers:getAuthHeaders()});
+    if(!r.ok)return null;
+    const d=await r.json();
+    if(d.length>0)return d[0];
+    // No profile found: show profile creation only on first sign-up, not on re-login
+    // Use email-based fallback to avoid blocking access
+    const fallback={display_name:currentUser.email?.split('@')[0]||'Usuario',email:currentUser.email};
+    currentUser._profile=fallback;
+    updateUserAvatar(fallback);
+    // Try to create the profile silently
+    fetch(`${SUPABASE_URL}/rest/v1/profiles`,{method:'POST',headers:{...getAuthHeaders(),'Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({id:currentUser.id,...fallback})}).catch(()=>{});
+    return fallback;
+  }catch{return null;}
 }
 
 async function claimNullItems(){try{await fetch(`${SUPABASE_URL}/rest/v1/watchlist?user_id=is.null`,{method:'PATCH',headers:{...getAuthHeaders(),'Prefer':'return=minimal'},body:JSON.stringify({user_id:currentUser.id})});}catch{}}
@@ -2922,7 +2936,7 @@ async function sendMagicLink() { handleAuth(); } // legacy alias
 async function createProfile(){
   const name=document.getElementById('auth-username').value.trim();
   if(!name){showToast('Ingresá tu nombre','error');return;}
-  try{await fetch(`${SUPABASE_URL}/rest/v1/profiles`,{method:'POST',headers:{...getAuthHeaders(),'Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({id:currentUser.id,display_name:name,email:currentUser.email})});currentUser._profile={display_name:name,email:currentUser.email};updateUserAvatar(currentUser._profile);document.getElementById('auth-screen').classList.remove('visible');await claimNullItems();await loadItems();showToast(`Bienvenido, ${name}`,'success');}
+  try{await fetch(`${SUPABASE_URL}/rest/v1/profiles`,{method:'POST',headers:{...getAuthHeaders(),'Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({id:currentUser.id,display_name:name,email:currentUser.email})});currentUser._profile={display_name:name,email:currentUser.email};updateUserAvatar(currentUser._profile);hideAuthScreen();await claimNullItems();await loadItems();showToast(`Bienvenido, ${name}`,'success');}
   catch{showToast('Error al guardar perfil','error');}
 }
 
