@@ -9,26 +9,27 @@
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400;1,600&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
 <style>
 :root {
-  --bg-0: #0C0A08;
-  --bg-1: #131109;
-  --bg-2: #1B1813;
-  --bg-3: #23211C;
-  --bg-4: #2E2B25;
+  --bg-0: #0B0B0B;
+  --bg-1: #111111;
+  --bg-2: #171717;
+  --bg-3: #1E1E1E;
+  --bg-4: #252525;
 
-  --t-1: #EAE3D8;
-  --t-2: #A09588;
-  --t-3: #5E5850;
-  --t-4: #3A3630;
+  --t-1: #F3F0EA;
+  --t-2: #9A948A;
+  --t-3: #5A5450;
+  --t-4: #332F2C;
 
-  --gold:  #E8A030;
-  --gold2: #C88820;
+  --gold:  #B88646;
+  --gold2: #9A6E30;
+  --accent2: #6F7C8C;
   --green: #3DD494;
   --red:   #E05858;
   --blue:  #5AA8F8;
 
-  --b-1: rgba(255,255,255,.08);
-  --b-2: rgba(255,255,255,.15);
-  --b-3: rgba(255,255,255,.26);
+  --b-1: rgba(255,255,255,.07);
+  --b-2: rgba(255,255,255,.13);
+  --b-3: rgba(255,255,255,.22);
 
   --r-sm: 6px;
   --r-md: 10px;
@@ -63,8 +64,8 @@ input, select, textarea {
   -webkit-appearance: none; appearance: none;
 }
 input:focus, select:focus, textarea:focus {
-  border-color: rgba(232,160,48,.5);
-  box-shadow: 0 0 0 3px rgba(232,160,48,.07);
+  border-color: rgba(184,134,70,.5);
+  box-shadow: 0 0 0 3px rgba(184,134,70,.07);
 }
 input::placeholder { color: var(--t-4); }
 select option { background: var(--bg-2); color: var(--t-1); }
@@ -75,7 +76,7 @@ select option { background: var(--bg-2); color: var(--t-1); }
 /* ── NAV ────────────────────────────────────────────────── */
 #nav {
   position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-  background: rgba(12,10,8,.92);
+  background: rgba(11,11,11,.94);
   backdrop-filter: blur(32px) saturate(180%);
   -webkit-backdrop-filter: blur(32px) saturate(180%);
   border-bottom: 1px solid var(--b-1);
@@ -115,8 +116,8 @@ select option { background: var(--bg-2); color: var(--t-1); }
   transition: all .2s;
 }
 #omnisearch-bar:focus-within {
-  border-color: rgba(232,160,48,.4); background: var(--bg-3);
-  box-shadow: 0 0 0 3px rgba(232,160,48,.06);
+  border-color: rgba(184,134,70,.4); background: var(--bg-3);
+  box-shadow: 0 0 0 3px rgba(184,134,70,.06);
 }
 #omnisearch-bar .s-icon { color: var(--t-3); flex-shrink: 0; display: block; }
 #omnisearch-bar input { background: none; border: none; padding: 0; width: 100%; font-size: 13px; }
@@ -220,10 +221,10 @@ select option { background: var(--bg-2); color: var(--t-1); }
 .hero-overlay {
   position: absolute; inset: 0;
   background: linear-gradient(to bottom,
-    rgba(12,10,8,.25) 0%,
-    rgba(12,10,8,.0)  22%,
-    rgba(12,10,8,.6)  56%,
-    rgba(12,10,8,1)   85%);
+    rgba(11,11,11,.25) 0%,
+    rgba(11,11,11,.0)  22%,
+    rgba(11,11,11,.65) 56%,
+    rgba(11,11,11,1)   85%);
 }
 .hero-body {
   position: absolute; bottom: 0; left: 0; right: 0;
@@ -249,6 +250,79 @@ select option { background: var(--bg-2); color: var(--t-1); }
 
 /* Inicio sections */
 .inicio-body { padding: 32px 28px; }
+
+/* Metrics bar */
+.archivo-metrics {
+  display: grid; grid-template-columns: repeat(4,1fr);
+  background: var(--bg-1); border-bottom: 1px solid var(--b-1);
+  max-height: 120px; overflow: hidden;
+}
+.am-item {
+  padding: 16px 20px; border-right: 1px solid var(--b-1);
+  display: flex; flex-direction: column; justify-content: center;
+}
+.am-item:last-child { border-right: none; }
+.am-val { font-size: 24px; font-weight: 800; color: var(--t-1); letter-spacing: -1px; line-height: 1; font-variant-numeric: tabular-nums; }
+.am-lbl { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.2px; color: var(--t-3); margin-top: 6px; }
+
+/* Carousel */
+.carousel-wrap { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+.carousel-wrap::-webkit-scrollbar { display: none; }
+.car-card {
+  flex-shrink: 0; width: 72px; cursor: pointer;
+  transition: transform .2s var(--ease-out);
+}
+.car-card:hover { transform: translateY(-3px); }
+.car-card img, .car-card .car-ph {
+  width: 72px; aspect-ratio: 2/3; object-fit: cover;
+  border-radius: var(--r-sm); background: var(--bg-3); display: block;
+}
+.car-card .car-ph { display: flex; align-items: center; justify-content: center; font-family: var(--serif); font-style: italic; font-size: 22px; color: rgba(255,255,255,.2); }
+.car-title { font-size: 9.5px; color: var(--t-2); margin-top: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; }
+
+/* Week summary */
+.week-strip { display: flex; gap: 12px; flex-wrap: wrap; }
+.week-item { display: flex; align-items: center; gap: 8px; background: var(--bg-1); border: 1px solid var(--b-1); border-radius: var(--r-sm); padding: 8px 12px; }
+.week-num { font-size: 18px; font-weight: 800; color: var(--t-1); letter-spacing: -1px; font-variant-numeric: tabular-nums; }
+.week-type { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .8px; color: var(--t-3); }
+
+/* ADN profile block */
+.adn-profile-block {
+  background: var(--bg-2); border: 1px solid var(--b-1);
+  border-radius: var(--r-lg); padding: 24px; margin-bottom: 24px;
+}
+.adn-profile-archetype {
+  font-family: var(--serif); font-style: italic;
+  font-size: clamp(22px, 4vw, 32px); font-weight: 400;
+  color: var(--t-1); margin-bottom: 12px; line-height: 1.2;
+}
+.adn-profile-desc { font-size: 13.5px; color: var(--t-2); line-height: 1.7; }
+
+/* ADN criterio */
+.criterio-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 1px; background: var(--b-1); border: 1px solid var(--b-1); border-radius: var(--r-md); overflow: hidden; margin-bottom: 16px; }
+.criterio-item { background: var(--bg-1); padding: 16px; text-align: center; }
+.criterio-val { font-size: 22px; font-weight: 800; letter-spacing: -1px; }
+.criterio-lbl { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--t-3); margin-top: 4px; }
+.criterio-diff { font-size: 10.5px; font-weight: 700; margin-top: 2px; }
+
+.coincidencia-row { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--b-1); }
+.coincidencia-row:last-child { border-bottom: none; }
+.coinc-src { font-size: 11.5px; color: var(--t-2); width: 56px; flex-shrink: 0; }
+.coinc-bar-track { flex: 1; background: var(--bg-3); border-radius: 2px; height: 4px; overflow: hidden; }
+.coinc-bar-fill { height: 100%; border-radius: 2px; transition: width .7s var(--ease-out); }
+.coinc-pct { font-size: 12px; font-weight: 700; color: var(--t-1); width: 36px; text-align: right; flex-shrink: 0; }
+
+/* Ratings comparison bar in detail */
+.rating-compare { margin-bottom: 16px; }
+.rc-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.rc-label { font-size: 10.5px; color: var(--t-2); width: 72px; flex-shrink: 0; font-weight: 600; }
+.rc-track { flex: 1; background: var(--bg-3); border-radius: 2px; height: 5px; overflow: hidden; }
+.rc-fill  { height: 100%; border-radius: 2px; transition: width .6s var(--ease-out); }
+.rc-val   { font-size: 12px; font-weight: 800; width: 32px; text-align: right; flex-shrink: 0; }
+.rc-mine  { background: var(--gold); }
+.rc-imdb  { background: #C4953A; }
+.rc-rt    { background: #C0392B; }
+.rc-tmdb  { background: var(--accent2); }
 
 .sec-label {
   font-size: 9.5px; font-weight: 700; text-transform: uppercase;
@@ -339,7 +413,7 @@ select option { background: var(--bg-2); color: var(--t-1); }
   transition: all .15s; flex-shrink: 0; white-space: nowrap;
 }
 .filter-toggle-btn:hover { border-color: var(--b-2); color: var(--t-1); }
-.filter-toggle-btn.active { border-color: var(--gold); color: var(--gold); background: rgba(232,160,48,.06); }
+.filter-toggle-btn.active { border-color: var(--gold); color: var(--gold); background: rgba(184,134,70,.06); }
 
 .filter-chip {
   padding: 7px 13px; border-radius: var(--r-sm);
@@ -379,15 +453,15 @@ select option { background: var(--bg-2); color: var(--t-1); }
   padding: 6px 10px;
   transition: all .2s;
 }
-.search-inline:focus-within { border-color: rgba(232,160,48,.4); background: var(--bg-2); }
+.search-inline:focus-within { border-color: rgba(184,134,70,.4); background: var(--bg-2); }
 .search-inline svg { color: var(--t-3); flex-shrink: 0; display: block; }
 .search-inline input { background: none; border: none; padding: 0; font-size: 12.5px; width: 100%; }
 
 /* Biblioteca grid */
 #bib-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  gap: 12px;
 }
 
 /* Biblioteca list */
@@ -551,7 +625,7 @@ select option { background: var(--bg-2); color: var(--t-1); }
   font-size: 12.5px; font-weight: 500; color: var(--t-2);
   cursor: pointer; transition: all .15s;
 }
-.disc-pill.active { background: var(--gold); color: #000; border-color: var(--gold); font-weight: 700; }
+.disc-pill.active { background: var(--bg-3); color: var(--t-1); border-color: var(--gold); font-weight: 700; }
 .disc-pill:hover:not(.active) { border-color: var(--b-2); color: var(--t-1); }
 
 .disc-section { margin-bottom: 40px; }
@@ -611,17 +685,17 @@ select option { background: var(--bg-2); color: var(--t-1); }
 
 /* ── MODALS ──────────────────────────────────────────────── */
 .modal-overlay {
-  position: fixed; inset: 0; background: rgba(0,0,0,.82);
+  position: fixed; inset: 0; background: rgba(0,0,0,.78);
   z-index: 200; display: flex; align-items: flex-start;
   justify-content: center; padding: 24px 20px;
   overflow-y: auto; opacity: 0; pointer-events: none;
   transition: opacity .2s;
-  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
 }
 .modal-overlay.open { opacity: 1; pointer-events: all; }
 .modal {
   background: var(--bg-1); border-radius: var(--r-xl);
-  width: 100%; max-width: 680px; overflow: hidden;
+  width: 100%; max-width: 920px; overflow: hidden;
   transform: translateY(24px) scale(.978);
   transition: transform .28s var(--ease-spring);
   position: relative; margin: auto;
@@ -645,8 +719,8 @@ select option { background: var(--bg-2); color: var(--t-1); }
   padding: 4px 12px; border-radius: 99px; font-size: 11.5px; font-weight: 600;
   border: 1px solid var(--b-2); color: var(--t-2); cursor: pointer; transition: all .15s;
 }
-.ms-type-btn.active { background: var(--gold); border-color: var(--gold); color: #000; }
-.ms-type-btn:hover:not(.active) { border-color: var(--gold); color: var(--gold); }
+.ms-type-btn.active { background: var(--bg-3); border-color: var(--gold); color: var(--t-1); }
+.ms-type-btn:hover:not(.active) { border-color: var(--b-2); color: var(--t-1); }
 #ms-input { width: 100%; padding: 11px 14px; font-size: 14px; border-radius: var(--r-sm); }
 #ms-results { padding: 0 12px 18px; max-height: 400px; overflow-y: auto; }
 .ms-result { display: flex; gap: 12px; padding: 9px 8px; border-radius: var(--r-sm); cursor: pointer; transition: background .1s; align-items: flex-start; }
@@ -663,7 +737,7 @@ select option { background: var(--bg-2); color: var(--t-1); }
 #modal-detail .modal-backdrop { width: 100%; height: 260px; object-fit: cover; object-position: center 20%; display: block; }
 #detail-content::after {
   content: ''; position: absolute; left: 0; right: 0; top: 0; height: 260px;
-  background: linear-gradient(to bottom, rgba(12,10,8,.2) 0%, transparent 25%, rgba(19,17,9,.8) 65%, rgba(19,17,9,1) 100%);
+  background: linear-gradient(to bottom, rgba(11,11,11,.2) 0%, transparent 25%, rgba(17,17,17,.85) 65%, rgba(17,17,17,1) 100%);
   pointer-events: none; z-index: 1;
 }
 #modal-detail .modal-backdrop-placeholder { width: 100%; height: 260px; background: linear-gradient(135deg, var(--bg-2) 0%, var(--bg-3) 100%); }
@@ -674,7 +748,7 @@ select option { background: var(--bg-2); color: var(--t-1); }
 #modal-detail .detail-title { font-family: var(--serif); font-style: italic; font-size: 22px; font-weight: 400; line-height: 1.15; color: var(--t-1); }
 #modal-detail .detail-meta  { font-size: 11.5px; color: var(--t-2); margin-top: 6px; font-weight: 500; }
 #modal-detail .detail-genres { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 8px; }
-#modal-detail .genre-tag { padding: 3px 10px; border-radius: 99px; font-size: 10.5px; background: rgba(232,160,48,.1); border: 1px solid rgba(232,160,48,.2); color: var(--gold); font-weight: 600; }
+#modal-detail .genre-tag { padding: 3px 10px; border-radius: 99px; font-size: 10.5px; background: rgba(111,124,140,.1); border: 1px solid rgba(111,124,140,.22); color: var(--accent2); font-weight: 600; }
 #modal-detail .detail-overview { font-size: 12.5px; color: var(--t-2); line-height: 1.7; margin-bottom: 20px; }
 
 .ratings-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-bottom: 18px; }
@@ -682,12 +756,13 @@ select option { background: var(--bg-2); color: var(--t-1); }
 .rating-box:hover { border-color: var(--b-2); }
 .rating-box .rb-val { font-size: 19px; font-weight: 800; letter-spacing: -.5px; }
 .rating-box .rb-src { font-size: 9.5px; color: var(--t-2); margin-top: 4px; text-transform: uppercase; letter-spacing: .8px; font-weight: 700; }
-.rb-imdb { color: var(--gold); }
-.rb-rt   { color: var(--red); }
-.rb-mc   { color: var(--blue); }
+.rb-imdb { color: #C4953A; }
+.rb-rt   { color: #C0392B; }
+.rb-mc   { color: var(--accent2); }
+.rb-tmdb { color: var(--accent2); }
 
-.my-rating-section { margin-bottom: 18px; padding: 14px; background: rgba(232,160,48,.05); border-radius: var(--r-sm); border: 1px solid rgba(232,160,48,.13); }
-.my-rating-section label { font-size: 9.5px; color: var(--gold); display: block; margin-bottom: 9px; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; }
+.my-rating-section { margin-bottom: 16px; padding: 16px; background: rgba(184,134,70,.04); border-radius: var(--r-sm); border: 1px solid rgba(184,134,70,.1); }
+.my-rating-section label { font-size: 9px; color: var(--t-2); display: block; margin-bottom: 9px; text-transform: uppercase; letter-spacing: 1.2px; font-weight: 700; }
 .star-input { display: flex; gap: 2px; }
 .star-input .star { font-size: 24px; cursor: pointer; color: var(--bg-4); transition: color .1s, transform .1s; }
 .star-input .star:hover, .star-input .star.active { color: var(--gold); transform: scale(1.15); }
@@ -714,7 +789,7 @@ select option { background: var(--bg-2); color: var(--t-1); }
 #modal-group p  { font-size: 12.5px; color: var(--t-2); margin-bottom: 16px; }
 .group-tabs { display: flex; gap: 5px; margin-bottom: 16px; }
 .group-tab  { flex: 1; padding: 7px; border-radius: var(--r-sm); font-size: 12.5px; font-weight: 600; text-align: center; cursor: pointer; border: 1px solid var(--b-2); color: var(--t-2); transition: all .15s; }
-.group-tab.active { background: var(--gold); color: #000; border-color: var(--gold); }
+.group-tab.active { background: var(--bg-3); color: var(--t-1); border-color: var(--gold); }
 .group-panel { display: none; }
 .group-panel.active { display: block; }
 .member-list { display: flex; flex-direction: column; gap: 7px; margin-bottom: 14px; }
@@ -754,7 +829,7 @@ select option { background: var(--bg-2); color: var(--t-1); }
 .auth-step h2 { font-size: 17px; font-weight: 700; margin-bottom: 5px; }
 .auth-step p  { font-size: 12.5px; color: var(--t-3); margin-bottom: 18px; line-height: 1.5; }
 .auth-input { width: 100%; padding: 11px 16px; font-size: 14.5px; border-radius: var(--r-sm); border: 1px solid var(--b-2); background: var(--bg-2); margin-bottom: 10px; text-align: center; }
-.auth-input:focus { border-color: rgba(232,160,48,.5); background: var(--bg-3); box-shadow: 0 0 0 3px rgba(232,160,48,.07); }
+.auth-input:focus { border-color: rgba(184,134,70,.5); background: var(--bg-3); box-shadow: 0 0 0 3px rgba(184,134,70,.07); }
 .auth-btn { width: 100%; padding: 12px; background: var(--gold); color: #000; border-radius: var(--r-sm); font-size: 14px; font-weight: 700; cursor: pointer; border: none; transition: background .15s; margin-bottom: 9px; }
 .auth-btn:hover { background: var(--gold2); }
 .auth-btn:disabled { opacity: .6; cursor: not-allowed; }
@@ -785,7 +860,7 @@ select option { background: var(--bg-2); color: var(--t-1); }
 /* Mobile nav */
 #mobile-nav {
   display: none; position: fixed; bottom: 0; left: 0; right: 0; z-index: 150;
-  background: rgba(12,10,8,.97); backdrop-filter: blur(32px);
+  background: rgba(11,11,11,.97); backdrop-filter: blur(32px);
   border-top: 1px solid var(--b-1); height: var(--mob-nav);
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
@@ -845,7 +920,9 @@ select option { background: var(--bg-2); color: var(--t-1); }
   .inicio-body { padding: 20px 14px; }
   .hero-body { padding: 20px 16px 20px; }
   .hero-actions { display: none; }
-  #bib-grid { grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  #bib-grid { grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .archivo-metrics { grid-template-columns: repeat(2,1fr); max-height: none; }
+  .criterio-grid { grid-template-columns: repeat(2,1fr); }
   .recs-grid { grid-template-columns: repeat(2,1fr); gap: 10px; }
   .adn-facts { grid-template-columns: 1fr 1fr; }
   .modal-overlay { padding: 0; align-items: flex-end; }
@@ -863,7 +940,8 @@ select option { background: var(--bg-2); color: var(--t-1); }
   #toast { bottom: calc(var(--mob-nav) + 8px); right: 12px; left: 12px; max-width: none; text-align: center; }
 }
 @media (max-width: 480px) {
-  #bib-grid { grid-template-columns: repeat(2,1fr); }
+  #bib-grid { grid-template-columns: repeat(3,1fr); }
+  .archivo-metrics { grid-template-columns: 1fr 1fr; }
   .adn-facts { grid-template-columns: 1fr; }
 }
 </style>
@@ -969,6 +1047,12 @@ select option { background: var(--bg-2); color: var(--t-1); }
 
   <!-- INICIO -->
   <div class="pane active" id="pane-inicio">
+    <div id="archivo-metrics" class="archivo-metrics" style="display:none">
+      <div class="am-item"><div class="am-val" id="am-obras">—</div><div class="am-lbl">Obras registradas</div></div>
+      <div class="am-item"><div class="am-val" id="am-horas">—</div><div class="am-lbl">Horas consumidas</div></div>
+      <div class="am-item"><div class="am-val" id="am-promedio">—</div><div class="am-lbl">Promedio personal</div></div>
+      <div class="am-item"><div class="am-val" id="am-ultima">—</div><div class="am-lbl">Última actividad</div></div>
+    </div>
     <div id="hero-wrap" class="hero-wrap">
       <div id="hero-bg" class="hero-bg"></div>
       <div class="hero-overlay"></div>
@@ -986,6 +1070,8 @@ select option { background: var(--bg-2); color: var(--t-1); }
       </div>
     </div>
     <div class="inicio-body">
+      <div id="inicio-carousel" class="inicio-sec"></div>
+      <div id="inicio-week" class="inicio-sec"></div>
       <div id="inicio-progress" class="inicio-sec"></div>
       <div id="inicio-recent" class="inicio-sec"></div>
       <div id="inicio-recs" class="inicio-sec"></div>
@@ -1319,6 +1405,25 @@ function renderAll() {
 // ============================================================
 function renderInicio() {
   const watched = items.filter(i => i.status !== 'watchlist');
+
+  // Metrics bar
+  const metricsEl = document.getElementById('archivo-metrics');
+  if (items.length > 0) {
+    metricsEl.style.display = 'grid';
+    const rated = items.filter(i=>i.my_rating);
+    const avg = rated.length ? (rated.reduce((s,i)=>s+parseFloat(i.my_rating),0)/rated.length).toFixed(1) : '—';
+    const totalMins = items.filter(i=>i.runtime&&i.type!=='book').reduce((s,i)=>s+(parseInt(i.runtime)||0),0);
+    const horas = totalMins>=60 ? Math.round(totalMins/60)+'h' : totalMins+'m';
+    const last = items[0];
+    const lastDate = last?.created_at ? new Date(last.created_at) : null;
+    const daysAgo = lastDate ? Math.floor((Date.now()-lastDate)/864e5) : null;
+    const ultimaStr = daysAgo===0?'Hoy':daysAgo===1?'Ayer':daysAgo!=null?`Hace ${daysAgo}d`:'—';
+    document.getElementById('am-obras').textContent = items.length;
+    document.getElementById('am-horas').textContent = horas;
+    document.getElementById('am-promedio').textContent = avg;
+    document.getElementById('am-ultima').textContent = ultimaStr;
+  } else { metricsEl.style.display = 'none'; }
+
   if (!watched.length) {
     document.getElementById('hero-title').textContent = 'Tu biblioteca';
     document.getElementById('hero-eyebrow').textContent = 'Bienvenido';
@@ -1327,6 +1432,8 @@ function renderInicio() {
     document.getElementById('hero-meta-rating').textContent = '';
     document.getElementById('hero-bg').style.backgroundImage = '';
     document.getElementById('hero-btn').style.display = 'none';
+    document.getElementById('inicio-carousel').innerHTML = '';
+    document.getElementById('inicio-week').innerHTML = '';
     document.getElementById('inicio-recent').innerHTML = '';
     document.getElementById('inicio-progress').innerHTML = '';
     document.getElementById('inicio-recs').innerHTML = '';
@@ -1358,6 +1465,40 @@ function renderInicio() {
     bg.style.backgroundImage = '';
     bg.style.backgroundColor = bookColor(last.title);
   }
+
+  // Carousel — últimas 10
+  const carouselEl = document.getElementById('inicio-carousel');
+  const lastTen = watched.slice(0, 10);
+  if (lastTen.length > 0) {
+    carouselEl.innerHTML = `<div class="sec-label">Continuá tu historia</div>
+      <div class="carousel-wrap">
+        ${lastTen.map(item => {
+          const isB = item.type==='book';
+          const src = item.poster_path ? (isB ? item.poster_path : `${TMDB_IMG}w185${item.poster_path}`) : null;
+          const img = src ? `<img src="${src}" alt="${item.title}" loading="lazy">` : `<div class="car-ph" style="background:${bookColor(item.title)}">${bookInitial(item.title)}</div>`;
+          return `<div class="car-card" onclick="openDetail('${item.id}')">${img}<div class="car-title">${item.title}</div></div>`;
+        }).join('')}
+      </div>`;
+  } else { carouselEl.innerHTML = ''; }
+
+  // Esta semana
+  const weekEl = document.getElementById('inicio-week');
+  const oneWeekAgo = Date.now() - 7*864e5;
+  const thisWeek = watched.filter(i => i.created_at && new Date(i.created_at).getTime() > oneWeekAgo);
+  if (thisWeek.length > 0) {
+    const wMovies = thisWeek.filter(i=>i.type==='movie').length;
+    const wSeries = thisWeek.filter(i=>i.type==='tv').length;
+    const wBooks  = thisWeek.filter(i=>i.type==='book').length;
+    const types = [
+      wMovies ? [wMovies, wMovies===1?'Película':'Películas'] : null,
+      wSeries ? [wSeries, wSeries===1?'Serie':'Series'] : null,
+      wBooks  ? [wBooks,  wBooks===1?'Libro':'Libros'] : null,
+    ].filter(Boolean);
+    weekEl.innerHTML = `<div class="sec-label">Esta semana</div>
+      <div class="week-strip">
+        ${types.map(([n,lbl])=>`<div class="week-item"><div class="week-num">${n}</div><div class="week-type">${lbl}</div></div>`).join('')}
+      </div>`;
+  } else { weekEl.innerHTML = ''; }
 
   // In progress
   const inProgress = items.filter(i => i.status === 'watching');
@@ -1693,11 +1834,27 @@ function renderADN() {
   books.forEach(b=>{ if(b.author) b.author.split(',').forEach(a=>{ const k=a.trim(); if(k) ac[k]=(ac[k]||0)+1; }); });
   const topAuthor = Object.entries(ac).sort((a,b)=>b[1]-a[1])[0]?.[0] || null;
 
-  // Build statement
+  // Build archetype + statement
+  let archetype = '';
   let statement = '';
+  const genres2 = topGenres.slice(0,2).map(g=>g[0]);
+  const isNostalgia = topDecade && parseInt(topDecade) <= 2000;
+
+  if (topGenre === 'Comedia' && isNostalgia) { archetype = 'El nostálgico que ríe'; }
+  else if (topGenre === 'Drama' && avg && parseFloat(avg) >= 8) { archetype = 'El purista emocional'; }
+  else if (topGenre === 'Acción' && avg && parseFloat(avg) < 7) { archetype = 'El espectador masivo'; }
+  else if (topGenre === 'Terror') { archetype = 'El buscador de adrenalina'; }
+  else if (topGenre === 'Ciencia ficción' || topGenre === 'Ciencia Ficción') { archetype = 'El explorador de ideas'; }
+  else if (topGenre === 'Animación' || topGenre === 'Animation') { archetype = 'El eterno joven'; }
+  else if (topGenre === 'Documental') { archetype = 'El curioso insaciable'; }
+  else if (books.length > movies.length) { archetype = 'El lector voraz'; }
+  else if (avg && parseFloat(avg) >= 8) { archetype = 'El crítico selectivo'; }
+  else if (topDecade && parseInt(topDecade) <= 1990) { archetype = 'El arqueólogo cultural'; }
+  else { archetype = 'El explorador ecléctico'; }
+
   if (topGenre && topDecade) {
-    statement = `Principalmente sos un amante del ${topGenre.toLowerCase()} de los ${topDecade}s`;
-    if (topGenres.length > 1) statement += ` con una vena por ${topGenres[1][0].toLowerCase()}`;
+    statement = `Tu biblioteca está dominada por ${topGenre.toLowerCase()} ${topDecade && parseInt(topDecade) < 2020 ? 'de los '+topDecade+'s' : 'contemporáneo'}`;
+    if (topGenres.length > 1) statement += `, con una marcada vena por ${topGenres[1][0].toLowerCase()}`;
     statement += '.';
   } else if (topGenre) {
     statement = `Tenés una clara obsesión por el ${topGenre.toLowerCase()}.`;
@@ -1706,10 +1863,11 @@ function renderADN() {
   }
   if (avg) {
     const n = parseFloat(avg);
-    if (n >= 8)       statement += ` Sos de los que solo registran lo que realmente amaron.`;
-    else if (n >= 6.5) statement += ` Sos exigente pero justo.`;
-    else              statement += ` Registrás todo, lo bueno y lo malo.`;
+    if (n >= 8)        statement += ` Calificás con exigencia — registrás lo que realmente vale.`;
+    else if (n >= 6.5) statement += ` Valorás personajes antes que espectáculo, tendés a puntuar según conexión emocional.`;
+    else               statement += ` Registrás de todo, lo bueno y lo malo, con criterio abierto.`;
   }
+  if (topAuthor) statement += ` En libros, ${topAuthor.split(' ').pop()} es tu referencia.`;
 
   // IMDb discrepancy table
   const diffs = withImdb.map(i=>({title:i.title,diff:parseFloat(i.my_rating)-parseFloat(i.imdb_rating),my:i.my_rating,imdb:i.imdb_rating}));
@@ -1726,9 +1884,30 @@ function renderADN() {
     </div>`;
   };
 
+  // Criterio comparison
+  const withImdbAll = rated.filter(i=>i.imdb_rating&&i.type!=='book');
+  const withTmdb    = rated.filter(i=>i.tmdb_rating&&i.type!=='book');
+  const withRt      = rated.filter(i=>i.rt_score!=null&&i.type!=='book');
+  const avgImdb  = withImdbAll.length ? (withImdbAll.reduce((s,i)=>s+parseFloat(i.imdb_rating),0)/withImdbAll.length).toFixed(1) : null;
+  const avgTmdb  = withTmdb.length ? (withTmdb.reduce((s,i)=>s+parseFloat(i.tmdb_rating),0)/withTmdb.length).toFixed(1) : null;
+  const avgRtRaw = withRt.length ? withRt.reduce((s,i)=>s+parseInt(i.rt_score),0)/withRt.length : null;
+  const avgRtAs10 = avgRtRaw ? (avgRtRaw/10).toFixed(1) : null;
+  const diffImdb = avg && avgImdb ? (parseFloat(avg)-parseFloat(avgImdb)).toFixed(1) : null;
+  const diffTmdb = avg && avgTmdb ? (parseFloat(avg)-parseFloat(avgTmdb)).toFixed(1) : null;
+  const diffRt   = avg && avgRtAs10 ? (parseFloat(avg)-parseFloat(avgRtAs10)).toFixed(1) : null;
+
+  // Coincidencia % (1 - abs(diff)/10)
+  const coincImdb = diffImdb ? Math.max(0,Math.round((1-Math.abs(parseFloat(diffImdb))/10)*100)) : null;
+  const coincTmdb = diffTmdb ? Math.max(0,Math.round((1-Math.abs(parseFloat(diffTmdb))/10)*100)) : null;
+  const coincRt   = diffRt   ? Math.max(0,Math.round((1-Math.abs(parseFloat(diffRt))/10)*100)) : null;
+
+  // Top 10 mayores diferencias
+  const top10diffs = [...diffs].sort((a,b)=>Math.abs(b.diff)-Math.abs(a.diff)).slice(0,10);
+
   el.innerHTML = `
-    <div class="adn-statement-block">
-      <div class="adn-statement">"${statement}"</div>
+    <div class="adn-profile-block">
+      <div class="adn-profile-archetype">${archetype}</div>
+      <div class="adn-profile-desc">${statement}</div>
     </div>
 
     <div class="adn-facts">
@@ -1763,20 +1942,63 @@ function renderADN() {
       </div>
     </div>` : ''}
 
-    ${diffs.length >= 4 ? `
+    ${avg && avgImdb ? `
     <div class="adn-section">
-      <div class="adn-section-header">Donde discrepo con IMDb${avgDiff ? ` · promedio ${avgDiff}` : ''}</div>
+      <div class="adn-section-header">Tu criterio</div>
       <div class="adn-section-body">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
-          <div>
-            <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:var(--red);margin-bottom:10px;display:flex;align-items:center;gap:6px"><span style="width:7px;height:7px;border-radius:50%;background:var(--red);display:inline-block"></span>IMDb las sobrevalora</div>
-            ${overrated.map(diffRow).join('')}
+        <div class="criterio-grid">
+          <div class="criterio-item">
+            <div class="criterio-val" style="color:var(--gold)">${avg}</div>
+            <div class="criterio-lbl">Archivo</div>
           </div>
-          <div>
-            <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:var(--green);margin-bottom:10px;display:flex;align-items:center;gap:6px"><span style="width:7px;height:7px;border-radius:50%;background:var(--green);display:inline-block"></span>IMDb las subvalora</div>
-            ${underrated.map(diffRow).join('')}
-          </div>
+          ${avgImdb ? `<div class="criterio-item">
+            <div class="criterio-val" style="color:#C4953A">${avgImdb}</div>
+            <div class="criterio-lbl">IMDb</div>
+            ${diffImdb ? `<div class="criterio-diff" style="color:${parseFloat(diffImdb)>=0?'var(--green)':'var(--red)'}">
+              ${parseFloat(diffImdb)>=0?'+':''}${diffImdb}
+            </div>` : ''}
+          </div>` : ''}
+          ${avgTmdb ? `<div class="criterio-item">
+            <div class="criterio-val" style="color:var(--accent2)">${avgTmdb}</div>
+            <div class="criterio-lbl">TMDB</div>
+            ${diffTmdb ? `<div class="criterio-diff" style="color:${parseFloat(diffTmdb)>=0?'var(--green)':'var(--red)'}">
+              ${parseFloat(diffTmdb)>=0?'+':''}${diffTmdb}
+            </div>` : ''}
+          </div>` : ''}
+          ${avgRtAs10 ? `<div class="criterio-item">
+            <div class="criterio-val" style="color:#C0392B">${avgRtAs10}</div>
+            <div class="criterio-lbl">Rotten</div>
+            ${diffRt ? `<div class="criterio-diff" style="color:${parseFloat(diffRt)>=0?'var(--green)':'var(--red)'}">
+              ${parseFloat(diffRt)>=0?'+':''}${diffRt}
+            </div>` : ''}
+          </div>` : ''}
         </div>
+      </div>
+    </div>` : ''}
+
+    ${(coincImdb||coincTmdb||coincRt) ? `
+    <div class="adn-section">
+      <div class="adn-section-header">Coincidencia</div>
+      <div class="adn-section-body">
+        ${coincImdb!=null ? `<div class="coincidencia-row"><span class="coinc-src">IMDb</span><div class="coinc-bar-track"><div class="coinc-bar-fill rc-imdb" style="width:${coincImdb}%"></div></div><span class="coinc-pct">${coincImdb}%</span></div>` : ''}
+        ${coincTmdb!=null ? `<div class="coincidencia-row"><span class="coinc-src">TMDB</span><div class="coinc-bar-track"><div class="coinc-bar-fill rc-tmdb" style="width:${coincTmdb}%"></div></div><span class="coinc-pct">${coincTmdb}%</span></div>` : ''}
+        ${coincRt!=null   ? `<div class="coincidencia-row"><span class="coinc-src">Rotten</span><div class="coinc-bar-track"><div class="coinc-bar-fill rc-rt" style="width:${coincRt}%"></div></div><span class="coinc-pct">${coincRt}%</span></div>` : ''}
+      </div>
+    </div>` : ''}
+
+    ${top10diffs.length >= 4 ? `
+    <div class="adn-section">
+      <div class="adn-section-header">Tus mayores diferencias con IMDb</div>
+      <div class="adn-section-body">
+        ${top10diffs.map(d => {
+          const v = d.my - d.imdb; const sign = v>=0?'+':'';
+          const col = v>=1.5?'var(--green)':v<=-1.5?'var(--red)':'var(--t-2)';
+          return `<div class="idt-row">
+            <span class="idt-title">${d.title}</span>
+            <span class="idt-scores">vos ${d.my} · imdb ${d.imdb}</span>
+            <span class="idt-diff" style="color:${col}">${sign}${v.toFixed(1)}</span>
+          </div>`;
+        }).join('')}
       </div>
     </div>` : ''}`;
 }
@@ -1829,13 +2051,16 @@ async function renderDisc() {
   const recCard = (r,idx) => {
     const d=r.data, title=d.title||d.name, year=(d.release_date||d.first_air_date||'').slice(0,4);
     const starsHtml=Array.from({length:5},(_,i)=>`<span class="qs rec-qs" data-ridx="${idx}" data-val="${(i+1)*2}" onmouseenter="hvrRec(this)" onmouseleave="rstRec(${idx})" onclick="qAddRec(event,${d.id},'${type}',${(i+1)*2},this)">★</span>`).join('');
+    // Affinity score as percentage (score/topItems.length * 10)
+    const affinity = Math.min(99, Math.round((r.score / Math.max(topItems.length*0.8,1)) * 100));
+    const whyLabel = r.because.length===1 ? `Porque te gustó <em>${r.because[0]}</em>` : `${r.because.slice(0,2).map(b=>`<em>${b}</em>`).join(' · ')}`;
     return `<div class="rec-card" onclick="openRecDetail(event,${d.id},'${type}')">
       <img src="${TMDB_IMG}w300${d.poster_path}" alt="${title}" loading="lazy" />
       <div class="rec-score">${d.vote_average?.toFixed(1)||'?'}</div>
       <div class="rec-body">
         <div class="rec-title">${title}</div>
         <div class="rec-meta">${year}</div>
-        <div class="rec-why">Por: ${r.because.join(', ')}</div>
+        <div class="rec-why">${whyLabel}</div>
       </div>
       <div class="rec-hover-overlay">
         <div class="quick-stars" id="rec-qs-${idx}">${starsHtml}</div>
@@ -2054,8 +2279,25 @@ function openDetailModal(item, isEdit) {
   if (isBook) {
     if (item.tmdb_rating) ratingsSection=`<div class="ratings-grid" style="grid-template-columns:1fr"><div class="rating-box"><div class="rb-val" style="color:#4EB8A0">${item.tmdb_rating}/5</div><div class="rb-src">Google Books</div></div></div>`;
   } else {
-    const boxes=[item.imdb_rating?`<div class="rating-box"><div class="rb-val rb-imdb">${item.imdb_rating}</div><div class="rb-src">IMDb</div></div>`:'',item.rt_score!=null?`<div class="rating-box"><div class="rb-val rb-rt">${item.rt_score}%</div><div class="rb-src">Rotten Tomatoes</div></div>`:'',item.metacritic_score!=null?`<div class="rating-box"><div class="rb-val rb-mc">${item.metacritic_score}</div><div class="rb-src">Metacritic</div></div>`:'',item.tmdb_rating?`<div class="rating-box"><div class="rb-val" style="color:var(--blue)">${item.tmdb_rating}</div><div class="rb-src">TMDB</div></div>`:''     ].filter(Boolean);
-    if (boxes.length) ratingsSection=`<div class="ratings-grid" style="grid-template-columns:repeat(${boxes.length},1fr)">${boxes.join('')}</div>`;
+    // Comparison bar
+    const rows = [];
+    if (item.my_rating) rows.push({label:'Mi nota',val:parseFloat(item.my_rating),max:10,cls:'rc-mine'});
+    if (item.imdb_rating) rows.push({label:'IMDb',val:parseFloat(item.imdb_rating),max:10,cls:'rc-imdb'});
+    if (item.tmdb_rating) rows.push({label:'TMDB',val:parseFloat(item.tmdb_rating),max:10,cls:'rc-tmdb'});
+    if (item.rt_score!=null) rows.push({label:'Rotten',val:item.rt_score/10,max:10,cls:'rc-rt'});
+    if (rows.length >= 2) {
+      ratingsSection = `<div class="rating-compare">
+        <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:var(--t-3);margin-bottom:12px">Comparación de calificaciones</div>
+        ${rows.map(r=>`<div class="rc-row">
+          <span class="rc-label">${r.label}</span>
+          <div class="rc-track"><div class="rc-fill ${r.cls}" style="width:${(r.val/r.max)*100}%"></div></div>
+          <span class="rc-val" style="color:${r.cls==='rc-mine'?'var(--gold)':r.cls==='rc-imdb'?'#C4953A':r.cls==='rc-rt'?'#C0392B':'var(--accent2)'}">${r.cls==='rc-rt'?(item.rt_score+'%'):r.val.toFixed(1)}</span>
+        </div>`).join('')}
+      </div>`;
+    } else {
+      const boxes=[item.imdb_rating?`<div class="rating-box"><div class="rb-val rb-imdb">${item.imdb_rating}</div><div class="rb-src">IMDb</div></div>`:'',item.rt_score!=null?`<div class="rating-box"><div class="rb-val rb-rt">${item.rt_score}%</div><div class="rb-src">Rotten Tomatoes</div></div>`:'',item.metacritic_score!=null?`<div class="rating-box"><div class="rb-val rb-mc">${item.metacritic_score}</div><div class="rb-src">Metacritic</div></div>`:'',item.tmdb_rating?`<div class="rating-box"><div class="rb-val rb-tmdb">${item.tmdb_rating}</div><div class="rb-src">TMDB</div></div>`:''     ].filter(Boolean);
+      if (boxes.length) ratingsSection=`<div class="ratings-grid" style="grid-template-columns:repeat(${boxes.length},1fr)">${boxes.join('')}</div>`;
+    }
   }
   const curRating = item.my_rating || 0;
   const starsInput = Array.from({length:10},(_,i)=>{const v=i+1;return `<span class="star ${v<=curRating?'active':''}" data-val="${v}" onclick="setRating(${v})">★</span>`;}).join('');
