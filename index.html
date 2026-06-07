@@ -962,8 +962,13 @@ select option { background: var(--bg-2); color: var(--t-1); }
 .mn-tab.active .mn-icon  { color: var(--gold); transform: scale(1.12); }
 .mn-tab.active .mn-label { color: var(--gold); }
 
+.mn-fab-spacer {
+  flex: 1; position: relative;
+  display: flex; align-items: center; justify-content: center;
+  pointer-events: none;
+}
 .mob-fab {
-  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
   width: 44px; height: 44px; border-radius: 50%;
   background: var(--gold); color: #000;
   display: flex; align-items: center; justify-content: center;
@@ -971,6 +976,7 @@ select option { background: var(--bg-2); color: var(--t-1); }
   cursor: pointer; -webkit-tap-highlight-color: transparent;
   box-shadow: 0 4px 16px rgba(232,160,48,.4);
   transition: transform .15s, box-shadow .15s;
+  pointer-events: auto;
 }
 .mob-fab:active { transform: translate(-50%, -50%) scale(.92); }
 
@@ -1271,7 +1277,7 @@ select option { background: var(--bg-2); color: var(--t-1); }
       <svg class="mn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
       <span class="mn-label">Biblio</span>
     </div>
-    <div class="mob-fab" onclick="openSearchModal()">+</div>
+    <div class="mn-fab-spacer"><div class="mob-fab" onclick="openSearchModal()">+</div></div>
     <div class="mn-tab" data-tab="descubri">
       <svg class="mn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
       <span class="mn-label">Descubrí</span>
