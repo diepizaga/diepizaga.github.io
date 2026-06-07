@@ -567,6 +567,10 @@ select option { background: var(--bg2); color: var(--text); }
 #recs-content .recs-header h2 { font-size: 22px; font-weight: 800; margin-bottom: 6px; letter-spacing: -.4px; }
 #recs-content .recs-header p { font-size: 13px; color: var(--text3); }
 .recs-section { margin-bottom: 36px; }
+.discover-tabs { display: flex; gap: 8px; margin-bottom: 20px; }
+.discover-tab { padding: 8px 16px; border-radius: 20px; border: 1.5px solid var(--border); background: var(--bg2); color: var(--text2); font-size: 13px; font-weight: 600; cursor: pointer; transition: all .15s; }
+.discover-tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.discover-tab:hover:not(.active) { border-color: var(--accent); color: var(--accent); }
 .recs-section-title {
   font-size: 11px; text-transform: uppercase; letter-spacing: 1px;
   color: var(--text3); font-weight: 700; margin-bottom: 14px;
@@ -937,6 +941,7 @@ select option { background: var(--bg2); color: var(--text); }
       <div class="nav-tab active" data-tab="all">Todo</div>
       <div class="nav-tab" data-tab="movie">Películas</div>
       <div class="nav-tab" data-tab="tv">Series</div>
+      <div class="nav-tab" data-tab="book">Libros 📚</div>
       <div class="nav-tab" data-tab="watchlist">Ver después</div>
       <div class="nav-tab" data-tab="discover">Descubrí</div>
       <div class="nav-tab" data-tab="compare">Grupo 👥</div>
@@ -973,6 +978,7 @@ select option { background: var(--bg2); color: var(--text); }
       <div class="stat-card"><div class="val" id="stat-total">0</div><div class="lbl">Total</div></div>
       <div class="stat-card"><div class="val" id="stat-movies">0</div><div class="lbl">Películas</div></div>
       <div class="stat-card"><div class="val" id="stat-series">0</div><div class="lbl">Series</div></div>
+      <div class="stat-card"><div class="val" id="stat-books">0</div><div class="lbl">Libros 📚</div></div>
       <div class="stat-card"><div class="val" id="stat-avg">—</div><div class="lbl">Mi promedio</div></div>
       <div class="stat-card"><div class="val" id="stat-watchlist">0</div><div class="lbl">Watchlist</div></div>
     </div>
@@ -1013,7 +1019,13 @@ select option { background: var(--bg2); color: var(--text); }
     </div>
 
     <div id="tab-discover" style="display:none">
-      <div class="insights-grid" id="insights-content" style="margin-bottom:40px"></div>
+      <div class="insights-grid" id="insights-content" style="margin-bottom:32px"></div>
+      <!-- Sub-tabs Descubrí -->
+      <div class="discover-tabs">
+        <button class="discover-tab active" data-dtab="movies" onclick="switchDiscoverTab('movies')">🎬 Películas</button>
+        <button class="discover-tab" data-dtab="series" onclick="switchDiscoverTab('series')">📺 Series</button>
+        <button class="discover-tab" data-dtab="books" onclick="switchDiscoverTab('books')">📚 Libros</button>
+      </div>
       <div id="recs-content"></div>
     </div>
 
@@ -1038,6 +1050,10 @@ select option { background: var(--bg2); color: var(--text); }
     <div class="mn-tab nav-tab" data-tab="tv">
       <svg class="mn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"/><polyline points="17 2 12 7 7 2"/></svg>
       <span class="mn-label">Series</span>
+    </div>
+    <div class="mn-tab nav-tab" data-tab="book">
+      <svg class="mn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+      <span class="mn-label">Libros</span>
     </div>
     <div class="mn-tab nav-tab" data-tab="watchlist">
       <svg class="mn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
@@ -1219,6 +1235,52 @@ async function tmdbRecommendations(tmdbId, type) {
   return d.results || [];
 }
 
+// ===================== GOOGLE BOOKS =====================
+async function googleBooksSearch(query) {
+  const q = encodeURIComponent(query);
+  const url = `https://www.googleapis.com/books/v1/volumes?q=${q}&langRestrict=es&maxResults=10&printType=books`;
+  const resp = await fetch(url);
+  const data = await resp.json();
+  return (data.items || []).map(item => ({
+    id: item.id,
+    _type: 'book',
+    title: item.volumeInfo?.title || '',
+    author: (item.volumeInfo?.authors || []).join(', '),
+    year: (item.volumeInfo?.publishedDate || '').slice(0, 4),
+    cover: item.volumeInfo?.imageLinks?.thumbnail?.replace('http:', 'https:') || null,
+    categories: item.volumeInfo?.categories || [],
+    pageCount: item.volumeInfo?.pageCount || null,
+    description: item.volumeInfo?.description || null,
+    google_rating: item.volumeInfo?.averageRating || null,
+    google_ratings_count: item.volumeInfo?.ratingsCount || null,
+    preview_link: item.volumeInfo?.previewLink || null,
+  }));
+}
+
+async function googleBooksDetail(bookId) {
+  const url = `https://www.googleapis.com/books/v1/volumes/${bookId}`;
+  const resp = await fetch(url);
+  const data = await resp.json();
+  const v = data.volumeInfo || {};
+  return {
+    id: data.id,
+    _type: 'book',
+    title: v.title || '',
+    author: (v.authors || []).join(', '),
+    year: (v.publishedDate || '').slice(0, 4),
+    cover: v.imageLinks?.thumbnail?.replace('http:', 'https:') || null,
+    cover_large: v.imageLinks?.medium?.replace('http:', 'https:') || v.imageLinks?.thumbnail?.replace('http:', 'https:') || null,
+    categories: v.categories || [],
+    pageCount: v.pageCount || null,
+    description: v.description || null,
+    google_rating: v.averageRating || null,
+    google_ratings_count: v.ratingsCount || null,
+    preview_link: v.previewLink || null,
+    publisher: v.publisher || null,
+    language: v.language || null,
+  };
+}
+
 // ===================== OMDB =====================
 async function omdbGetRatings(title, year) {
   try {
@@ -1243,6 +1305,7 @@ function getFiltered() {
   // tab filter
   if (filterTab === 'movie') list = list.filter(i => i.type === 'movie');
   else if (filterTab === 'tv') list = list.filter(i => i.type === 'tv');
+  else if (filterTab === 'book') list = list.filter(i => i.type === 'book');
   else if (filterTab === 'watchlist') list = list.filter(i => i.status === 'watchlist');
 
   // search
@@ -1296,6 +1359,7 @@ function updateStats() {
   document.getElementById('stat-total').textContent = watched.length;
   document.getElementById('stat-movies').textContent = items.filter(i => i.type === 'movie' && i.status !== 'watchlist').length;
   document.getElementById('stat-series').textContent = items.filter(i => i.type === 'tv' && i.status !== 'watchlist').length;
+  document.getElementById('stat-books').textContent = items.filter(i => i.type === 'book' && i.status !== 'watchlist').length;
   document.getElementById('stat-avg').textContent = avg !== '—' ? `${avg}★` : '—';
   document.getElementById('stat-watchlist').textContent = items.filter(i => i.status === 'watchlist').length;
 }
@@ -1327,9 +1391,14 @@ function starsHTML(rating, small = true) {
 }
 
 function cardHTML(item) {
-  const poster = item.poster_path
-    ? `<img class="poster" src="${TMDB_IMG}w300${item.poster_path}" alt="${item.title}" loading="lazy" />`
-    : `<div class="poster-placeholder">🎬</div>`;
+  const isBook = item.type === 'book';
+  const poster = isBook
+    ? (item.poster_path
+        ? `<img class="poster" src="${item.poster_path}" alt="${item.title}" loading="lazy" style="object-fit:contain;background:#f0ece4">`
+        : `<div class="poster-placeholder">📖</div>`)
+    : (item.poster_path
+        ? `<img class="poster" src="${TMDB_IMG}w300${item.poster_path}" alt="${item.title}" loading="lazy" />`
+        : `<div class="poster-placeholder">🎬</div>`);
   const typeBadge = item.type === 'movie' ? 'Peli' : 'Serie';
   const statusClass = `badge-${item.status || 'watched'}`;
   const statusLabel = item.status === 'watchlist' ? '🕐' : item.status === 'watching' ? '▶' : '✓';
@@ -1340,7 +1409,7 @@ function cardHTML(item) {
     <span class="badge-status ${statusClass}">${statusLabel}</span>
     <div class="card-body">
       <div class="card-title">${item.title}</div>
-      <div class="card-meta">${item.release_year || ''}</div>
+      <div class="card-meta">${item.type === 'book' ? (item.author ? `✍️ ${item.author.split(',')[0]}` : '📖') : ''}${item.release_year ? (item.type === 'book' && item.author ? ' · ' : '') + item.release_year : ''}</div>
       <div class="card-rating">${stars}</div>
     </div>
   </div>`;
@@ -1541,31 +1610,55 @@ function openDetail(id) {
 }
 
 function openDetailModal(item, isEdit) {
-  const backdrop = item.backdrop_path
-    ? `<img class="modal-backdrop" src="${TMDB_IMG}w780${item.backdrop_path}" alt="" />`
-    : `<div class="modal-backdrop-placeholder"></div>`;
-  const poster = item.poster_path
-    ? `<img class="detail-poster" src="${TMDB_IMG}w300${item.poster_path}" alt="${item.title}" />`
-    : `<div class="detail-poster" style="display:flex;align-items:center;justify-content:center;font-size:40px">🎬</div>`;
+  const isBook = item.type === 'book';
+
+  // Book: use cover directly (not TMDB path), no backdrop
+  const backdrop = isBook
+    ? `<div class="modal-backdrop-placeholder"></div>`
+    : (item.backdrop_path
+        ? `<img class="modal-backdrop" src="${TMDB_IMG}w780${item.backdrop_path}" alt="" />`
+        : `<div class="modal-backdrop-placeholder"></div>`);
+
+  const poster = isBook
+    ? (item.poster_path
+        ? `<img class="detail-poster" src="${item.poster_path}" alt="${item.title}" style="object-fit:contain;background:#f0ece4">`
+        : `<div class="detail-poster" style="display:flex;align-items:center;justify-content:center;font-size:48px;background:#f0ece4">📖</div>`)
+    : (item.poster_path
+        ? `<img class="detail-poster" src="${TMDB_IMG}w300${item.poster_path}" alt="${item.title}" />`
+        : `<div class="detail-poster" style="display:flex;align-items:center;justify-content:center;font-size:40px">🎬</div>`);
+
   const genres = (item.genres || []).map(g => `<span class="genre-tag">${g}</span>`).join('');
-  const meta = [
-    item.type === 'movie' ? '🎬 Película' : '📺 Serie',
-    item.release_year,
-    item.runtime ? `${item.runtime} min` : null
-  ].filter(Boolean).join(' · ');
+  const meta = isBook
+    ? [
+        '📖 Libro',
+        item.author ? `✍️ ${item.author}` : null,
+        item.release_year,
+        item.runtime ? `${item.runtime} págs.` : null
+      ].filter(Boolean).join(' · ')
+    : [
+        item.type === 'movie' ? '🎬 Película' : '📺 Serie',
+        item.release_year,
+        item.runtime ? `${item.runtime} min` : null
+      ].filter(Boolean).join(' · ');
 
   // Ratings
-  const imdbBox = item.imdb_rating
-    ? `<div class="rating-box"><div class="rb-val rb-imdb">⭐ ${item.imdb_rating}</div><div class="rb-src">IMDb</div></div>` : '';
-  const rtBox = item.rt_score != null
-    ? `<div class="rating-box"><div class="rb-val rb-rt">🍅 ${item.rt_score}%</div><div class="rb-src">Rotten Tomatoes</div></div>` : '';
-  const mcBox = item.metacritic_score != null
-    ? `<div class="rating-box"><div class="rb-val rb-mc">🎯 ${item.metacritic_score}</div><div class="rb-src">Metacritic</div></div>` : '';
-  const tmdbBox = item.tmdb_rating
-    ? `<div class="rating-box"><div class="rb-val" style="color:#0071eb">🔵 ${item.tmdb_rating}</div><div class="rb-src">TMDB</div></div>` : '';
-
-  const ratingsHTML = [imdbBox, rtBox, mcBox, tmdbBox].filter(Boolean).join('');
-  const ratingsSection = ratingsHTML ? `<div class="ratings-grid" style="grid-template-columns:repeat(${[imdbBox,rtBox,mcBox,tmdbBox].filter(Boolean).length},1fr)">${ratingsHTML}</div>` : '';
+  let ratingsSection = '';
+  if (isBook) {
+    const gbBox = item.tmdb_rating
+      ? `<div class="rating-box"><div class="rb-val" style="color:#4285f4">📗 ${item.tmdb_rating}/5</div><div class="rb-src">Google Books${item._bookDetail?.google_ratings_count ? ` (${item._bookDetail.google_ratings_count})` : ''}</div></div>` : '';
+    if (gbBox) ratingsSection = `<div class="ratings-grid" style="grid-template-columns:1fr">${gbBox}</div>`;
+  } else {
+    const imdbBox = item.imdb_rating
+      ? `<div class="rating-box"><div class="rb-val rb-imdb">⭐ ${item.imdb_rating}</div><div class="rb-src">IMDb</div></div>` : '';
+    const rtBox = item.rt_score != null
+      ? `<div class="rating-box"><div class="rb-val rb-rt">🍅 ${item.rt_score}%</div><div class="rb-src">Rotten Tomatoes</div></div>` : '';
+    const mcBox = item.metacritic_score != null
+      ? `<div class="rating-box"><div class="rb-val rb-mc">🎯 ${item.metacritic_score}</div><div class="rb-src">Metacritic</div></div>` : '';
+    const tmdbBox = item.tmdb_rating
+      ? `<div class="rating-box"><div class="rb-val" style="color:#0071eb">🔵 ${item.tmdb_rating}</div><div class="rb-src">TMDB</div></div>` : '';
+    const ratingsHTML = [imdbBox, rtBox, mcBox, tmdbBox].filter(Boolean).join('');
+    if (ratingsHTML) ratingsSection = `<div class="ratings-grid" style="grid-template-columns:repeat(${[imdbBox,rtBox,mcBox,tmdbBox].filter(Boolean).length},1fr)">${ratingsHTML}</div>`;
+  }
 
   // Star input (1-10)
   const curRating = item.my_rating || 0;
@@ -1586,7 +1679,7 @@ function openDetailModal(item, isEdit) {
         </div>
       </div>
       ${item.overview ? `<p class="detail-overview">${item.overview}</p>` : ''}
-      <div id="watch-providers-section" style="margin-bottom:16px"></div>
+      ${isBook ? `<div id="book-preview-section" style="margin-bottom:16px">${item._bookDetail?.preview_link ? `<a href="${item._bookDetail.preview_link}" target="_blank" style="font-size:12px;color:var(--accent)">👁 Ver preview en Google Books →</a>` : ''}</div>` : `<div id="watch-providers-section" style="margin-bottom:16px"></div>`}
       ${ratingsSection}
       <div class="my-rating-section">
         <label>Mi calificación</label>
@@ -1624,8 +1717,8 @@ function openDetailModal(item, isEdit) {
 
   openModal('modal-detail');
 
-  // Load watch providers async (non-blocking)
-  if (item.tmdb_id) loadWatchProviders(item.tmdb_id, item.type);
+  // Load watch providers async (non-blocking, only for movies/series)
+  if (!isBook && item.tmdb_id) loadWatchProviders(item.tmdb_id, item.type);
 }
 
 async function loadWatchProviders(tmdbId, type) {
@@ -1940,24 +2033,35 @@ async function runOmniSearch(q) {
   omniDropdown.innerHTML = '<div class="omni-spinner"><div class="spinner"></div></div>';
   omniDropdown.classList.add('open');
 
-  // Local matches (instant)
-  const localMatches = items.filter(i =>
-    i.title.toLowerCase().includes(q.toLowerCase()) ||
-    (i.original_title || '').toLowerCase().includes(q.toLowerCase())
-  ).slice(0, 4);
+  const isBookTab = filterTab === 'book';
 
-  // TMDB search (async)
-  let tmdbResults = [];
-  try {
-    tmdbResults = await tmdbSearch(q, 'multi');
-    // Filter out items already in local list
-    omniTmdbResults = tmdbResults.map(r => ({
-      ...r,
-      _type: r.media_type === 'movie' ? 'movie' : r.media_type === 'tv' ? 'tv' : 'movie'
-    })).slice(0, 8);
-  } catch {}
+  // Local matches
+  const localMatches = items.filter(i => {
+    const matchType = isBookTab ? i.type === 'book' : i.type !== 'book';
+    return matchType && (
+      i.title.toLowerCase().includes(q.toLowerCase()) ||
+      (i.original_title || '').toLowerCase().includes(q.toLowerCase()) ||
+      (i.author || '').toLowerCase().includes(q.toLowerCase())
+    );
+  }).slice(0, 4);
 
-  renderOmniDropdown(localMatches, omniTmdbResults, q);
+  if (isBookTab) {
+    // Google Books search
+    let bookResults = [];
+    try { bookResults = await googleBooksSearch(q); } catch {}
+    renderOmniDropdownBooks(localMatches, bookResults, q);
+  } else {
+    // TMDB search
+    let tmdbResults = [];
+    try {
+      tmdbResults = await tmdbSearch(q, 'multi');
+      omniTmdbResults = tmdbResults.map(r => ({
+        ...r,
+        _type: r.media_type === 'movie' ? 'movie' : r.media_type === 'tv' ? 'tv' : 'movie'
+      })).slice(0, 8);
+    } catch {}
+    renderOmniDropdown(localMatches, omniTmdbResults, q);
+  }
 }
 
 function renderOmniDropdown(local, tmdb, q) {
@@ -2035,6 +2139,93 @@ function renderOmniDropdown(local, tmdb, q) {
 
   omniDropdown.innerHTML = html;
   omniDropdown.classList.add('open');
+}
+
+function renderOmniDropdownBooks(local, books, q) {
+  if (!local.length && !books.length) {
+    omniDropdown.innerHTML = '<div class="omni-empty">Sin resultados para "' + q + '"</div>';
+    return;
+  }
+
+  let html = '';
+
+  if (local.length) {
+    html += '<div class="omni-section-label">En tu lista</div>';
+    html += local.map(item => {
+      const cover = item.poster_path
+        ? `<img src="${item.poster_path}" alt="" style="width:36px;height:52px;object-fit:cover;border-radius:4px">`
+        : `<div class="omni-thumb" style="font-size:20px">📖</div>`;
+      const stars = item.my_rating
+        ? `<span class="omni-rating">${'★'.repeat(Math.round(item.my_rating/2))} ${item.my_rating}</span>`
+        : `<span class="omni-rating" style="color:var(--text3)">Sin calificar</span>`;
+      return `<div class="omni-item" onclick="openDetail('${item.id}'); clearOmni();">
+        ${cover}
+        <div class="omni-info">
+          <div class="omni-title">${item.title}</div>
+          <div class="omni-meta">📖 ${item.author || ''} ${item.release_year || ''}</div>
+        </div>
+        <div class="omni-actions">${stars}</div>
+      </div>`;
+    }).join('');
+  }
+
+  const toAdd = books.filter(b => !items.find(i => i.google_books_id === b.id));
+  if (toAdd.length) {
+    if (local.length) html += '<div class="omni-divider"></div>';
+    html += '<div class="omni-section-label">Agregar a tu lista</div>';
+    html += toAdd.slice(0, 8).map((b, idx) => {
+      const cover = b.cover
+        ? `<img src="${b.cover}" alt="" style="width:36px;height:52px;object-fit:cover;border-radius:4px">`
+        : `<div class="omni-thumb" style="font-size:20px">📖</div>`;
+      const starsHtml = Array.from({length:5}, (_, i) =>
+        `<span class="qs" data-idx="b${idx}" data-val="${(i+1)*2}"
+          onmouseenter="hoverQuickStars(this)" onmouseleave="resetQuickStars('b${idx}')"
+          onclick="quickAddBook(event, '${b.id}', ${(i+1)*2})">★</span>`
+      ).join('');
+      return `<div class="omni-item" id="omni-book-${idx}">
+        ${cover}
+        <div class="omni-info">
+          <div class="omni-title">${b.title}</div>
+          <div class="omni-meta">📖 ${b.author || ''} ${b.year ? `· ${b.year}` : ''}</div>
+        </div>
+        <div class="omni-actions">
+          <div class="quick-stars" id="qs-b${idx}">${starsHtml}</div>
+          <button class="btn-omni-add" onclick="quickAddBook(event, '${b.id}', null)">+ Agregar</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  omniDropdown.innerHTML = html;
+  omniDropdown.classList.add('open');
+}
+
+async function quickAddBook(e, bookId, rating) {
+  e.stopPropagation();
+  closeOmni();
+  const b = await googleBooksDetail(bookId);
+  const bookItem = {
+    google_books_id: b.id,
+    type: 'book',
+    title: b.title,
+    author: b.author,
+    poster_path: b.cover_large || b.cover,
+    overview: b.description,
+    release_year: b.year ? parseInt(b.year) : null,
+    genres: b.categories,
+    runtime: b.pageCount,
+    tmdb_rating: b.google_rating,
+    status: 'watched',
+    my_rating: rating || null,
+    _bookDetail: b,
+  };
+  if (rating) {
+    await saveItem(bookItem);
+    showToast(`"${b.title}" agregado ⭐ ${rating}/10`, 'success');
+  } else {
+    pendingItem = bookItem;
+    openDetailModal(bookItem, false);
+  }
 }
 
 function hoverQuickStars(el) {
@@ -2138,84 +2329,83 @@ function showToast(msg, type = 'success') {
 }
 
 // ===================== RECOMMENDATIONS =====================
-let recsCache = null;
+const recsCache = { movies: null, series: null, books: null };
+let currentDiscoverTab = 'movies';
+
+function switchDiscoverTab(tab) {
+  currentDiscoverTab = tab;
+  document.querySelectorAll('.discover-tab').forEach(b =>
+    b.classList.toggle('active', b.dataset.dtab === tab)
+  );
+  renderRecs();
+}
 
 async function renderRecs() {
+  if (currentDiscoverTab === 'books') { await renderBookRecs(); return; }
+  const type = currentDiscoverTab === 'series' ? 'tv' : 'movie';
+  await renderTmdbRecs(type);
+}
+
+async function renderTmdbRecs(type) {
   const el = document.getElementById('recs-content');
-  if (recsCache) { el.innerHTML = recsCache; bindRecEvents(); return; }
+  const cacheKey = type === 'movie' ? 'movies' : 'series';
+  if (recsCache[cacheKey]) { el.innerHTML = recsCache[cacheKey]; return; }
 
   el.innerHTML = `<div class="recs-loading"><div class="spinner"></div><p>Analizando tus gustos...</p></div>`;
 
-  // Get top rated items (my_rating >= 7), sorted best first, up to 20
   const topItems = items
-    .filter(i => i.my_rating && parseFloat(i.my_rating) >= 7 && i.status !== 'watchlist')
+    .filter(i => i.type === type && i.my_rating && parseFloat(i.my_rating) >= 7 && i.status !== 'watchlist' && i.tmdb_id)
     .sort((a, b) => parseFloat(b.my_rating) - parseFloat(a.my_rating))
     .slice(0, 20);
 
+  const label = type === 'movie' ? 'películas' : 'series';
   if (topItems.length < 3) {
-    el.innerHTML = `<div class="recs-empty">🎬 Calificá al menos 3 películas con 7 o más para ver recomendaciones personalizadas.</div>`;
+    el.innerHTML = `<div class="recs-empty">${type === 'movie' ? '🎬' : '📺'} Calificá al menos 3 ${label} con 7 o más para ver recomendaciones personalizadas.</div>`;
     return;
   }
 
-  // Fetch recommendations for each top item (parallel, max 10 to avoid rate limits)
-  const watchedIds = new Set(items.map(i => i.tmdb_id));
-  const scoreMap = {}; // tmdb_id → { score, count, rec_because }
+  const watchedIds = new Set(items.filter(i => i.type === type).map(i => i.tmdb_id));
+  const scoreMap = {};
 
-  const fetches = topItems.slice(0, 12).map(async item => {
+  await Promise.all(topItems.slice(0, 12).map(async item => {
     try {
-      const recs = await tmdbRecommendations(item.tmdb_id, item.type);
+      const recs = await tmdbRecommendations(item.tmdb_id, type);
       recs.forEach(r => {
-        if (watchedIds.has(r.id)) return; // already watched
-        const weight = parseFloat(item.my_rating) / 10; // higher my rating = more weight
-        if (!scoreMap[r.id]) {
-          scoreMap[r.id] = { data: r, type: item.type, score: 0, count: 0, because: [] };
-        }
+        if (watchedIds.has(r.id)) return;
+        const weight = parseFloat(item.my_rating) / 10;
+        if (!scoreMap[r.id]) scoreMap[r.id] = { data: r, type, score: 0, count: 0, because: [] };
         scoreMap[r.id].score += weight;
         scoreMap[r.id].count += 1;
         if (scoreMap[r.id].because.length < 2) scoreMap[r.id].because.push(item.title);
       });
     } catch {}
-  });
+  }));
 
-  await Promise.all(fetches);
-
-  // Sort by score (frequency × rating weight)
-  const sorted = Object.values(scoreMap)
-    .filter(r => r.data.poster_path) // only if has poster
-    .sort((a, b) => b.score - a.score);
+  const sorted = Object.values(scoreMap).filter(r => r.data.poster_path).sort((a, b) => b.score - a.score);
 
   if (!sorted.length) {
-    el.innerHTML = `<div class="recs-empty">No encontramos recomendaciones por ahora. Agregá más películas calificadas.</div>`;
+    el.innerHTML = `<div class="recs-empty">No encontramos recomendaciones. Agregá más ${label} calificadas.</div>`;
     return;
   }
 
-  // Split into sections: top picks (score >= 1.2), and rest
   const topPicks = sorted.filter(r => r.score >= 1.2).slice(0, 12);
   const morePicks = sorted.filter(r => r.score < 1.2).slice(0, 16);
-
-  // Get top genres from user's 8+ rated movies
-  const highRated = items.filter(i => i.my_rating >= 8);
+  const highRated = items.filter(i => i.type === type && i.my_rating >= 8);
   const genreCount = {};
   highRated.forEach(i => (i.genres || []).forEach(g => genreCount[g] = (genreCount[g] || 0) + 1));
   const topGenres = Object.entries(genreCount).sort((a,b) => b[1]-a[1]).slice(0, 3).map(g => g[0]);
-
-  // Genre-based section: filter picks by user's fav genres
-  const genrePicks = sorted
-    .filter(r => (r.data.genre_ids || []).length > 0 && !topPicks.includes(r))
-    .slice(0, 12);
+  const genrePicks = sorted.filter(r => !topPicks.includes(r)).slice(0, 12);
 
   const recCardHTML = (r, idx) => {
     const d = r.data;
     const title = d.title || d.name;
     const year = (d.release_date || d.first_air_date || '').slice(0, 4);
-    const matchPct = Math.min(99, Math.round(r.score * 40 + 50));
     const starsHtml = Array.from({length: 5}, (_, i) =>
       `<span class="qs rec-qs" data-ridx="${idx}" data-val="${(i+1)*2}"
         onmouseenter="hoverRecStars(this)" onmouseleave="resetRecStars(${idx})"
-        onclick="quickAddRec(event, ${d.id}, '${r.type}', ${(i+1)*2}, this)">★</span>`
+        onclick="quickAddRec(event, ${d.id}, '${type}', ${(i+1)*2}, this)">★</span>`
     ).join('');
-
-    return `<div class="rec-card" onclick="openRecDetail(${d.id}, '${r.type}')">
+    return `<div class="rec-card" onclick="openRecDetail(${d.id}, '${type}')">
       <img src="${TMDB_IMG}w300${d.poster_path}" alt="${title}" loading="lazy" />
       <div class="rec-score-badge">⭐ ${d.vote_average?.toFixed(1) || '?'}</div>
       ${r.count >= 2 ? `<div class="rec-match">${r.count} coincidencias</div>` : ''}
@@ -2226,40 +2416,132 @@ async function renderRecs() {
       </div>
       <div class="rec-add-btn">
         <div class="quick-stars" id="rec-qs-${idx}">${starsHtml}</div>
-        <button class="btn-add-rec" onclick="openRecDetail(event, ${d.id}, '${r.type}')">Ver detalle</button>
+        <button class="btn-add-rec" onclick="openRecDetail(event, ${d.id}, '${type}')">Ver detalle</button>
       </div>
     </div>`;
   };
 
-  let html = `<div style="margin-bottom:24px;padding-top:8px;border-top:1px solid var(--border)">
-    <div class="recs-section-title" style="font-size:13px;font-weight:800;color:var(--text);text-transform:none;letter-spacing:0;margin-bottom:4px">🎯 Para vos</div>
-    <p style="font-size:12px;color:var(--text3)">Basado en tus ${topItems.length} películas mejor calificadas</p>
-  </div>`;
+  let html = `<p style="font-size:12px;color:var(--text3);margin-bottom:20px">Basado en tus ${topItems.length} ${label} mejor calificadas</p>`;
+  if (topPicks.length) html += `<div class="recs-section"><div class="recs-section-title">🔥 Más recomendadas para vos <span>${topPicks.length} títulos</span></div><div class="recs-grid">${topPicks.map(recCardHTML).join('')}</div></div>`;
+  if (topGenres.length && genrePicks.length) html += `<div class="recs-section"><div class="recs-section-title">🎭 Por tus géneros favoritos <span>${topGenres.join(' · ')}</span></div><div class="recs-grid">${genrePicks.map((r, i) => recCardHTML(r, i + 100)).join('')}</div></div>`;
+  if (morePicks.length) html += `<div class="recs-section"><div class="recs-section-title">📽 Más opciones</div><div class="recs-grid">${morePicks.map((r, i) => recCardHTML(r, i + 200)).join('')}</div></div>`;
 
-  if (topPicks.length) {
-    html += `<div class="recs-section">
-      <div class="recs-section-title">🔥 Más recomendadas para vos <span>${topPicks.length} títulos</span></div>
-      <div class="recs-grid">${topPicks.map((r, i) => recCardHTML(r, i)).join('')}</div>
-    </div>`;
-  }
-
-  if (topGenres.length && genrePicks.length) {
-    html += `<div class="recs-section">
-      <div class="recs-section-title">🎭 Por tus géneros favoritos <span>${topGenres.join(' · ')}</span></div>
-      <div class="recs-grid">${genrePicks.map((r, i) => recCardHTML(r, i + 100)).join('')}</div>
-    </div>`;
-  }
-
-  if (morePicks.length) {
-    html += `<div class="recs-section">
-      <div class="recs-section-title">📽 Más opciones</div>
-      <div class="recs-grid">${morePicks.map((r, i) => recCardHTML(r, i + 200)).join('')}</div>
-    </div>`;
-  }
-
-  recsCache = html;
+  recsCache[cacheKey] = html;
   el.innerHTML = html;
-  bindRecEvents();
+}
+
+async function renderBookRecs() {
+  const el = document.getElementById('recs-content');
+  if (recsCache.books) { el.innerHTML = recsCache.books; return; }
+
+  el.innerHTML = `<div class="recs-loading"><div class="spinner"></div><p>Buscando libros para vos...</p></div>`;
+
+  const topBooks = items
+    .filter(i => i.type === 'book' && i.my_rating && parseFloat(i.my_rating) >= 7)
+    .sort((a, b) => parseFloat(b.my_rating) - parseFloat(a.my_rating))
+    .slice(0, 10);
+
+  if (topBooks.length < 2) {
+    el.innerHTML = `<div class="recs-empty">📚 Agregá y calificá al menos 2 libros con 7 o más para ver recomendaciones.</div>`;
+    return;
+  }
+
+  // Get top authors and genres from liked books
+  const authorCount = {};
+  const genreCount = {};
+  topBooks.forEach(b => {
+    if (b.author) b.author.split(',').forEach(a => { const k = a.trim(); if(k) authorCount[k] = (authorCount[k]||0)+1; });
+    (b.genres || []).forEach(g => genreCount[g] = (genreCount[g]||0)+1);
+  });
+  const topAuthors = Object.entries(authorCount).sort((a,b) => b[1]-a[1]).slice(0,3).map(a=>a[0]);
+  const topGenres = Object.entries(genreCount).sort((a,b) => b[1]-a[1]).slice(0,3).map(g=>g[0]);
+
+  const readIds = new Set(items.filter(i => i.type === 'book').map(i => i.google_books_id).filter(Boolean));
+
+  // Search by top authors and genres
+  const queries = [
+    ...topAuthors.map(a => `inauthor:"${a}"`),
+    ...topGenres.slice(0,2).map(g => `subject:"${g}"`),
+  ].slice(0, 5);
+
+  const allBooks = [];
+  await Promise.all(queries.map(async q => {
+    try {
+      const results = await googleBooksSearch(q);
+      results.forEach(b => {
+        if (!readIds.has(b.id) && !allBooks.find(x => x.id === b.id)) allBooks.push(b);
+      });
+    } catch {}
+  }));
+
+  if (!allBooks.length) {
+    el.innerHTML = `<div class="recs-empty">No encontramos recomendaciones de libros por ahora.</div>`;
+    return;
+  }
+
+  const bookCardHTML = (b, idx) => {
+    const cover = b.cover
+      ? `<img src="${b.cover}" alt="${b.title}" loading="lazy" style="width:100%;height:180px;object-fit:contain;background:#f0ece4;border-radius:8px 8px 0 0">`
+      : `<div style="width:100%;height:180px;background:#f0ece4;border-radius:8px 8px 0 0;display:flex;align-items:center;justify-content:center;font-size:48px">📖</div>`;
+    const starsHtml = Array.from({length:5}, (_, i) =>
+      `<span class="qs rec-qs" data-ridx="bk${idx}" data-val="${(i+1)*2}"
+        onmouseenter="hoverRecStars(this)" onmouseleave="resetRecStars('bk${idx}')"
+        onclick="quickAddBookRec(event, '${b.id}', ${(i+1)*2})">★</span>`
+    ).join('');
+    return `<div class="rec-card">
+      ${cover}
+      ${b.google_rating ? `<div class="rec-score-badge">📗 ${b.google_rating}/5</div>` : ''}
+      <div class="rec-body">
+        <div class="rec-title">${b.title}</div>
+        <div class="rec-meta" style="color:var(--text3);font-size:11px">✍️ ${b.author || '—'} ${b.year ? `· ${b.year}` : ''}</div>
+      </div>
+      <div class="rec-add-btn">
+        <div class="quick-stars" id="rec-qs-bk${idx}">${starsHtml}</div>
+        <button class="btn-add-rec" onclick="quickAddBookRec(event, '${b.id}', null)">+ Agregar</button>
+      </div>
+    </div>`;
+  };
+
+  let html = `<p style="font-size:12px;color:var(--text3);margin-bottom:20px">Basado en tus autores y géneros favoritos: ${topAuthors.slice(0,2).join(', ')}</p>`;
+
+  if (topAuthors.length) {
+    const authorBooks = allBooks.filter(b => topAuthors.some(a => (b.author||'').includes(a))).slice(0, 12);
+    if (authorBooks.length) html += `<div class="recs-section"><div class="recs-section-title">✍️ De tus autores favoritos <span>${topAuthors.slice(0,2).join(' · ')}</span></div><div class="recs-grid">${authorBooks.map(bookCardHTML).join('')}</div></div>`;
+  }
+
+  const otherBooks = allBooks.filter(b => !topAuthors.some(a => (b.author||'').includes(a))).slice(0, 12);
+  if (otherBooks.length) html += `<div class="recs-section"><div class="recs-section-title">📚 Por tus géneros <span>${topGenres.slice(0,2).join(' · ')}</span></div><div class="recs-grid">${otherBooks.map((b,i) => bookCardHTML(b, i+100)).join('')}</div></div>`;
+
+  recsCache.books = html;
+  el.innerHTML = html;
+}
+
+async function quickAddBookRec(e, bookId, rating) {
+  e.stopPropagation();
+  const b = await googleBooksDetail(bookId);
+  const bookItem = {
+    google_books_id: b.id,
+    type: 'book',
+    title: b.title,
+    author: b.author,
+    poster_path: b.cover_large || b.cover,
+    overview: b.description,
+    release_year: b.year ? parseInt(b.year) : null,
+    genres: b.categories,
+    runtime: b.pageCount,
+    tmdb_rating: b.google_rating,
+    status: 'watched',
+    my_rating: rating || null,
+    _bookDetail: b,
+  };
+  if (rating) {
+    await saveItem(bookItem);
+    recsCache.books = null;
+    showToast(`"${b.title}" agregado ⭐ ${rating}/10`, 'success');
+  } else {
+    pendingItem = bookItem;
+    openDetailModal(bookItem, false);
+  }
 }
 
 function bindRecEvents() {} // placeholder, events are inline
