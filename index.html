@@ -1215,8 +1215,8 @@ async function tmdbSearch(query, type) {
     const d = await res.json();
     return (d.results || []).filter(r => r.media_type !== 'person');
   };
-  // Try es-AR → es-ES → en-US in sequence until we get results
-  for (const lang of ['es-AR', 'es-ES', 'en-US']) {
+  // es-AR first, then en-US — skip es-ES entirely
+  for (const lang of ['es-AR', 'en-US']) {
     const results = await trySearch(query, lang);
     if (results.length) return results.slice(0, 10);
   }
@@ -1224,11 +1224,30 @@ async function tmdbSearch(query, type) {
 }
 
 async function tmdbDetail(id, type) {
-  const res = await fetch(
-    `https://api.themoviedb.org/3/${type}/${id}?language=es-AR&append_to_response=external_ids`,
-    { headers: { Authorization: `Bearer ${TMDB_TOKEN}` } }
-  );
-  return res.json();
+  // Fetch es-AR and en-US in parallel, pick best title
+  const [resAR, resEN] = await Promise.all([
+    fetch(`https://api.themoviedb.org/3/${type}/${id}?language=es-AR&append_to_response=external_ids`,
+      { headers: { Authorization: `Bearer ${TMDB_TOKEN}` } }).then(r => r.json()),
+    fetch(`https://api.themoviedb.org/3/${type}/${id}?language=en-US`,
+      { headers: { Authorization: `Bearer ${TMDB_TOKEN}` } }).then(r => r.json()),
+  ]);
+
+  const titleAR = resAR.title || resAR.name || '';
+  const titleEN = resEN.title || resEN.name || '';
+
+  // Use es-AR title only if it's genuinely different from English
+  // (if they're the same or es-AR came back in English, keep en-US as fallback display)
+  // but always prefer es-AR if it has a real Spanish translation
+  const useAR = titleAR && titleAR.toLowerCase() !== titleEN.toLowerCase();
+
+  return {
+    ...resEN,           // base: English (poster, backdrop, genres, ratings, etc.)
+    ...resAR,           // override with es-AR (overview in Spanish, etc.)
+    title: useAR ? titleAR : titleEN,
+    name: useAR ? titleAR : titleEN,
+    original_title: resEN.original_title || resEN.original_name || titleEN,
+    overview: resAR.overview || resEN.overview, // prefer Spanish overview
+  };
 }
 
 async function tmdbRecommendations(tmdbId, type) {
