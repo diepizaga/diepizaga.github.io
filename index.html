@@ -1095,7 +1095,7 @@ select option { background: var(--bg-2); color: var(--t-1); }
     <div class="nav-actions">
       <button class="btn-add-nav" onclick="openSearchModal()">+ Agregar</button>
       <div id="user-menu-wrap">
-        <div class="user-avatar" id="user-avatar-btn" onclick="toggleUserMenu()"></div>
+        <div class="user-avatar" id="user-avatar-btn" onclick="toggleUserMenu()" title="Iniciar sesión">?</div>
         <div id="user-dropdown">
           <div class="ud-head"><div class="ud-name" id="ud-name">—</div><div class="ud-email" id="ud-email">—</div></div>
           <div class="ud-item" onclick="openGroupModal()">
@@ -2797,6 +2797,7 @@ async function onSignedIn(){
   const profile=await loadProfile();
   if(profile){currentUser._profile=profile;updateUserAvatar(profile);}
   await claimNullItems();
+  await loadItems();
 }
 
 async function loadProfile(){
@@ -2821,7 +2822,7 @@ async function claimNullItems(){try{await fetch(`${SUPABASE_URL}/rest/v1/watchli
 function updateUserAvatar(profile){
   const btn=document.getElementById('user-avatar-btn');if(!btn)return;
   const name=profile.display_name||currentUser.email||'?';
-  btn.textContent=name.charAt(0).toUpperCase();btn.style.display='flex';
+  btn.textContent=name.charAt(0).toUpperCase();btn.style.display='flex';btn.title=name;
   const ne=document.getElementById('ud-name'),ee=document.getElementById('ud-email');
   if(ne)ne.textContent=name;if(ee)ee.textContent=currentUser.email||'';
 }
@@ -2898,7 +2899,6 @@ async function signInWithPassword(email, password, nameForProfile) {
     await fetch(`${SUPABASE_URL}/rest/v1/profiles`, { method: 'POST', headers: { ...getAuthHeaders(), 'Prefer': 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ id: currentUser.id, display_name: nameForProfile, email: currentUser.email }) });
   }
   await onSignedIn();
-  await loadItems();
 }
 
 function showPasswordResetForm(recoveryToken) {
@@ -2927,7 +2927,7 @@ async function confirmPasswordReset(recoveryToken) {
     if (!r.ok) { msg.textContent = data.msg || 'Error al guardar.'; msg.style.color = 'var(--red)'; return; }
     currentUser = data; currentSession = { access_token: recoveryToken, refresh_token: '' };
     localStorage.setItem('cinelog_session', JSON.stringify({ access_token: recoveryToken, refresh_token: '', user: data }));
-    await onSignedIn(); await loadItems();
+    await onSignedIn();
   } catch { msg.textContent = 'Error de red.'; msg.style.color = 'var(--red)'; }
 }
 
@@ -2940,10 +2940,20 @@ async function createProfile(){
   catch{showToast('Error al guardar perfil','error');}
 }
 
-function toggleUserMenu(){document.getElementById('user-dropdown')?.classList.toggle('open');}
+function toggleUserMenu(){
+  if(!currentUser){
+    const as=document.getElementById('auth-screen');
+    as.style.display='flex';as.classList.add('visible');
+    showAuthStep('email');
+    return;
+  }
+  document.getElementById('user-dropdown')?.classList.toggle('open');
+}
 function signOut(){
   localStorage.removeItem('cinelog_session');
   currentUser=null; currentSession=null; items=[];
+  const avatarBtn=document.getElementById('user-avatar-btn');
+  if(avatarBtn){avatarBtn.textContent='?';avatarBtn.title='Iniciar sesión';}
   document.querySelectorAll('.pane').forEach(p=>p.classList.remove('active'));
   document.getElementById('pane-inicio').classList.add('active');
   const as=document.getElementById('auth-screen');
@@ -2995,7 +3005,7 @@ dropArea.addEventListener('drop',e=>{e.preventDefault();dropArea.style.borderCol
 // ============================================================
 // INIT
 // ============================================================
-loadItems();
+initAuth();
 </script>
 </body>
 </html>
