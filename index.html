@@ -1225,27 +1225,34 @@ async function tmdbSearch(query, type) {
 }
 
 async function tmdbDetail(id, type) {
-  // Fetch es-AR and en-US in parallel, pick best title
-  const [resAR, resEN] = await Promise.all([
+  // Fetch es-AR, es-ES and en-US in parallel
+  const [resAR, resES, resEN] = await Promise.all([
     fetch(`https://api.themoviedb.org/3/${type}/${id}?language=es-AR&append_to_response=external_ids`,
+      { headers: { Authorization: `Bearer ${TMDB_TOKEN}` } }).then(r => r.json()),
+    fetch(`https://api.themoviedb.org/3/${type}/${id}?language=es-ES`,
       { headers: { Authorization: `Bearer ${TMDB_TOKEN}` } }).then(r => r.json()),
     fetch(`https://api.themoviedb.org/3/${type}/${id}?language=en-US`,
       { headers: { Authorization: `Bearer ${TMDB_TOKEN}` } }).then(r => r.json()),
   ]);
 
-  const titleAR = resAR.title || resAR.name || '';
-  const titleEN = resEN.title || resEN.name || '';
+  const titleAR = (resAR.title || resAR.name || '').trim();
+  const titleES = (resES.title || resES.name || '').trim();
+  const titleEN = (resEN.title || resEN.name || '').trim();
 
-  // Use es-AR title only if it's genuinely different from English
-  // (if they're the same or es-AR came back in English, keep en-US as fallback display)
-  // but always prefer es-AR if it has a real Spanish translation
-  const useAR = titleAR && titleAR.toLowerCase() !== titleEN.toLowerCase();
+  // Use es-AR title only if it's a genuine Latin American translation:
+  // must differ from English AND differ from Spain Spanish
+  // (if es-AR == es-ES, TMDB just served the Spain translation as fallback — ignore it)
+  const isGenuineLatam = titleAR
+    && titleAR.toLowerCase() !== titleEN.toLowerCase()
+    && titleAR.toLowerCase() !== titleES.toLowerCase();
+
+  const bestTitle = isGenuineLatam ? titleAR : titleEN;
 
   return {
-    ...resEN,           // base: English (poster, backdrop, genres, ratings, etc.)
+    ...resEN,           // base: English metadata
     ...resAR,           // override with es-AR (overview in Spanish, etc.)
-    title: useAR ? titleAR : titleEN,
-    name: useAR ? titleAR : titleEN,
+    title: bestTitle,
+    name: bestTitle,
     original_title: resEN.original_title || resEN.original_name || titleEN,
     overview: resAR.overview || resEN.overview, // prefer Spanish overview
   };
