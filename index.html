@@ -887,8 +887,9 @@ select option { background: var(--bg2); color: var(--text); }
       <input class="auth-input" type="password" id="auth-password" placeholder="Contraseña" autocomplete="current-password" style="margin-top:8px" />
       <input class="auth-input" type="text" id="auth-username" placeholder="Tu nombre (solo primera vez)" maxlength="20" style="margin-top:8px;display:none" />
       <button class="auth-btn" id="auth-submit-btn" onclick="handleAuth()">Entrar →</button>
-      <div style="text-align:center;margin-top:12px">
+      <div style="text-align:center;margin-top:12px;display:flex;flex-direction:column;gap:6px">
         <a href="#" id="auth-toggle-link" onclick="toggleAuthMode();return false" style="font-size:13px;color:var(--accent)">¿No tenés cuenta? Registrate</a>
+        <a href="#" id="auth-forgot-link" onclick="handleForgotPassword();return false" style="font-size:12px;color:var(--text3)">Olvidé mi contraseña</a>
       </div>
       <div class="auth-msg" id="auth-msg-email" style="margin-top:10px"></div>
     </div>
@@ -2689,9 +2690,34 @@ function toggleAuthMode() {
   document.getElementById('auth-username').style.display = isSignup ? 'block' : 'none';
   document.getElementById('auth-submit-btn').textContent = isSignup ? 'Crear cuenta →' : 'Entrar →';
   document.getElementById('auth-toggle-link').textContent = isSignup ? '¿Ya tenés cuenta? Iniciá sesión' : '¿No tenés cuenta? Registrate';
+  document.getElementById('auth-forgot-link').style.display = isSignup ? 'none' : 'inline';
   document.getElementById('auth-msg-email').textContent = '';
   if (isSignup) document.getElementById('auth-password').setAttribute('autocomplete', 'new-password');
   else document.getElementById('auth-password').setAttribute('autocomplete', 'current-password');
+}
+
+async function handleForgotPassword() {
+  const email = document.getElementById('auth-email').value.trim();
+  const msg = document.getElementById('auth-msg-email');
+  if (!email) { msg.textContent = 'Ingresá tu email primero.'; msg.style.color = 'var(--rt-fresh)'; return; }
+  msg.textContent = 'Enviando...'; msg.style.color = 'var(--text2)';
+  try {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/recover`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON },
+      body: JSON.stringify({ email })
+    });
+    if (res.ok || res.status === 200) {
+      msg.textContent = '✓ Te mandamos un email para resetear tu contraseña. Revisá spam también.';
+      msg.style.color = 'var(--green)';
+    } else {
+      const err = await res.json().catch(() => ({}));
+      msg.textContent = err.msg || err.error_description || 'Error al enviar el email.';
+      msg.style.color = 'var(--rt-fresh)';
+    }
+  } catch(e) {
+    msg.textContent = 'Error de conexión.'; msg.style.color = 'var(--rt-fresh)';
+  }
 }
 
 async function handleAuth() {
@@ -2770,6 +2796,19 @@ async function signInWithPassword(email, password, nameForProfile) {
 }
 
 async function initAuth() {
+  // Check if this is a password-reset redirect (hash contains access_token + type=recovery)
+  const hash = window.location.hash;
+  if (hash && hash.includes('type=recovery') && hash.includes('access_token=')) {
+    const params = new URLSearchParams(hash.replace(/^#/, ''));
+    const recoveryToken = params.get('access_token');
+    if (recoveryToken) {
+      history.replaceState(null, '', window.location.pathname);
+      document.getElementById('auth-screen').classList.add('visible');
+      showPasswordResetForm(recoveryToken);
+      return;
+    }
+  }
+
   // Check stored session
   const stored = localStorage.getItem('cinelog_session');
   if (stored) {
@@ -2791,6 +2830,45 @@ async function initAuth() {
     await onSignedIn();
   } else {
     document.getElementById('auth-screen').classList.add('visible');
+  }
+}
+
+function showPasswordResetForm(recoveryToken) {
+  const step = document.getElementById('auth-step-email');
+  step.classList.add('active');
+  step.innerHTML = `
+    <h2>Nueva contraseña</h2>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:16px">Elegí una contraseña nueva para tu cuenta.</p>
+    <input class="auth-input" type="password" id="reset-pw1" placeholder="Nueva contraseña" autocomplete="new-password" />
+    <input class="auth-input" type="password" id="reset-pw2" placeholder="Repetí la contraseña" autocomplete="new-password" style="margin-top:8px" />
+    <button class="auth-btn" onclick="confirmPasswordReset('${recoveryToken}')">Guardar contraseña →</button>
+    <div class="auth-msg" id="reset-msg" style="margin-top:10px"></div>
+  `;
+}
+
+async function confirmPasswordReset(recoveryToken) {
+  const pw1 = document.getElementById('reset-pw1').value;
+  const pw2 = document.getElementById('reset-pw2').value;
+  const msg = document.getElementById('reset-msg');
+  if (!pw1 || pw1.length < 6) { msg.textContent = 'La contraseña debe tener al menos 6 caracteres.'; msg.style.color = 'var(--rt-fresh)'; return; }
+  if (pw1 !== pw2) { msg.textContent = 'Las contraseñas no coinciden.'; msg.style.color = 'var(--rt-fresh)'; return; }
+  msg.textContent = 'Guardando...'; msg.style.color = 'var(--text2)';
+  try {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON, 'Authorization': `Bearer ${recoveryToken}` },
+      body: JSON.stringify({ password: pw1 })
+    });
+    const data = await res.json();
+    if (!res.ok) { msg.textContent = data.msg || 'Error al guardar.'; msg.style.color = 'var(--rt-fresh)'; return; }
+    // Store session and proceed
+    currentUser = data;
+    currentSession = { access_token: recoveryToken, refresh_token: '' };
+    localStorage.setItem('cinelog_session', JSON.stringify({ access_token: recoveryToken, refresh_token: '', user: data }));
+    await onSignedIn();
+    await loadItems();
+  } catch(e) {
+    msg.textContent = 'Error de red.'; msg.style.color = 'var(--rt-fresh)';
   }
 }
 
