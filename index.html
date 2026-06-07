@@ -599,7 +599,7 @@ select option { background: var(--bg-2); color: var(--t-1); }
 .insight-sub { font-size: 12.5px; color: var(--t-2); margin-top: 5px; }
 
 /* ── ADN ─────────────────────────────────────────────────── */
-#pane-adn { padding: 40px 28px 60px; max-width: 900px; }
+#pane-adn { padding: 40px 28px 60px; }
 
 .adn-header { margin-bottom: 48px; }
 .adn-eyebrow { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--gold); margin-bottom: 12px; }
@@ -858,8 +858,34 @@ select option { background: var(--bg-2); color: var(--t-1); }
 .member-avatar { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10.5px; font-weight: 700; color: #000; flex-shrink: 0; background: var(--gold); }
 .member-name { font-size: 12.5px; font-weight: 600; flex: 1; }
 .member-you { font-size: 9.5px; color: var(--gold); font-weight: 700; background: rgba(232,160,48,.15); padding: 2px 6px; border-radius: 4px; }
+.member-compare-btn { font-size: 11px; font-weight: 600; color: var(--gold); background: rgba(184,134,70,.12); border: 1px solid rgba(184,134,70,.25); border-radius: 5px; padding: 3px 9px; cursor: pointer; transition: background .15s; white-space: nowrap; }
+.member-compare-btn:hover { background: rgba(184,134,70,.22); }
 
-/* Compare */
+/* Compatibility view */
+.compat-back { font-size: 12px; color: var(--t-3); cursor: pointer; margin-bottom: 14px; display: inline-flex; align-items: center; gap: 5px; }
+.compat-back:hover { color: var(--t-1); }
+.compat-score-ring { text-align: center; padding: 18px 0 14px; }
+.compat-score-num { font-size: 52px; font-weight: 900; color: var(--gold); line-height: 1; letter-spacing: -3px; }
+.compat-score-lbl { font-size: 10px; color: var(--t-3); text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; }
+.compat-bars { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 18px; }
+.compat-bar-item { background: var(--bg-2); border-radius: 8px; padding: 10px 12px; }
+.compat-bar-lbl { font-size: 9.5px; color: var(--t-3); text-transform: uppercase; letter-spacing: .8px; margin-bottom: 6px; }
+.compat-bar-track { height: 5px; background: var(--bg-4); border-radius: 3px; overflow: hidden; }
+.compat-bar-fill { height: 100%; background: var(--gold); border-radius: 3px; transition: width .6s ease; }
+.compat-bar-val { font-size: 11px; font-weight: 700; color: var(--t-1); margin-top: 5px; }
+.compat-section-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--t-3); margin: 16px 0 8px; }
+.compat-rec-item { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid var(--b-1); }
+.compat-rec-item:last-child { border-bottom: none; }
+.compat-rec-poster { width: 34px; height: 50px; object-fit: cover; border-radius: 4px; background: var(--bg-3); flex-shrink: 0; }
+.compat-rec-info { flex: 1; min-width: 0; }
+.compat-rec-title { font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.compat-rec-meta { font-size: 11px; color: var(--t-3); margin-top: 2px; }
+.compat-rec-rating { font-size: 13px; font-weight: 800; color: var(--gold); flex-shrink: 0; }
+.compat-member-card { display: flex; align-items: center; gap: 11px; padding: 10px 12px; background: var(--bg-2); border-radius: 9px; border: 1px solid var(--b-1); cursor: pointer; transition: border-color .15s; margin-bottom: 8px; }
+.compat-member-card:hover { border-color: var(--gold); }
+.compat-member-score { font-size: 18px; font-weight: 900; color: var(--gold); letter-spacing: -1px; min-width: 40px; text-align: right; }
+
+/* Compare (legacy grid) */
 .compare-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px,1fr)); gap: 12px; }
 .compare-card { background: var(--bg-1); border: 1px solid var(--b-1); border-radius: var(--r-md); padding: 12px; display: flex; gap: 11px; cursor: pointer; transition: box-shadow .2s, border-color .2s; }
 .compare-card:hover { box-shadow: 0 4px 20px rgba(0,0,0,.65); border-color: var(--b-2); }
@@ -1050,17 +1076,21 @@ select option { background: var(--bg-2); color: var(--t-1); }
 
 <!-- GROUP MODAL -->
 <div class="modal-overlay" id="modal-group">
-  <div class="modal">
+  <div class="modal" style="max-width:560px;width:100%">
     <button class="modal-close" onclick="closeModal('modal-group')">✕</button>
     <div class="modal-body" style="padding:22px">
       <h2 style="font-size:18px;font-weight:700;margin-bottom:5px">Mi grupo</h2>
-      <p>Compartí el código con amigos para comparar calificaciones.</p>
-      <div class="group-tabs">
+      <p>Comparé gustos, compatibilidad y recomendaciones con tu grupo.</p>
+      <div class="group-tabs" id="group-tabs-row">
         <div class="group-tab active" onclick="switchGroupTab('members')">Miembros</div>
+        <div class="group-tab" onclick="switchGroupTab('compare')">Compatibilidad</div>
         <div class="group-tab" onclick="switchGroupTab('join')">Unirse</div>
       </div>
       <div class="group-panel active" id="group-panel-members">
         <div id="group-members-content"><div style="text-align:center;padding:18px;color:var(--t-3)">Cargando…</div></div>
+      </div>
+      <div class="group-panel" id="group-panel-compare">
+        <div id="group-compare-content"><div style="text-align:center;padding:18px;color:var(--t-3)">Cargando…</div></div>
       </div>
       <div class="group-panel" id="group-panel-join">
         <p style="font-size:12.5px;color:var(--t-2);margin-bottom:11px">Pedile el código de 6 letras a alguien del grupo:</p>
@@ -1239,7 +1269,7 @@ select option { background: var(--bg-2); color: var(--t-1); }
     </div>
     <div class="mn-tab" data-tab="biblioteca">
       <svg class="mn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-      <span class="mn-label">Biblioteca</span>
+      <span class="mn-label">Biblio</span>
     </div>
     <div class="mob-fab" onclick="openSearchModal()">+</div>
     <div class="mn-tab" data-tab="descubri">
@@ -1414,30 +1444,60 @@ async function tmdbRecs(tmdbId, type) {
 }
 
 // ============================================================
-// GOOGLE BOOKS
+// OPEN LIBRARY (reemplaza Google Books — sin API key, siempre disponible)
 // ============================================================
+function olCover(coverId, size='M') {
+  return coverId ? `https://covers.openlibrary.org/b/id/${coverId}-${size}.jpg` : null;
+}
 async function booksSearch(q) {
-  const r = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=10&printType=books`);
+  const r = await fetch(`https://openlibrary.org/search.json?q=${encodeURIComponent(q)}&limit=12&fields=key,title,author_name,first_publish_year,cover_i,subject,number_of_pages_median`);
+  if (!r.ok) return [];
   const d = await r.json();
-  return (d.items||[]).map(it=>({
-    id:it.id, _type:'book', title:it.volumeInfo?.title||'', author:(it.volumeInfo?.authors||[]).join(', '),
-    year:(it.volumeInfo?.publishedDate||'').slice(0,4),
-    cover:it.volumeInfo?.imageLinks?.thumbnail?.replace('http:','https:')||null,
-    categories:it.volumeInfo?.categories||[], pageCount:it.volumeInfo?.pageCount||null,
-    description:it.volumeInfo?.description||null, google_rating:it.volumeInfo?.averageRating||null,
-    preview_link:it.volumeInfo?.previewLink||null,
+  return (d.docs||[]).filter(it=>it.title).map(it=>({
+    id: it.key,            // e.g. "/works/OL18417W"
+    _type: 'book',
+    title: it.title,
+    author: (it.author_name||[]).slice(0,2).join(', '),
+    year: it.first_publish_year ? String(it.first_publish_year) : '',
+    cover: olCover(it.cover_i),
+    categories: (it.subject||[]).slice(0,5),
+    pageCount: it.number_of_pages_median||null,
+    description: null,
+    google_rating: null,
+    preview_link: `https://openlibrary.org${it.key}`,
   }));
 }
 
 async function booksDetail(id) {
-  const r = await fetch(`https://www.googleapis.com/books/v1/volumes/${id}`);
-  const d = await r.json(); const v = d.volumeInfo||{};
-  return { id:d.id, _type:'book', title:v.title||'', author:(v.authors||[]).join(', '),
-    year:(v.publishedDate||'').slice(0,4),
-    cover:v.imageLinks?.thumbnail?.replace('http:','https:')||null,
-    cover_large:v.imageLinks?.medium?.replace('http:','https:')||v.imageLinks?.thumbnail?.replace('http:','https:')||null,
-    categories:v.categories||[], pageCount:v.pageCount||null, description:v.description||null,
-    google_rating:v.averageRating||null, preview_link:v.previewLink||null, publisher:v.publisher||null };
+  // id is like "/works/OL18417W"
+  const [work, editions] = await Promise.all([
+    fetch(`https://openlibrary.org${id}.json`).then(r=>r.json()).catch(()=>({})),
+    fetch(`https://openlibrary.org${id}/editions.json?limit=1`).then(r=>r.json()).catch(()=>({entries:[]})),
+  ]);
+  const coverId = work.covers?.[0] || editions.entries?.[0]?.covers?.[0] || null;
+  const desc = typeof work.description === 'string' ? work.description : work.description?.value || null;
+  const pageCount = editions.entries?.[0]?.number_of_pages || null;
+  let author = '';
+  if (work.authors?.length) {
+    try {
+      const aData = await fetch(`https://openlibrary.org${work.authors[0].author.key}.json`).then(r=>r.json());
+      author = aData.name || '';
+    } catch {}
+  }
+  return {
+    id, _type:'book',
+    title: work.title || '',
+    author,
+    year: work.first_publish_date ? work.first_publish_date.slice(-4) : '',
+    cover: olCover(coverId),
+    cover_large: olCover(coverId, 'L'),
+    categories: (work.subjects||[]).slice(0,5),
+    pageCount,
+    description: desc,
+    google_rating: null,
+    preview_link: `https://openlibrary.org${id}`,
+    publisher: editions.entries?.[0]?.publishers?.[0] || null,
+  };
 }
 
 // ============================================================
@@ -2967,30 +3027,231 @@ document.addEventListener('click',e=>{const dd=document.getElementById('user-dro
 // ============================================================
 // GRUPO
 // ============================================================
-let currentGroup=null;
-async function openGroupModal(){
+let currentGroup = null;
+let groupMembers  = [];
+
+async function openGroupModal() {
   document.getElementById('user-dropdown')?.classList.remove('open');
-  if(!currentUser){showToast('Iniciá sesión primero','error');return;}
-  document.getElementById('modal-group').style.display='flex';
+  if (!currentUser) { showToast('Iniciá sesión primero', 'error'); return; }
+  document.getElementById('modal-group').style.display = 'flex';
   await loadCurrentGroup();
 }
-async function loadCurrentGroup(){
-  try{const r=await fetch(`${SUPABASE_URL}/rest/v1/group_members?user_id=eq.${currentUser.id}&select=group_id,groups(*)`,{headers:getAuthHeaders()});if(!r.ok)return;const d=await r.json();if(d.length>0&&d[0].groups)currentGroup=d[0].groups;}catch{}
-  switchGroupTab(currentGroup?'members':'join');
+
+async function loadCurrentGroup() {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/group_members?user_id=eq.${currentUser.id}&select=group_id,groups(*)`, { headers: getAuthHeaders() });
+    if (!r.ok) return;
+    const d = await r.json();
+    if (d.length > 0 && d[0].groups) currentGroup = d[0].groups;
+  } catch {}
+  // Show/hide compare tab depending on whether user has a group
+  const compareTabs = document.querySelectorAll('#group-tabs-row .group-tab');
+  if (compareTabs[1]) compareTabs[1].style.display = currentGroup ? '' : 'none';
+  switchGroupTab(currentGroup ? 'members' : 'join');
 }
-function switchGroupTab(tab){
-  document.querySelectorAll('.group-tab').forEach(b=>b.classList.toggle('active',b.getAttribute('onclick')?.includes(`'${tab}'`)));
-  document.querySelectorAll('.group-panel').forEach(p=>p.classList.remove('active'));
-  const panel=document.getElementById(`group-panel-${tab}`);if(panel)panel.classList.add('active');
-  if(tab==='members')renderGroupMembers();
+
+function switchGroupTab(tab) {
+  document.querySelectorAll('.group-tab').forEach(b => b.classList.toggle('active', b.getAttribute('onclick')?.includes(`'${tab}'`)));
+  document.querySelectorAll('.group-panel').forEach(p => p.classList.remove('active'));
+  const panel = document.getElementById(`group-panel-${tab}`);
+  if (panel) panel.classList.add('active');
+  if (tab === 'members')  renderGroupMembers();
+  if (tab === 'compare')  renderGroupCompareList();
 }
-async function renderGroupMembers(){
-  const el=document.getElementById('group-members-content');if(!el)return;
-  if(!currentGroup){el.innerHTML=`<div style="text-align:center;padding:16px;color:var(--t-3)"><p style="margin-bottom:12px">No estás en ningún grupo.</p><div style="display:flex;gap:7px;justify-content:center"><button class="auth-btn" style="flex:1" onclick="switchGroupTab('join')">Unirme →</button><button class="auth-btn-sec" style="flex:1" onclick="showCreateGroup()">Crear grupo</button></div></div>`;return;}
-  try{const r=await fetch(`${SUPABASE_URL}/rest/v1/group_members?group_id=eq.${currentGroup.id}&select=user_id,role,profiles(display_name,email)`,{headers:getAuthHeaders()});const members=await r.json();const code=currentGroup.invite_code||'—';
-  el.innerHTML=`<div style="background:var(--bg-2);border-radius:9px;padding:13px;margin-bottom:14px;text-align:center;border:1px solid var(--b-1)"><div style="font-weight:700;font-size:14.5px;margin-bottom:4px">${currentGroup.name}</div><div style="font-size:11.5px;color:var(--t-3);margin-bottom:8px">Código de invitación</div><div style="font-size:22px;font-weight:900;letter-spacing:6px;color:var(--gold);cursor:pointer;font-family:monospace" onclick="navigator.clipboard.writeText('${code}');showToast('Código copiado','success')">${code}</div><div style="font-size:9.5px;color:var(--t-3);margin-top:4px">Tap para copiar</div></div><div class="member-list">${members.map(m=>{const p=m.profiles||{},name=p.display_name||p.email||'Anónimo',isMe=m.user_id===currentUser.id;return `<div class="member-item"><div class="member-avatar">${name.charAt(0).toUpperCase()}</div><div class="member-name">${name}</div>${isMe?'<span class="member-you">vos</span>':''}${m.role==='owner'?'<span style="font-size:9.5px;color:var(--t-3)">admin</span>':''}</div>`;}).join('')}</div>`;}
-  catch{el.innerHTML=`<div style="color:var(--t-3);text-align:center;padding:18px">Error al cargar</div>`;}
+
+async function renderGroupMembers() {
+  const el = document.getElementById('group-members-content');
+  if (!el) return;
+  if (!currentGroup) {
+    el.innerHTML = `<div style="text-align:center;padding:16px;color:var(--t-3)"><p style="margin-bottom:12px">No estás en ningún grupo.</p><div style="display:flex;gap:7px;justify-content:center"><button class="auth-btn" style="flex:1" onclick="switchGroupTab('join')">Unirme →</button><button class="auth-btn-sec" style="flex:1" onclick="showCreateGroup()">Crear grupo</button></div></div>`;
+    return;
+  }
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/group_members?group_id=eq.${currentGroup.id}&select=user_id,role,profiles(display_name,email)`, { headers: getAuthHeaders() });
+    const members = await r.json();
+    groupMembers = members;
+    const code = currentGroup.invite_code || '—';
+    el.innerHTML = `
+      <div style="background:var(--bg-2);border-radius:9px;padding:13px;margin-bottom:14px;text-align:center;border:1px solid var(--b-1)">
+        <div style="font-weight:700;font-size:14.5px;margin-bottom:4px">${currentGroup.name}</div>
+        <div style="font-size:11.5px;color:var(--t-3);margin-bottom:8px">Código de invitación</div>
+        <div style="font-size:22px;font-weight:900;letter-spacing:6px;color:var(--gold);cursor:pointer;font-family:monospace" onclick="navigator.clipboard.writeText('${code}');showToast('Código copiado','success')">${code}</div>
+        <div style="font-size:9.5px;color:var(--t-3);margin-top:4px">Tap para copiar</div>
+      </div>
+      <div class="member-list">
+        ${members.map(m => {
+          const p = m.profiles || {}, name = p.display_name || p.email || 'Anónimo', isMe = m.user_id === currentUser.id;
+          return `<div class="member-item">
+            <div class="member-avatar">${name.charAt(0).toUpperCase()}</div>
+            <div class="member-name">${name}</div>
+            ${isMe ? '<span class="member-you">vos</span>' : `<button class="member-compare-btn" onclick="compareWithMember('${m.user_id}','${name.replace(/'/g,"\\'")}')">Comparar →</button>`}
+            ${m.role === 'owner' ? '<span style="font-size:9.5px;color:var(--t-3)">admin</span>' : ''}
+          </div>`;
+        }).join('')}
+      </div>`;
+  } catch { el.innerHTML = `<div style="color:var(--t-3);text-align:center;padding:18px">Error al cargar</div>`; }
 }
+
+// ── Compare: list view (pick a member) ──────────────────────
+async function renderGroupCompareList() {
+  const el = document.getElementById('group-compare-content');
+  if (!el) return;
+  if (!currentGroup) { el.innerHTML = `<div style="text-align:center;padding:30px;color:var(--t-3)">Necesitás estar en un grupo.</div>`; return; }
+  el.innerHTML = `<div style="text-align:center;padding:18px;color:var(--t-3)">Cargando miembros…</div>`;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/group_members?group_id=eq.${currentGroup.id}&select=user_id,role,profiles(display_name,email)`, { headers: getAuthHeaders() });
+    const members = await r.json();
+    groupMembers = members;
+    const others = members.filter(m => m.user_id !== currentUser.id);
+    if (!others.length) { el.innerHTML = `<div style="text-align:center;padding:30px;color:var(--t-3)">Todavía no hay otros miembros. Compartí el código!</div>`; return; }
+    el.innerHTML = `<p style="font-size:12px;color:var(--t-3);margin-bottom:12px">Elegí un miembro para ver compatibilidad y recomendaciones:</p>${others.map(m => {
+      const p = m.profiles || {}, name = p.display_name || p.email || 'Anónimo';
+      return `<div class="compat-member-card" onclick="compareWithMember('${m.user_id}','${name.replace(/'/g,"\\'")}')">
+        <div class="member-avatar" style="width:32px;height:32px;font-size:12px">${name.charAt(0).toUpperCase()}</div>
+        <div style="flex:1"><div style="font-size:13px;font-weight:700">${name}</div><div style="font-size:11px;color:var(--t-3)">Tap para comparar</div></div>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--t-3)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>`;
+    }).join('')}`;
+  } catch { el.innerHTML = `<div style="color:var(--t-3);text-align:center;padding:18px">Error al cargar</div>`; }
+}
+
+// ── Compare: detail view (vs one member) ────────────────────
+async function compareWithMember(memberId, memberName) {
+  const el = document.getElementById('group-compare-content') || document.getElementById('group-members-content');
+  // Switch to compare tab if coming from members tab
+  document.querySelectorAll('.group-tab').forEach(b => b.classList.toggle('active', b.getAttribute('onclick')?.includes("'compare'")));
+  document.querySelectorAll('.group-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('group-panel-compare').classList.add('active');
+
+  const cel = document.getElementById('group-compare-content');
+  cel.innerHTML = `<div style="text-align:center;padding:30px;color:var(--t-3)">Analizando compatibilidad con <strong>${memberName}</strong>…</div>`;
+
+  try {
+    // Fetch both watchlists in parallel
+    const [myR, theirR] = await Promise.all([
+      fetch(`${SUPABASE_URL}/rest/v1/watchlist?user_id=eq.${currentUser.id}&select=tmdb_id,type,title,poster_path,my_rating,genres,release_year,google_books_id,author`, { headers: getAuthHeaders() }),
+      fetch(`${SUPABASE_URL}/rest/v1/watchlist?user_id=eq.${memberId}&select=tmdb_id,type,title,poster_path,my_rating,genres,release_year,google_books_id,author`, { headers: getAuthHeaders() }),
+    ]);
+    const [myList, theirList] = await Promise.all([myR.json(), theirR.json()]);
+
+    // Genre scores
+    function genreMap(list) {
+      const m = {};
+      list.forEach(i => (i.genres||[]).forEach(g => { m[g] = (m[g]||0)+1; }));
+      return m;
+    }
+    const myGenres    = genreMap(myList);
+    const theirGenres = genreMap(theirList);
+    const allGenreKeys = new Set([...Object.keys(myGenres), ...Object.keys(theirGenres)]);
+    const overlap = [...allGenreKeys].filter(g => myGenres[g] && theirGenres[g]);
+    const genrePct = allGenreKeys.size ? Math.round(overlap.length / allGenreKeys.size * 100) : 0;
+
+    // Shared items (both watched)
+    const myIdSet = new Set(myList.map(i => i.tmdb_id ? `t${i.tmdb_id}` : `b${i.google_books_id}`).filter(Boolean));
+    const shared  = theirList.filter(i => {
+      const key = i.tmdb_id ? `t${i.tmdb_id}` : `b${i.google_books_id}`;
+      return key && myIdSet.has(key);
+    });
+    const myMap = {};
+    myList.forEach(i => { const k = i.tmdb_id ? `t${i.tmdb_id}` : `b${i.google_books_id}`; if(k) myMap[k]=i; });
+
+    // Rating correlation on shared items
+    let ratingPct = 0;
+    if (shared.length) {
+      const diffs = shared.map(i => {
+        const k = i.tmdb_id ? `t${i.tmdb_id}` : `b${i.google_books_id}`;
+        const mine = myMap[k]?.my_rating, theirs = i.my_rating;
+        if (!mine || !theirs) return 2; // neutral diff when one is missing
+        return Math.abs(mine - theirs);
+      });
+      const avgDiff = diffs.reduce((a,b) => a+b, 0) / diffs.length;
+      ratingPct = Math.round(Math.max(0, 1 - avgDiff/9) * 100);
+    } else {
+      ratingPct = genrePct; // fallback when no shared items yet
+    }
+
+    // Overall compatibility
+    const score = shared.length
+      ? Math.round(genrePct * 0.45 + ratingPct * 0.45 + Math.min(shared.length/20,1)*10)
+      : genrePct;
+
+    // Recommendations: their highly-rated items you haven't seen
+    const recs = theirList
+      .filter(i => {
+        if (!i.my_rating || i.my_rating < 7) return false;
+        const k = i.tmdb_id ? `t${i.tmdb_id}` : `b${i.google_books_id}`;
+        return k && !myIdSet.has(k);
+      })
+      .sort((a,b) => (b.my_rating||0) - (a.my_rating||0))
+      .slice(0, 8);
+
+    // Shared items sorted by biggest rating gap
+    const sharedWithGap = shared
+      .map(i => {
+        const k = i.tmdb_id ? `t${i.tmdb_id}` : `b${i.google_books_id}`;
+        return { item: i, myRating: myMap[k]?.my_rating, theirRating: i.my_rating };
+      })
+      .filter(x => x.myRating && x.theirRating)
+      .sort((a,b) => b.theirRating - a.theirRating)
+      .slice(0, 6);
+
+    function scoreColor(s) { return s >= 70 ? 'var(--green)' : s >= 45 ? 'var(--gold)' : 'var(--t-3)'; }
+    function posterHtml(item, cls) {
+      const isBook = item.type === 'book';
+      const src = isBook ? item.poster_path : (item.poster_path ? `${TMDB_IMG}w92${item.poster_path}` : null);
+      return src ? `<img src="${src}" alt="" class="${cls}" onerror="this.style.background='var(--bg-3)'">` : `<div class="${cls}" style="background:var(--bg-3)"></div>`;
+    }
+
+    cel.innerHTML = `
+      <div class="compat-back" onclick="renderGroupCompareList()">← Todos los miembros</div>
+      <div class="compat-score-ring">
+        <div class="compat-score-num" style="color:${scoreColor(score)}">${score}%</div>
+        <div class="compat-score-lbl">Compatibilidad con ${memberName}</div>
+      </div>
+      <div class="compat-bars">
+        <div class="compat-bar-item">
+          <div class="compat-bar-lbl">Géneros en común</div>
+          <div class="compat-bar-track"><div class="compat-bar-fill" style="width:${genrePct}%"></div></div>
+          <div class="compat-bar-val">${genrePct}% · ${overlap.length} géneros</div>
+        </div>
+        <div class="compat-bar-item">
+          <div class="compat-bar-lbl">Coincidencia de notas</div>
+          <div class="compat-bar-track"><div class="compat-bar-fill" style="width:${ratingPct}%"></div></div>
+          <div class="compat-bar-val">${ratingPct}% · ${shared.length} en común</div>
+        </div>
+      </div>
+
+      ${recs.length ? `
+        <div class="compat-section-title">📽 ${memberName} recomienda (no las viste)</div>
+        ${recs.map(i => `
+          <div class="compat-rec-item">
+            ${posterHtml(i,'compat-rec-poster')}
+            <div class="compat-rec-info">
+              <div class="compat-rec-title">${i.title}</div>
+              <div class="compat-rec-meta">${i.type==='movie'?'Película':i.type==='tv'?'Serie':'Libro'}${i.release_year?' · '+i.release_year:''}</div>
+            </div>
+            <div class="compat-rec-rating">${i.my_rating}/10</div>
+          </div>`).join('')}
+      ` : `<div style="color:var(--t-3);font-size:12px;text-align:center;padding:12px 0">Sin recomendaciones aún — necesitás más cosas en común.</div>`}
+
+      ${sharedWithGap.length ? `
+        <div class="compat-section-title">✓ Ambos vieron</div>
+        ${sharedWithGap.map(({item,myRating,theirRating}) => `
+          <div class="compat-rec-item">
+            ${posterHtml(item,'compat-rec-poster')}
+            <div class="compat-rec-info">
+              <div class="compat-rec-title">${item.title}</div>
+              <div class="compat-rec-meta">Vos: ${myRating}/10 · ${memberName}: ${theirRating}/10</div>
+            </div>
+            <div class="compat-rec-rating" style="color:${Math.abs(myRating-theirRating)>=3?'var(--red)':'var(--t-3)'}">${myRating===theirRating?'=':(myRating>theirRating?'+':'') + (myRating-theirRating)}</div>
+          </div>`).join('')}
+      ` : ''}
+    `;
+  } catch(e) {
+    document.getElementById('group-compare-content').innerHTML = `<div style="color:var(--t-3);text-align:center;padding:18px">Error al cargar datos</div>`;
+  }
+}
+
 function showCreateGroup(){const p=document.getElementById('group-panel-join');if(!p)return;p.innerHTML=`<p style="font-size:12.5px;color:var(--t-2);margin-bottom:11px">Creá tu grupo:</p><input class="auth-input" type="text" id="create-group-name" placeholder="Nombre del grupo" maxlength="30"/><button class="auth-btn" onclick="createGroup()">Crear →</button><div style="margin-top:9px;text-align:center"><a href="#" onclick="resetJoinPanel();return false" style="font-size:12px;color:var(--t-3)">← Tengo un código</a></div>`;switchGroupTab('join');}
 function resetJoinPanel(){const p=document.getElementById('group-panel-join');if(p)p.innerHTML=`<p style="font-size:12.5px;color:var(--t-2);margin-bottom:11px">Código de 6 letras:</p><input class="auth-input" type="text" id="join-code-input" placeholder="ABC123" maxlength="6" style="text-transform:uppercase;letter-spacing:4px;font-size:20px;font-weight:700"/><button class="auth-btn" onclick="joinGroup()">Unirse</button><div class="auth-msg" id="join-msg"></div>`;}
 async function joinGroup(){const input=document.getElementById('join-code-input');if(!input)return;const code=input.value.trim().toUpperCase();if(code.length<4){showToast('Ingresá el código','error');return;}try{const r=await fetch(`${SUPABASE_URL}/rest/v1/groups?invite_code=eq.${code}&select=*`,{headers:getAuthHeaders()});const gs=await r.json();if(!gs.length){showToast('Código inválido','error');return;}const g=gs[0];await fetch(`${SUPABASE_URL}/rest/v1/group_members`,{method:'POST',headers:{...getAuthHeaders(),'Prefer':'resolution=ignore-duplicates,return=minimal'},body:JSON.stringify({group_id:g.id,user_id:currentUser.id,role:'member'})});currentGroup=g;showToast(`Te uniste a "${g.name}"`,'success');switchGroupTab('members');}catch{showToast('Error al unirse','error');}}
