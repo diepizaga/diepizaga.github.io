@@ -127,7 +127,7 @@ select option { background: var(--bg-2); color: var(--t-1); }
 .sb-add-btn:hover { background: var(--gold2); }
 .sb-add-btn:active { transform: scale(.97); }
 .sb-add-label { }
-.sb-compact-btn {
+.sb-compact-btn-REMOVED {
   display: flex; align-items: center; justify-content: center;
   padding: 7px; border-radius: var(--r-sm);
   color: var(--t-4); transition: color .12s, background .12s;
@@ -1413,9 +1413,6 @@ select option { background: var(--bg-2); color: var(--t-1); }
     <div class="sb-user" onclick="toggleUserMenu()">
       <div class="sb-avatar" id="sb-avatar">?</div>
       <div class="sb-user-name" id="sb-user-name">—</div>
-    </div>
-    <div class="sb-compact-btn" onclick="toggleSidebarCompact()" title="Colapsar sidebar">
-      <svg id="sb-compact-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
     </div>
   </div>
 </aside>
@@ -3004,9 +3001,18 @@ document.querySelectorAll('.sb-item[data-tab]').forEach(t => {
 
 function toggleSidebarCompact() {
   const sb = document.getElementById('sidebar');
-  const app = document.getElementById('app');
   sb.classList.toggle('compact');
 }
+
+// Click anywhere on sidebar "dead zones" (logo, gaps) to toggle compact
+(function(){
+  const sb = document.getElementById('sidebar');
+  if (!sb) return;
+  sb.addEventListener('click', function(e) {
+    if (e.target.closest('.sb-item, .sb-add-btn, .sb-user, button, a')) return;
+    toggleSidebarCompact();
+  });
+})();
 
 function updateDescubriSubtitle() {
   const el = document.querySelector('.descubri-sub');
