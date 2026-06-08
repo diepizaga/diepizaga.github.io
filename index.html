@@ -810,16 +810,17 @@ select option { background: var(--bg-2); color: var(--t-1); }
 }
 .adn-section-body { }
 
-.adn-genres { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; }
+.adn-genres { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .adn-genre-chip {
   padding: 5px 12px; border-radius: 99px;
   border: 1px solid var(--b-1); background: var(--bg-1);
-  display: flex; align-items: center; gap: 6px;
+  display: flex; align-items: center; gap: 7px;
   transition: border-color .15s;
 }
 .adn-genre-chip:hover { border-color: var(--b-2); }
+.gc-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 .adn-genre-chip .gc-name { font-weight: 600; color: var(--t-1); }
-.adn-genre-chip .gc-count { color: var(--t-4); font-weight: 400; }
+.adn-genre-chip .gc-count { color: var(--t-4); font-weight: 400; margin-left: 1px; }
 
 .decade-row {
   display: flex; align-items: center; gap: 14px;
@@ -2508,20 +2509,40 @@ function renderADN() {
   // Top 10 mayores diferencias
   const top10diffs = [...diffs].sort((a,b)=>Math.abs(b.diff)-Math.abs(a.diff)).slice(0,10);
 
-  // Genre → ambient glow color
-  const GENRE_GLOW = {
-    'Comedia':'#C4953A','Comedy':'#C4953A',
-    'Drama':'#5B7FA6','Thriller':'#5B7FA6',
-    'Terror':'#8B2020','Horror':'#8B2020',
-    'Ciencia ficción':'#2E86AB','Ciencia Ficción':'#2E86AB','Science Fiction':'#2E86AB',
-    'Animación':'#E07A2F','Animation':'#E07A2F','Family':'#E07A2F',
-    'Documental':'#7A8C6E','Documentary':'#7A8C6E',
-    'Acción':'#B85C38','Action':'#B85C38','Adventure':'#B85C38',
-    'Romance':'#9E5873',
-    'Fantasía':'#6B4FA6','Fantasy':'#6B4FA6',
-    'Misterio':'#4A6B6B','Mystery':'#4A6B6B','Crime':'#4A6B6B',
+  // Genre → ambient glow (rgba with opacity) + solid dot color
+  window.GENRE_COLORS = {
+    'Comedia':         { glow:'rgba(90,140,106,.22)',   dot:'rgb(90,140,106)' },
+    'Comedy':          { glow:'rgba(90,140,106,.22)',   dot:'rgb(90,140,106)' },
+    'Drama':           { glow:'rgba(61,144,192,.22)',   dot:'rgb(61,144,192)' },
+    'Thriller':        { glow:'rgba(61,144,192,.22)',   dot:'rgb(61,144,192)' },
+    'Acción':          { glow:'rgba(192,100,64,.22)',   dot:'rgb(192,100,64)' },
+    'Action':          { glow:'rgba(192,100,64,.22)',   dot:'rgb(192,100,64)' },
+    'Terror':          { glow:'rgba(192,64,64,.22)',    dot:'rgb(192,64,64)' },
+    'Horror':          { glow:'rgba(192,64,64,.22)',    dot:'rgb(192,64,64)' },
+    'Ciencia ficción': { glow:'rgba(139,109,168,.22)',  dot:'rgb(139,109,168)' },
+    'Ciencia Ficción': { glow:'rgba(139,109,168,.22)',  dot:'rgb(139,109,168)' },
+    'Science Fiction': { glow:'rgba(139,109,168,.22)',  dot:'rgb(139,109,168)' },
+    'Fantasía':        { glow:'rgba(139,109,168,.22)',  dot:'rgb(139,109,168)' },
+    'Fantasy':         { glow:'rgba(139,109,168,.22)',  dot:'rgb(139,109,168)' },
+    'Aventura':        { glow:'rgba(80,140,130,.22)',   dot:'rgb(80,140,130)' },
+    'Adventure':       { glow:'rgba(80,140,130,.22)',   dot:'rgb(80,140,130)' },
+    'Suspense':        { glow:'rgba(168,139,80,.22)',   dot:'rgb(168,139,80)' },
+    'Romance':         { glow:'rgba(192,100,130,.22)',  dot:'rgb(192,100,130)' },
+    'Animación':       { glow:'rgba(100,160,192,.22)',  dot:'rgb(100,160,192)' },
+    'Animation':       { glow:'rgba(100,160,192,.22)',  dot:'rgb(100,160,192)' },
+    'Crimen':          { glow:'rgba(140,90,90,.22)',    dot:'rgb(140,90,90)' },
+    'Crime':           { glow:'rgba(140,90,90,.22)',    dot:'rgb(140,90,90)' },
+    'Misterio':        { glow:'rgba(140,90,90,.22)',    dot:'rgb(140,90,90)' },
+    'Mystery':         { glow:'rgba(140,90,90,.22)',    dot:'rgb(140,90,90)' },
+    'Familia':         { glow:'rgba(100,192,140,.22)',  dot:'rgb(100,192,140)' },
+    'Family':          { glow:'rgba(100,192,140,.22)',  dot:'rgb(100,192,140)' },
+    'Documental':      { glow:'rgba(122,140,110,.22)',  dot:'rgb(122,140,110)' },
+    'Documentary':     { glow:'rgba(122,140,110,.22)',  dot:'rgb(122,140,110)' },
+    'default':         { glow:'rgba(212,149,106,.22)',  dot:'rgb(212,149,106)' },
   };
-  const glowColor = topGenre ? (GENRE_GLOW[topGenre] || '#D4956A') : '#D4956A';
+
+  const _gc = window.GENRE_COLORS;
+  const glowColor = topGenre ? (_gc[topGenre]?.glow || _gc.default.glow) : _gc.default.glow;
   const glowEl = document.getElementById('adn-genre-glow');
   if (glowEl) {
     glowEl.style.background = glowColor;
@@ -2569,14 +2590,16 @@ function renderADN() {
   if (totalHours)    statParts.push(`<span>${totalHours}</span> horas`);
   const statsLine = statParts.join(' &middot; ');
 
-  // Genre chips with size proportional to frequency
+  // Genre chips with color dot + size proportional to frequency
   const maxGenreCount = topGenres[0]?.[1] || 1;
   const genreChips = topGenres.slice(0,12).map(([g,c]) => {
     const pct = c / maxGenreCount;
     const fs = pct > 0.7 ? 14 : pct > 0.45 ? 13 : pct > 0.25 ? 12 : 11;
     const op = pct > 0.5 ? 1 : pct > 0.25 ? 0.85 : 0.65;
+    const dotColor = (window.GENRE_COLORS[g] || window.GENRE_COLORS.default).dot;
     return `<div class="adn-genre-chip" style="font-size:${fs}px;opacity:${op}">
-      <span class="gc-name">${g}</span><span class="gc-count">${c}</span>
+      <div class="gc-dot" style="background:${dotColor}"></div>
+      <span class="gc-name">${g}</span><span class="gc-count">· ${c}</span>
     </div>`;
   }).join('');
 
@@ -2675,21 +2698,59 @@ function renderADN() {
 function adnSwitchType(el, type) {
   document.querySelectorAll('.adn-type-pill').forEach(p=>p.classList.remove('active'));
   el.classList.add('active');
-  // For now just re-render ADN with filtered data — simple approach: re-render full ADN
-  // In future: filter genres/decades sections by type
-  // We filter the adn-section bodies by toggling visibility
+
+  const GC = window.GENRE_COLORS || {};
+  const watched = items.filter(i => i.status !== 'watchlist');
+
+  // Subset by type
+  const subset = type === 'all' ? watched
+    : watched.filter(i => i.type === type);
+
+  // Recalculate dominant genre for this subset → update glow
+  const gc = {};
+  subset.forEach(i => (i.genres||[]).forEach(g => gc[g]=(gc[g]||0)+1));
+  const topGenre = Object.entries(gc).sort((a,b)=>b[1]-a[1])[0]?.[0] || null;
+  const glowColor = topGenre ? (GC[topGenre]?.glow || GC.default?.glow || 'rgba(212,149,106,.22)') : (GC.default?.glow || 'rgba(212,149,106,.22)');
+  const glowEl = document.getElementById('adn-genre-glow');
+  if (glowEl) glowEl.style.background = glowColor;
+
+  // Show/hide sections based on type
   const contentEl = document.getElementById('adn-content');
   if (!contentEl) return;
-  // Show/hide vs-IMDb section if type is books
-  const criterioSections = contentEl.querySelectorAll('.adn-section');
-  criterioSections.forEach(sec => {
+  const isBooks = type === 'book';
+
+  contentEl.querySelectorAll('.adn-section').forEach(sec => {
     const header = sec.querySelector('.adn-section-header');
     if (!header) return;
     const txt = header.textContent.toLowerCase();
-    if (txt.includes('criterio') || txt.includes('coincidencia') || txt.includes('diferencias')) {
-      sec.style.display = (type === 'book') ? 'none' : '';
+    const isCriterio = txt.includes('criterio') || txt.includes('coincidencia') || txt.includes('diferencias');
+    sec.style.display = (isBooks && isCriterio) ? 'none' : '';
+
+    // Rename "Directores" → "Autores favoritos" for books
+    if (txt.includes('director')) {
+      header.textContent = isBooks ? 'Autores favoritos' : 'Directores';
+    }
+    if (txt.includes('autores favoritos') && !isBooks) {
+      header.textContent = 'Directores';
     }
   });
+
+  // Update genre chips for the filtered subset
+  const genresEl = contentEl.querySelector('.adn-genres');
+  if (genresEl && subset.length) {
+    const maxC = Object.values(gc).sort((a,b)=>b-a)[0] || 1;
+    const topGenres = Object.entries(gc).sort((a,b)=>b[1]-a[1]).slice(0,12);
+    genresEl.innerHTML = topGenres.map(([g,c]) => {
+      const pct = c / maxC;
+      const fs = pct > 0.7 ? 14 : pct > 0.45 ? 13 : pct > 0.25 ? 12 : 11;
+      const op = pct > 0.5 ? 1 : pct > 0.25 ? 0.85 : 0.65;
+      const dotColor = (GC[g] || GC.default || {dot:'rgb(212,149,106)'}).dot;
+      return `<div class="adn-genre-chip" style="font-size:${fs}px;opacity:${op}">
+        <div class="gc-dot" style="background:${dotColor}"></div>
+        <span class="gc-name">${g}</span><span class="gc-count">· ${c}</span>
+      </div>`;
+    }).join('');
+  }
 }
 
 // ============================================================
