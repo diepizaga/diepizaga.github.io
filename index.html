@@ -1781,8 +1781,10 @@ async function loadItems() {
 }
 
 async function saveItem(data) {
-  if (data.id) { const {id,...rest} = data; await sbFetch(`watchlist?id=eq.${id}`, { method:'PATCH', body:JSON.stringify(rest), prefer:'return=representation' }); }
-  else { const p = currentUser?.id ? {...data, user_id:currentUser.id} : data; await sbFetch('watchlist', { method:'POST', body:JSON.stringify(p) }); }
+  // Strip internal-only fields (prefixed _) — they don't exist as DB columns
+  const clean = Object.fromEntries(Object.entries(data).filter(([k]) => !k.startsWith('_')));
+  if (clean.id) { const {id,...rest} = clean; await sbFetch(`watchlist?id=eq.${id}`, { method:'PATCH', body:JSON.stringify(rest), prefer:'return=representation' }); }
+  else { const p = currentUser?.id ? {...clean, user_id:currentUser.id} : clean; await sbFetch('watchlist', { method:'POST', body:JSON.stringify(p) }); }
   await loadItems();
 }
 
