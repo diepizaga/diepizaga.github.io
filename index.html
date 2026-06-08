@@ -1301,8 +1301,11 @@ select option { background: var(--bg-2); color: var(--t-1); }
 /* Responsive */
 @media (max-width: 760px) {
   #sidebar { display: none; }
-  #app { margin-left: 0 !important; padding-top: var(--top-nav-h, 94px); }
-  #nav { display: flex !important; flex-wrap: wrap; height: auto; padding: 9px 14px; gap: 7px 10px; }
+  /* #app: no padding-top — hero full-bleed, panes handle their own clearance */
+  #app { margin-left: 0 !important; padding-top: 0; }
+
+  /* #nav: clean 50px fixed header bar */
+  #nav { display: flex !important; flex-wrap: nowrap; height: 50px; padding: 0 16px; gap: 0; align-items: center; }
   #nav .nav-tabs { display: none; }
   .logo { order: 1; flex: 1; font-size: 19px; }
   .nav-actions { order: 2; flex-shrink: 0; }
@@ -1311,18 +1314,27 @@ select option { background: var(--bg-2); color: var(--t-1); }
   #omnisearch-wrap { display: none; }
   #mobile-nav { display: flex; }
 
-  /* bottom padding so content clears the nav */
-  #pane-inicio  { padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px)) !important; }
-  #pane-biblioteca { padding: 16px 14px calc(72px + env(safe-area-inset-bottom, 0px)) !important; }
-  #pane-adn     { padding: 24px 14px calc(72px + env(safe-area-inset-bottom, 0px)) !important; }
-  #pane-descubri { padding: 16px 14px calc(72px + env(safe-area-inset-bottom, 0px)) !important; }
+  /* Inicio: hero full-bleed — no top padding, nav floats above */
+  #pane-inicio  { padding-top: 0 !important; padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px)) !important; }
+
+  /* Other panes: clear the 50px fixed header */
+  #pane-biblioteca { padding: calc(50px + 16px) 14px calc(72px + env(safe-area-inset-bottom, 0px)) !important; }
+  #pane-adn        { padding: calc(50px + 16px) 14px calc(72px + env(safe-area-inset-bottom, 0px)) !important; }
+  #pane-descubri   { padding: calc(50px + 16px) 14px calc(72px + env(safe-area-inset-bottom, 0px)) !important; }
 
   /* inicio body lateral padding */
-  .inicio-body { padding: 20px 20px; }
+  .inicio-body { padding: 20px 16px; }
 
-  /* hero text padding */
-  .hero-body { padding: 20px 20px 24px; }
+  /* Hero: compact height, content pushed below fixed header */
+  .hero-wrap { height: calc(52vw + 50px) !important; min-height: 230px !important; max-height: 310px !important; padding-top: 50px; }
+  .hero-body { padding: 0 16px 20px !important; }
+  .hero-title { font-size: clamp(22px, 7vw, 36px) !important; letter-spacing: -.8px !important; line-height: 1.1 !important; }
   .hero-actions { display: none; }
+
+  /* Section spacing tighter on mobile */
+  .inicio-sec { margin-bottom: 24px; }
+  /* Empty section (no in-progress items) = zero margin, no gap */
+  .inicio-sec:empty { margin-bottom: 0 !important; }
 
   /* carousel smaller cards + touch scroll */
   .carousel-wrap { gap: 8px; padding: 0 20px 4px; overflow-x: auto; -webkit-overflow-scrolling: touch; scroll-snap-type: x mandatory; }
@@ -1342,7 +1354,7 @@ select option { background: var(--bg-2); color: var(--t-1); }
   .inicio-metrics-grid { grid-template-columns: repeat(2,1fr); }
   .criterio-card { padding: 16px 18px; }
   .identity-module { flex-direction: column; gap: 16px; }
-  .hero-wrap { max-height: 50vh !important; min-height: 260px !important; }
+  .adn-profile-archetype { font-size: clamp(34px, 10vw, 50px) !important; }
   .recs-grid { grid-template-columns: repeat(2,1fr); gap: 10px; }
   .adn-facts { grid-template-columns: 1fr 1fr; }
   .modal-overlay { padding: 0; align-items: flex-end; }
@@ -4157,18 +4169,14 @@ dropArea.addEventListener('drop',e=>{e.preventDefault();dropArea.style.borderCol
 
 // ============================================================
 // ============================================================
-// MOBILE NAV HEIGHT — mide el nav real y ajusta el padding del app
+// MOBILE NAV HEIGHT — header fijo de 50px, no necesita medición dinámica
 // ============================================================
 function fixMobileLayout() {
   if (window.innerWidth > 760) return;
-  const nav = document.getElementById('nav');
-  if (!nav) return;
-  const h = nav.getBoundingClientRect().height;
-  document.documentElement.style.setProperty('--top-nav-h', h + 'px');
+  document.documentElement.style.setProperty('--top-nav-h', '50px');
 }
 window.addEventListener('DOMContentLoaded', fixMobileLayout);
 window.addEventListener('resize', fixMobileLayout);
-setTimeout(fixMobileLayout, 200); // fonts/layout settled
 
 // ============================================================
 // INIT
