@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
 <title>Archivo</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1258,6 +1260,9 @@ select option { background: var(--bg-2); color: var(--t-1); }
 }
 .mn-tab.active .mn-icon  { color: var(--gold); }
 .mn-tab.active .mn-label { color: var(--gold); }
+/* icon-only tabs — no label at all */
+.mn-tab[data-tab="descubri"] .mn-label,
+.mn-tab[data-tab="adn"] .mn-label { display: none !important; font-size: 0 !important; }
 
 .mn-fab-spacer {
   flex: 1; position: relative;
