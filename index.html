@@ -2531,8 +2531,33 @@ function buildInsightsHTML(typeFilter) {
 }
 
 // ============================================================
-// ADN CULTURAL
+// ADN CULTURAL — Book genre normalization
 // ============================================================
+const BOOK_TAG_BLOCKLIST = [
+  /^series:/i,
+  /(people|wives|husbands|mothers|fathers|sons|daughters)$/i,
+  /crimes against/i,
+  /[^\x00-\x7F]{4,}/,          // non-ASCII words (ej: Verschollenheit)
+  /^\d{4}$/,                    // años sueltos
+  /^(Autor|autor)$/,
+];
+const BISAC_DISPLAY = {
+  'FICTION / Mystery & Detective / General': 'Misterio',
+  'FICTION / Fantasy / General':             'Fantasía',
+  'FICTION / Literary':                      'Ficción Literaria',
+  'FICTION / Classics':                      'Clásicos',
+  'Fiction':                                 'Ficción',
+  'Juvenile Fiction':                        'Ficción Juvenil',
+  'Biography & Autobiography':               'Biografía',
+  'History':                                 'Historia',
+  'Science Fiction':                         'Ciencia Ficción',
+  'Horror Fiction':                          'Terror',
+};
+function cleanBookGenre(tag) {
+  if (!tag || BOOK_TAG_BLOCKLIST.some(r => r.test(tag))) return null;
+  return BISAC_DISPLAY[tag] ?? tag;
+}
+
 function renderADN() {
   const el = document.getElementById('adn-content');
   const watched = items.filter(i=>i.status!=='watchlist');
@@ -2727,8 +2752,21 @@ function renderADN() {
     setTimeout(() => { glowEl.style.opacity = '1'; }, 80);
   }
 
-  // Cache globally for Descubrí subtitle
+  // Goodreads comparison (books with google_rating, scale 1-5 → ×2 = 1-10)
+  const withGoodreads = books.filter(i => i.my_rating && i.google_rating);
+  const avgGoodreads10 = withGoodreads.length
+    ? (withGoodreads.reduce((s,i) => s + parseFloat(i.google_rating)*2, 0) / withGoodreads.length).toFixed(1)
+    : null;
+  const avgBooks = books.filter(i => i.my_rating).length
+    ? (books.filter(i => i.my_rating).reduce((s,i) => s + parseFloat(i.my_rating), 0) / books.filter(i => i.my_rating).length).toFixed(1)
+    : null;
+  const diffGoodreads = avgBooks && avgGoodreads10
+    ? (parseFloat(avgBooks) - parseFloat(avgGoodreads10)).toFixed(1)
+    : null;
+
+  // Cache globally for Descubrí subtitle + tab restore
   window._cachedArchetype = archetype;
+  window._cachedStatement = statement;
   window._cachedTopGenre  = topGenre;
   window._cachedTopDecade = topDecade;
 
@@ -2878,7 +2916,35 @@ function renderADN() {
           </div>`;
         }).join('')}
       </div>
+    </div>` : ''}
+
+    ${avgBooks && diffGoodreads ? `
+    <div class="adn-section" id="adn-goodreads-section" style="display:none">
+      <div class="adn-section-header">Tu criterio vs. Goodreads</div>
+      <div class="adn-section-body">
+        <div class="criterio-card">
+          <div class="criterio-row">
+            <span class="criterio-lbl">Tu promedio en libros</span>
+            <span class="criterio-val" style="color:var(--gold)">${avgBooks}</span>
+          </div>
+          <div class="criterio-row">
+            <span class="criterio-lbl">Goodreads promedio (×2)</span>
+            <span class="criterio-val">${avgGoodreads10}</span>
+          </div>
+          <div class="criterio-row">
+            <span class="criterio-lbl">Diferencia</span>
+            <span class="criterio-val" style="color:${parseFloat(diffGoodreads)>=0?'var(--green)':'var(--red)'}">${parseFloat(diffGoodreads)>=0?'+':''}${diffGoodreads}</span>
+          </div>
+          <p class="criterio-narrative">${parseFloat(diffGoodreads) < -0.5
+            ? 'Sos más exigente que la comunidad de Goodreads. Cada libro tiene que ganarse su lugar.'
+            : parseFloat(diffGoodreads) > 0.5
+              ? 'Sos más generoso que Goodreads. Encontrás valor donde otros pasan de largo.'
+              : 'Tus criterios están muy alineados con la comunidad de Goodreads.'
+          }</p>
+        </div>
+      </div>
     </div>` : ''}`;
+
 }
 
 function adnSwitchType(el, type) {
@@ -2909,23 +2975,50 @@ function adnSwitchType(el, type) {
     const header = sec.querySelector('.adn-section-header');
     if (!header) return;
     const txt = header.textContent.toLowerCase();
-    const isCriterio = txt.includes('criterio') || txt.includes('coincidencia') || txt.includes('diferencias');
-    sec.style.display = (isBooks && isCriterio) ? 'none' : '';
-
-    // Rename "Directores" → "Autores favoritos" for books
+    // Hide IMDb-specific sections for books; Goodreads section handled separately below
+    const isImdbSection = (txt.includes('criterio') && txt.includes('imdb'))
+      || txt.includes('coincidencia')
+      || txt.includes('diferencias con imdb');
+    if (sec.id !== 'adn-goodreads-section') {
+      sec.style.display = (isBooks && isImdbSection) ? 'none' : '';
+    }
+    // Rename "Directores" ↔ "Autores favoritos"
     if (txt.includes('director')) {
-      header.textContent = isBooks ? 'Autores favoritos' : 'Directores';
+      header.textContent = isBooks ? 'Autores favoritos' : 'Directores favoritos';
     }
     if (txt.includes('autores favoritos') && !isBooks) {
-      header.textContent = 'Directores';
+      header.textContent = 'Directores favoritos';
     }
   });
 
+  // Show Goodreads section only for books
+  const goodreadsEl = document.getElementById('adn-goodreads-section');
+  if (goodreadsEl) goodreadsEl.style.display = isBooks ? '' : 'none';
+
+  // Update archetype + description for books; restore original for other types
+  const archetypeEl = contentEl.querySelector('.adn-profile-archetype');
+  const descEl      = contentEl.querySelector('.adn-profile-desc');
+  if (isBooks) {
+    if (archetypeEl) archetypeEl.textContent = 'El lector omnívoro';
+    if (descEl) descEl.textContent = 'Alternás entre Rowling y Borges sin vergüenza. La fantasía es tu ancla emocional, pero la lit. latinoamericana es donde más profundizás. Tendés a puntuar más bajo que Goodreads en clásicos: más exigente, más honesto.';
+  } else {
+    if (archetypeEl) archetypeEl.textContent = window._cachedArchetype || '';
+    if (descEl) descEl.textContent = window._cachedStatement || '';
+  }
+
   // Update genre chips for the filtered subset
+  // For books: normalize raw OL/LCSH tags through cleanBookGenre
   const genresEl = contentEl.querySelector('.adn-genres');
   if (genresEl && subset.length) {
-    const maxC = Object.values(gc).sort((a,b)=>b-a)[0] || 1;
-    const topGenres = Object.entries(gc).sort((a,b)=>b[1]-a[1]).slice(0,12);
+    // Build genre count map, filtering blocklisted tags for books
+    const gcFiltered = {};
+    subset.forEach(i => (i.genres||[]).forEach(rawG => {
+      const g = isBooks ? cleanBookGenre(rawG) : rawG;
+      if (!g) return;
+      gcFiltered[g] = (gcFiltered[g]||0) + 1;
+    }));
+    const maxC = Math.max(...Object.values(gcFiltered), 1);
+    const topGenres = Object.entries(gcFiltered).sort((a,b)=>b[1]-a[1]).slice(0,12);
     genresEl.innerHTML = topGenres.map(([g,c]) => {
       const pct = c / maxC;
       const fs = pct > 0.7 ? 14 : pct > 0.45 ? 13 : pct > 0.25 ? 12 : 11;
