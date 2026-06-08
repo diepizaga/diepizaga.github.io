@@ -3222,42 +3222,75 @@ document.querySelectorAll('.ms-type-btn').forEach(btn => {
   });
 });
 
+function renderBookResults(books) {
+  return books.map(b => {
+    const inList = items.find(i=>i.google_books_id===b.id);
+    const col = bookColor(b.title);
+    const cover = b.cover
+      ? `<img src="${b.cover}" alt="" style="width:40px;height:60px;object-fit:cover;border-radius:4px;flex-shrink:0">`
+      : `<div style="width:40px;height:60px;background:${col};border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-style:italic;font-size:20px;color:rgba(255,255,255,.25)">${bookInitial(b.title)}</div>`;
+    const desc = b.description ? b.description.replace(/<[^>]*>/g,'').slice(0,140)+'…' : '';
+    return `<div class="ms-result" onclick="selectBookResult('${b.id.replace(/'/g,"\\'")}')">
+      ${cover}
+      <div class="ms-info">
+        <div class="ms-title">${b.title}${b.year?` <span style="color:var(--t-3);font-weight:400">(${b.year})</span>`:''}</div>
+        <div class="ms-meta">Libro${b.author?' · '+b.author:''}${inList?' · <span style="color:var(--green)">✓ En tu lista</span>':''}</div>
+        ${desc?`<div class="ms-overview">${desc}</div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderTmdbResults(results) {
+  return results.map(r => {
+    const type=r.media_type||searchType, title=r.title||r.name, year=(r.release_date||r.first_air_date||'').slice(0,4);
+    const inList = items.find(i=>i.tmdb_id===r.id&&i.type===(type==='movie'?'movie':'tv'));
+    const poster = r.poster_path
+      ? `<img src="${TMDB_IMG}w92${r.poster_path}" alt="" style="width:40px;height:60px;object-fit:cover;border-radius:4px;flex-shrink:0">`
+      : `<div style="width:40px;height:60px;background:var(--bg-3);border-radius:4px;flex-shrink:0"></div>`;
+    return `<div class="ms-result" onclick="selectResult(${r.id},'${type==='movie'?'movie':'tv'}')">
+      ${poster}
+      <div class="ms-info">
+        <div class="ms-title">${title}${year?` <span style="color:var(--t-3);font-weight:400">(${year})</span>`:''}</div>
+        <div class="ms-meta">${type==='movie'?'Película':'Serie'}${inList?' · <span style="color:var(--green)">✓ En tu lista</span>':''}</div>
+        <div class="ms-overview">${r.overview||''}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
 async function doSearch(q) {
   const c = document.getElementById('ms-results');
   try {
     if (searchType === 'book') {
       const results = await booksSearch(q);
       if (!results.length) { c.innerHTML = '<div style="padding:36px;text-align:center;color:var(--t-3)">Sin resultados</div>'; return; }
-      c.innerHTML = results.map(b => {
-        const inList = items.find(i=>i.google_books_id===b.id);
-        const col = bookColor(b.title);
-        const cover = b.cover?`<img src="${b.cover}" alt="" style="width:40px;height:60px;object-fit:cover;border-radius:4px;flex-shrink:0">`:`<div style="width:40px;height:60px;background:${col};border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-style:italic;font-size:20px;color:rgba(255,255,255,.25)">${bookInitial(b.title)}</div>`;
-        const desc = b.description?b.description.replace(/<[^>]*>/g,'').slice(0,140)+'…':'';
-        return `<div class="ms-result" onclick="selectBookResult('${b.id}')">
-          ${cover}
-          <div class="ms-info">
-            <div class="ms-title">${b.title}${b.year?` <span style="color:var(--t-3);font-weight:400">(${b.year})</span>`:''}</div>
-            <div class="ms-meta">Libro${b.author?' · '+b.author:''}${inList?' · <span style="color:var(--green)">✓ En tu lista</span>':''}</div>
-            ${desc?`<div class="ms-overview">${desc}</div>`:''}
-          </div>
-        </div>`;
-      }).join(''); return;
+      c.innerHTML = renderBookResults(results);
+      return;
     }
+    if (searchType === 'multi') {
+      // Search TMDB + Open Library in parallel
+      const [tmdbRes, bookRes] = await Promise.all([
+        tmdbSearch(q, 'multi').catch(()=>[]),
+        booksSearch(q).catch(()=>[])
+      ]);
+      if (!tmdbRes.length && !bookRes.length) {
+        c.innerHTML = '<div style="padding:36px;text-align:center;color:var(--t-3)">Sin resultados</div>'; return;
+      }
+      // Interleave: show top TMDB results first, then books
+      let html = '';
+      if (tmdbRes.length) html += renderTmdbResults(tmdbRes.slice(0,8));
+      if (bookRes.length) {
+        if (tmdbRes.length) html += `<div style="padding:10px 0 6px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--t-4)">Libros</div>`;
+        html += renderBookResults(bookRes.slice(0,5));
+      }
+      c.innerHTML = html;
+      return;
+    }
+    // movie or tv only
     const results = await tmdbSearch(q, searchType);
     if (!results.length) { c.innerHTML = '<div style="padding:36px;text-align:center;color:var(--t-3)">Sin resultados</div>'; return; }
-    c.innerHTML = results.map(r => {
-      const type=r.media_type||searchType, title=r.title||r.name, year=(r.release_date||r.first_air_date||'').slice(0,4);
-      const inList = items.find(i=>i.tmdb_id===r.id&&i.type===(type==='movie'?'movie':'tv'));
-      const poster = r.poster_path?`<img src="${TMDB_IMG}w92${r.poster_path}" alt="" style="width:40px;height:60px;object-fit:cover;border-radius:4px;flex-shrink:0">`:`<div style="width:40px;height:60px;background:var(--bg-3);border-radius:4px;flex-shrink:0"></div>`;
-      return `<div class="ms-result" onclick="selectResult(${r.id},'${type==='movie'?'movie':'tv'}')">
-        ${poster}
-        <div class="ms-info">
-          <div class="ms-title">${title}${year?` <span style="color:var(--t-3);font-weight:400">(${year})</span>`:''}</div>
-          <div class="ms-meta">${type==='movie'?'Película':'Serie'}${inList?' · <span style="color:var(--green)">✓ En tu lista</span>':''}</div>
-          <div class="ms-overview">${r.overview||''}</div>
-        </div>
-      </div>`;
-    }).join('');
+    c.innerHTML = renderTmdbResults(results);
   } catch(e) { c.innerHTML = `<div style="padding:36px;text-align:center;color:var(--red)">${e.message}</div>`; }
 }
 
