@@ -430,12 +430,22 @@ select option { background: var(--bg-2); color: var(--t-1); }
 }
 .adn-stats-line span { color: var(--t-2); font-weight: 600; }
 
-/* ADN criterio */
-.criterio-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 1px; background: var(--b-1); border: 1px solid var(--b-1); border-radius: var(--r-md); overflow: hidden; margin-bottom: 16px; }
-.criterio-item { background: var(--bg-1); padding: 16px; text-align: center; }
-.criterio-val { font-size: 22px; font-weight: 800; letter-spacing: -1px; }
-.criterio-lbl { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--t-3); margin-top: 4px; }
-.criterio-diff { font-size: 10.5px; font-weight: 700; margin-top: 2px; }
+/* ADN criterio — new narrative card */
+.criterio-card { background: var(--bg-1); border: 1px solid var(--b-1); border-radius: var(--r-lg); padding: 20px 24px; }
+.criterio-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--b-1); }
+.criterio-row:last-of-type { border-bottom: none; }
+.criterio-lbl { font-size: 13px; color: var(--t-2); }
+.criterio-val { font-size: 16px; font-weight: 700; font-family: var(--mono); }
+.criterio-narrative { margin-top: 14px; font-size: 12.5px; color: var(--t-3); line-height: 1.7; border-top: 1px solid var(--b-1); padding-top: 14px; }
+
+/* ADN directores */
+.director-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--b-1); cursor: pointer; }
+.director-row:last-child { border-bottom: none; }
+.dir-rank { font-size: 11px; color: var(--t-3); font-weight: 600; width: 16px; text-align: right; flex-shrink: 0; }
+.dir-thumb { width: 32px; height: 46px; border-radius: var(--r-sm); overflow: hidden; flex-shrink: 0; background: var(--bg-3); }
+.dir-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.dir-name { flex: 1; font-size: 13.5px; font-weight: 600; color: var(--t-1); }
+.dir-count { font-size: 11px; color: var(--gold); font-weight: 700; flex-shrink: 0; }
 
 .coincidencia-row { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--b-1); }
 .coincidencia-row:last-child { border-bottom: none; }
@@ -1286,7 +1296,7 @@ select option { background: var(--bg-2); color: var(--t-1); }
   #bib-insights #ins-grid-wrap { display: block !important; }
   .insights-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
   .inicio-metrics-grid { grid-template-columns: repeat(2,1fr); }
-  .criterio-grid { grid-template-columns: repeat(2,1fr); }
+  .criterio-card { padding: 16px 18px; }
   .identity-module { flex-direction: column; gap: 16px; }
   .hero-wrap { max-height: 50vh !important; min-height: 260px !important; }
   .recs-grid { grid-template-columns: repeat(2,1fr); gap: 10px; }
@@ -2436,6 +2446,18 @@ function renderADN() {
   books.forEach(b=>{ if(b.author) b.author.split(',').forEach(a=>{ const k=a.trim(); if(k) ac[k]=(ac[k]||0)+1; }); });
   const topAuthor = Object.entries(ac).sort((a,b)=>b[1]-a[1])[0]?.[0] || null;
 
+  // Top directors (movies + series)
+  const dirMap={};
+  watched.filter(i=>i.type!=='book'&&i.director).forEach(i=>{
+    const k=(i.director||'').trim(); if(!k) return;
+    if(!dirMap[k]) dirMap[k]={count:0,topItem:null};
+    dirMap[k].count++;
+    if(!dirMap[k].topItem||(i.my_rating&&(!dirMap[k].topItem.my_rating||parseFloat(i.my_rating)>parseFloat(dirMap[k].topItem.my_rating))))
+      dirMap[k].topItem=i;
+  });
+  const topDirs = Object.entries(dirMap).sort((a,b)=>b[1].count-a[1].count).slice(0,5)
+    .map(([name,{count,topItem}])=>({name,count,topItem}));
+
   // Build archetype + statement
   let archetype = '';
   let statement = '';
@@ -2505,6 +2527,35 @@ function renderADN() {
 
   // Top 10 mayores diferencias
   const top10diffs = [...diffs].sort((a,b)=>Math.abs(b.diff)-Math.abs(a.diff)).slice(0,10);
+
+  // Criterio narrative — genre with biggest avg discrepancy vs IMDb
+  let critNarrativa = '';
+  if (avg && avgImdb) {
+    const diff = parseFloat(avg) - parseFloat(avgImdb);
+    // Per-genre discrepancy
+    const genreDiffs={};
+    withImdbAll.forEach(i=>{
+      (i.genres||[]).forEach(g=>{
+        if(!genreDiffs[g]) genreDiffs[g]={sum:0,n:0};
+        genreDiffs[g].sum += parseFloat(i.my_rating)-parseFloat(i.imdb_rating);
+        genreDiffs[g].n++;
+      });
+    });
+    const genreDiffAvg = Object.entries(genreDiffs)
+      .filter(([,v])=>v.n>=2)
+      .map(([g,v])=>({g,avg:v.sum/v.n}))
+      .sort((a,b)=>Math.abs(b.avg)-Math.abs(a.avg));
+    const worstGenre = genreDiffAvg[0];
+    const wg = worstGenre ? worstGenre.g : null;
+    const wgDiff = worstGenre ? (worstGenre.avg>=0?'+':'')+worstGenre.avg.toFixed(1) : null;
+    if (diff < -0.5) {
+      critNarrativa = `Sos más exigente que el promedio de IMDb.${wg ? ` Tus calificaciones de ${wg.toLowerCase()} son donde más diferís (${wgDiff} vs IMDb).` : ''}`;
+    } else if (diff > 0.5) {
+      critNarrativa = `Sos más generoso que el promedio de IMDb.${wg ? ` ${wg} es donde más diferís (${wgDiff} vs IMDb).` : ''}`;
+    } else {
+      critNarrativa = `Tus criterios están muy alineados con IMDb.${wg ? ` La mayor diferencia está en ${wg.toLowerCase()} (${wgDiff} vs IMDb).` : ''}`;
+    }
+  }
 
   // Genre → ambient glow (rgba with opacity) + solid dot color
   window.GENRE_COLORS = {
@@ -2618,6 +2669,26 @@ function renderADN() {
       </div>
     </div>` : ''}
 
+    ${topDirs.length ? `
+    <div class="adn-section" id="adn-directors-section">
+      <div class="adn-section-header" id="adn-directors-header">Directores favoritos</div>
+      <div class="adn-section-body">
+        <div class="director-list" id="adn-director-list">
+          ${topDirs.map((d,i)=>{
+            const img = d.topItem && d.topItem.poster_path
+              ? `<img src="https://image.tmdb.org/t/p/w92${d.topItem.poster_path}" alt="" loading="lazy" onerror="this.style.display='none'">`
+              : '';
+            return `<div class="director-row">
+              <span class="dir-rank">${i+1}</span>
+              <div class="dir-thumb">${img}</div>
+              <span class="dir-name">${d.name}</span>
+              <span class="dir-count">${d.count} film${d.count!==1?'s':''}</span>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>
+    </div>` : ''}
+
     ${topDecades.length > 2 ? `
     <div class="adn-section">
       <div class="adn-section-header">Décadas</div>
@@ -2633,34 +2704,22 @@ function renderADN() {
 
     ${avg && avgImdb ? `
     <div class="adn-section">
-      <div class="adn-section-header">Criterio</div>
+      <div class="adn-section-header">Tu criterio vs. IMDb</div>
       <div class="adn-section-body">
-        <div class="criterio-grid">
-          <div class="criterio-item">
-            <div class="criterio-val" style="color:var(--gold)">${avg}</div>
-            <div class="criterio-lbl">Archivo</div>
+        <div class="criterio-card">
+          <div class="criterio-row">
+            <span class="criterio-lbl">Calificación promedio tuya</span>
+            <span class="criterio-val" style="color:var(--gold)">${avg}</span>
           </div>
-          ${avgImdb ? `<div class="criterio-item">
-            <div class="criterio-val" style="color:#C4953A">${avgImdb}</div>
-            <div class="criterio-lbl">IMDb</div>
-            ${diffImdb ? `<div class="criterio-diff" style="color:${parseFloat(diffImdb)>=0?'var(--green)':'var(--red)'}">
-              ${parseFloat(diffImdb)>=0?'+':''}${diffImdb}
-            </div>` : ''}
-          </div>` : ''}
-          ${avgTmdb ? `<div class="criterio-item">
-            <div class="criterio-val" style="color:var(--accent2)">${avgTmdb}</div>
-            <div class="criterio-lbl">TMDB</div>
-            ${diffTmdb ? `<div class="criterio-diff" style="color:${parseFloat(diffTmdb)>=0?'var(--green)':'var(--red)'}">
-              ${parseFloat(diffTmdb)>=0?'+':''}${diffTmdb}
-            </div>` : ''}
-          </div>` : ''}
-          ${avgRtAs10 ? `<div class="criterio-item">
-            <div class="criterio-val" style="color:#C0392B">${avgRtAs10}</div>
-            <div class="criterio-lbl">Rotten</div>
-            ${diffRt ? `<div class="criterio-diff" style="color:${parseFloat(diffRt)>=0?'var(--green)':'var(--red)'}">
-              ${parseFloat(diffRt)>=0?'+':''}${diffRt}
-            </div>` : ''}
-          </div>` : ''}
+          <div class="criterio-row">
+            <span class="criterio-lbl">Calificación promedio IMDb</span>
+            <span class="criterio-val">${avgImdb}</span>
+          </div>
+          <div class="criterio-row">
+            <span class="criterio-lbl">Diferencia</span>
+            <span class="criterio-val" style="color:${parseFloat(diffImdb)>=0?'var(--green)':'var(--red)'}">${parseFloat(diffImdb)>=0?'+':''}${diffImdb}</span>
+          </div>
+          ${critNarrativa ? `<p class="criterio-narrative">${critNarrativa}</p>` : ''}
         </div>
       </div>
     </div>` : ''}
@@ -2747,6 +2806,68 @@ function adnSwitchType(el, type) {
         <span class="gc-name">${g}</span><span class="gc-count">· ${c}</span>
       </div>`;
     }).join('');
+  }
+
+  // Update directors/authors list for the filtered subset
+  const dirListEl = document.getElementById('adn-director-list');
+  const dirHeaderEl = document.getElementById('adn-directors-header');
+  const dirSectionEl = document.getElementById('adn-directors-section');
+  if (dirListEl && dirSectionEl) {
+    if (isBooks) {
+      // Autores favoritos from books subset
+      const authorMap = {};
+      subset.forEach(i => {
+        if (!i.author) return;
+        i.author.split(',').forEach(a => {
+          const k = a.trim(); if (!k) return;
+          if (!authorMap[k]) authorMap[k] = {count:0, topItem:null};
+          authorMap[k].count++;
+          if (!authorMap[k].topItem) authorMap[k].topItem = i;
+        });
+      });
+      const topAuthors = Object.entries(authorMap).sort((a,b)=>b[1].count-a[1].count).slice(0,5);
+      if (topAuthors.length) {
+        if (dirHeaderEl) dirHeaderEl.textContent = 'Autores favoritos';
+        dirSectionEl.style.display = '';
+        dirListEl.innerHTML = topAuthors.map(([name,{count}],i) =>
+          `<div class="director-row">
+            <span class="dir-rank">${i+1}</span>
+            <div class="dir-thumb"></div>
+            <span class="dir-name">${name}</span>
+            <span class="dir-count">${count} libro${count!==1?'s':''}</span>
+          </div>`).join('');
+      } else {
+        dirSectionEl.style.display = 'none';
+      }
+    } else {
+      // Directores from subset (movies+series)
+      const dMap = {};
+      subset.filter(i=>i.type!=='book'&&i.director).forEach(i => {
+        const k = (i.director||'').trim(); if (!k) return;
+        if (!dMap[k]) dMap[k] = {count:0, topItem:null};
+        dMap[k].count++;
+        if (!dMap[k].topItem || (i.my_rating && (!dMap[k].topItem.my_rating || parseFloat(i.my_rating)>parseFloat(dMap[k].topItem.my_rating))))
+          dMap[k].topItem = i;
+      });
+      const topD = Object.entries(dMap).sort((a,b)=>b[1].count-a[1].count).slice(0,5);
+      if (topD.length) {
+        if (dirHeaderEl) dirHeaderEl.textContent = 'Directores favoritos';
+        dirSectionEl.style.display = '';
+        dirListEl.innerHTML = topD.map(([name,{count,topItem}],i) => {
+          const img = topItem && topItem.poster_path
+            ? `<img src="https://image.tmdb.org/t/p/w92${topItem.poster_path}" alt="" loading="lazy" onerror="this.style.display='none'">`
+            : '';
+          return `<div class="director-row">
+            <span class="dir-rank">${i+1}</span>
+            <div class="dir-thumb">${img}</div>
+            <span class="dir-name">${name}</span>
+            <span class="dir-count">${count} film${count!==1?'s':''}</span>
+          </div>`;
+        }).join('');
+      } else {
+        dirSectionEl.style.display = 'none';
+      }
+    }
   }
 }
 
