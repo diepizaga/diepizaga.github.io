@@ -6,7 +6,7 @@
 <title>Archivo</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400;1,600&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400;1,600&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root {
   --bg-0: #050505;
@@ -20,24 +20,25 @@
   --t-3: #5C5C5C;
   --t-4: #333333;
 
-  --gold:  #B88646;
-  --gold2: #9A6E30;
+  --gold:  #D4956A;
+  --gold2: #B87850;
   --accent2: #8A8F99;
-  --green: #6B8F71;
-  --red:   #8A8F99;
-  --blue:  #8A8F99;
+  --green: #5A8C6A;
+  --red:   #C04040;
+  --blue:  #3D90C0;
 
   --b-1: rgba(255,255,255,.06);
   --b-2: rgba(255,255,255,.11);
   --b-3: rgba(255,255,255,.20);
 
-  --r-sm: 12px;
-  --r-md: 12px;
-  --r-lg: 12px;
-  --r-xl: 16px;
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-xl: 18px;
 
   --serif: 'Cormorant Garamond', Georgia, serif;
   --sans:  'DM Sans', system-ui, -apple-system, sans-serif;
+  --mono:  'DM Mono', 'Courier New', monospace;
 
   --ease-out: cubic-bezier(.16,1,.3,1);
   --ease-spring: cubic-bezier(.34,1.15,.64,1);
@@ -64,8 +65,8 @@ input, select, textarea {
   -webkit-appearance: none; appearance: none;
 }
 input:focus, select:focus, textarea:focus {
-  border-color: rgba(184,134,70,.5);
-  box-shadow: 0 0 0 3px rgba(184,134,70,.07);
+  border-color: rgba(212,149,106,.5);
+  box-shadow: 0 0 0 3px rgba(212,149,106,.07);
 }
 input::placeholder { color: var(--t-4); }
 select option { background: var(--bg-2); color: var(--t-1); }
@@ -73,7 +74,80 @@ select option { background: var(--bg-2); color: var(--t-1); }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 2px; }
 
-/* ── NAV ────────────────────────────────────────────────── */
+/* ── SIDEBAR (desktop) ──────────────────────────────────── */
+#sidebar {
+  position: fixed; left: 0; top: 0; bottom: 0; width: 200px;
+  background: var(--bg-0); border-right: 1px solid var(--b-1);
+  display: flex; flex-direction: column; z-index: 100;
+  transition: width .22s var(--ease-out); overflow: hidden;
+}
+#sidebar.compact { width: 52px; }
+#sidebar.compact .sb-label { display: none; }
+#sidebar.compact .sb-logo-full { display: none; }
+#sidebar.compact .sb-logo-icon { display: flex; }
+#sidebar.compact .sb-add-label { display: none; }
+#sidebar.compact .sb-user-name { display: none; }
+
+.sb-logo-wrap {
+  padding: 20px 14px 14px; flex-shrink: 0;
+  display: flex; align-items: center; gap: 10px;
+}
+.sb-logo-full {
+  font-family: var(--serif); font-style: italic;
+  font-size: 21px; font-weight: 400; color: var(--gold);
+  letter-spacing: -.3px; white-space: nowrap; line-height: 1;
+}
+.sb-logo-icon { display: none; color: var(--gold); }
+
+.sb-nav { flex: 1; overflow-y: auto; padding: 4px 8px; scrollbar-width: none; }
+.sb-nav::-webkit-scrollbar { display: none; }
+.sb-item {
+  display: flex; align-items: center; gap: 10px; padding: 9px 8px;
+  border-radius: var(--r-md); font-size: 12.5px; font-weight: 500;
+  color: var(--t-3); cursor: pointer; white-space: nowrap;
+  transition: background .12s ease, color .12s ease;
+  margin-bottom: 1px;
+}
+.sb-item:hover { background: rgba(255,255,255,.04); color: var(--t-2); }
+.sb-item.active { background: rgba(212,149,106,.08); color: var(--t-1); }
+.sb-item.active .sb-icon { color: var(--gold); }
+.sb-icon { flex-shrink: 0; color: var(--t-4); transition: color .12s; }
+.sb-label { flex: 1; }
+.sb-divider { height: 1px; background: var(--b-1); margin: 8px 8px; }
+
+.sb-bottom { padding: 10px 8px 14px; flex-shrink: 0; }
+.sb-add-btn {
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+  width: 100%; background: var(--gold); color: #000;
+  border-radius: var(--r-md); padding: 9px 12px;
+  font-weight: 700; font-size: 12px;
+  transition: background .15s ease, transform 100ms ease-out;
+  white-space: nowrap; margin-bottom: 8px;
+}
+.sb-add-btn:hover { background: var(--gold2); }
+.sb-add-btn:active { transform: scale(.97); }
+.sb-add-label { }
+.sb-compact-btn {
+  display: flex; align-items: center; justify-content: center;
+  padding: 7px; border-radius: var(--r-sm);
+  color: var(--t-4); transition: color .12s, background .12s;
+  cursor: pointer; width: 100%;
+}
+.sb-compact-btn:hover { color: var(--t-2); background: rgba(255,255,255,.04); }
+.sb-user {
+  display: flex; align-items: center; gap: 8px; padding: 8px 8px 0;
+  margin-top: 4px;
+}
+.sb-avatar {
+  width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
+  background: var(--gold); color: #000; font-size: 11px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+}
+.sb-user-name { font-size: 11.5px; color: var(--t-3); min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+.sb-user-name:hover { color: var(--t-1); }
+
+/* ── NAV (legacy — hidden on desktop when sidebar active) ── */
 #nav {
   position: fixed; top: 0; left: 0; right: 0; z-index: 100;
   background: rgba(11,11,11,.94);
@@ -82,6 +156,7 @@ select option { background: var(--bg-2); color: var(--t-1); }
   border-bottom: 1px solid var(--b-1);
   height: 56px; display: flex; align-items: center;
   gap: 16px; padding: 0 28px;
+  display: none; /* hidden — replaced by sidebar on desktop */
 }
 
 .logo {
@@ -116,8 +191,8 @@ select option { background: var(--bg-2); color: var(--t-1); }
   transition: all .2s;
 }
 #omnisearch-bar:focus-within {
-  border-color: rgba(184,134,70,.4); background: var(--bg-3);
-  box-shadow: 0 0 0 3px rgba(184,134,70,.06);
+  border-color: rgba(212,149,106,.4); background: var(--bg-3);
+  box-shadow: 0 0 0 3px rgba(212,149,106,.06);
 }
 #omnisearch-bar .s-icon { color: var(--t-3); flex-shrink: 0; display: block; }
 #omnisearch-bar input { background: none; border: none; padding: 0; width: 100%; font-size: 13px; }
@@ -203,7 +278,8 @@ select option { background: var(--bg-2); color: var(--t-1); }
 .ud-sep { height: 1px; background: var(--b-1); margin: 3px 0; }
 
 /* ── LAYOUT ─────────────────────────────────────────────── */
-#app { padding-top: 56px; min-height: 100vh; }
+#app { padding-top: 0; margin-left: 200px; min-height: 100vh; transition: margin-left .22s var(--ease-out); }
+#sidebar.compact ~ #app { margin-left: 52px; }
 .pane { display: none; }
 .pane.active { display: block; }
 
@@ -450,15 +526,16 @@ select option { background: var(--bg-2); color: var(--t-1); }
 
 .bib-controls { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
 
-/* Type pills */
-.type-pills { display: flex; gap: 3px; background: var(--bg-1); border: 1px solid var(--b-1); border-radius: var(--r-md); padding: 3px; }
+/* Type pills — unified with disc-pill style */
+.type-pills { display: flex; gap: 6px; }
 .type-pill {
-  padding: 7px 14px; border-radius: var(--r-sm);
-  font-size: 12.5px; font-weight: 500; color: var(--t-3);
-  cursor: pointer; transition: all .15s; white-space: nowrap;
+  padding: 6px 14px; border-radius: 99px;
+  border: 1px solid var(--b-1); background: var(--bg-1);
+  font-size: 12px; font-weight: 500; color: var(--t-3);
+  cursor: pointer; transition: border-color .15s, color .15s, font-weight .1s; white-space: nowrap;
 }
-.type-pill.active { background: var(--bg-4); color: var(--t-1); font-weight: 600; }
-.type-pill:hover:not(.active) { color: var(--t-2); }
+.type-pill:hover:not(.active) { border-color: var(--b-2); color: var(--t-2); }
+.type-pill.active { border-color: var(--gold); color: var(--gold); font-weight: 700; background: var(--bg-1); }
 
 /* Filter + view toggle row */
 .bib-filter-row {
@@ -475,7 +552,7 @@ select option { background: var(--bg-2); color: var(--t-1); }
   transition: all .15s; flex-shrink: 0; white-space: nowrap;
 }
 .filter-toggle-btn:hover { border-color: var(--b-2); color: var(--t-1); }
-.filter-toggle-btn.active { border-color: var(--gold); color: var(--gold); background: rgba(184,134,70,.06); }
+.filter-toggle-btn.active { border-color: var(--gold); color: var(--gold); background: rgba(212,149,106,.06); }
 
 .filter-chip {
   padding: 7px 13px; border-radius: var(--r-sm);
@@ -515,7 +592,7 @@ select option { background: var(--bg-2); color: var(--t-1); }
   padding: 6px 10px;
   transition: all .2s;
 }
-.search-inline:focus-within { border-color: rgba(184,134,70,.4); background: var(--bg-2); }
+.search-inline:focus-within { border-color: rgba(212,149,106,.4); background: var(--bg-2); }
 .search-inline svg { color: var(--t-3); flex-shrink: 0; display: block; }
 .search-inline input { background: none; border: none; padding: 0; font-size: 12.5px; width: 100%; }
 
@@ -623,12 +700,48 @@ select option { background: var(--bg-2); color: var(--t-1); }
 /* ── ADN ─────────────────────────────────────────────────── */
 #pane-adn { padding: 40px 28px 60px; }
 
-.adn-header { margin-bottom: 48px; }
+.adn-header { margin-bottom: 32px; }
 .adn-eyebrow { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--gold); margin-bottom: 12px; }
 .adn-title {
   font-family: var(--serif); font-style: italic;
   font-size: 36px; font-weight: 400; color: var(--t-1);
   letter-spacing: -.5px; line-height: 1.2; margin-bottom: 0;
+}
+
+/* ADN stats row — DM Mono big numbers */
+.adn-stats-row {
+  display: flex; gap: 36px; flex-wrap: wrap; margin-bottom: 28px;
+  padding-bottom: 28px; border-bottom: 1px solid var(--b-1);
+}
+.adn-stat { }
+.adn-stat-val {
+  font-family: var(--mono);
+  font-size: clamp(28px, 4vw, 44px); font-weight: 500;
+  line-height: 1; letter-spacing: -1.5px;
+  font-variant-numeric: tabular-nums; color: var(--t-1);
+}
+.adn-stat-val.gold { color: var(--gold); }
+.adn-stat-lbl {
+  font-size: 8.5px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 1.4px; color: var(--t-3); margin-top: 6px;
+}
+
+/* ADN type toggle pills */
+.adn-type-toggle {
+  display: flex; gap: 6px; margin-bottom: 32px; flex-wrap: wrap;
+}
+.adn-type-pill {
+  padding: 5px 13px; border-radius: 99px;
+  border: 1px solid var(--b-1); background: var(--bg-1);
+  font-size: 11.5px; font-weight: 500; color: var(--t-3);
+  cursor: pointer; transition: border-color .15s, color .15s;
+}
+.adn-type-pill:hover:not(.active) { border-color: var(--b-2); color: var(--t-2); }
+.adn-type-pill.active { border-color: var(--gold); color: var(--gold); font-weight: 700; }
+
+@media (max-width: 760px) {
+  .adn-stats-row { gap: 24px; }
+  .adn-stat-val { font-size: clamp(24px, 8vw, 36px) !important; }
 }
 
 .adn-statement-block {
@@ -703,7 +816,7 @@ select option { background: var(--bg-2); color: var(--t-1); }
   font-size: 12.5px; font-weight: 500; color: var(--t-2);
   cursor: pointer; transition: all .15s;
 }
-.disc-pill.active { background: var(--bg-3); color: var(--t-1); border-color: var(--gold); font-weight: 700; }
+.disc-pill.active { background: var(--bg-1); color: var(--gold); border-color: var(--gold); font-weight: 700; }
 .disc-pill:hover:not(.active) { border-color: var(--b-2); color: var(--t-1); }
 
 .disc-section { margin-bottom: 48px; }
@@ -743,7 +856,7 @@ select option { background: var(--bg-2); color: var(--t-1); }
   border: 1px solid var(--b-1); background: var(--bg-1); margin-bottom: 24px;
   cursor: pointer; transition: border-color .2s ease, box-shadow .25s ease;
 }
-.rec-card-featured:hover { border-color: rgba(184,134,70,.5); box-shadow: 0 12px 48px rgba(0,0,0,.55); }
+.rec-card-featured:hover { border-color: rgba(212,149,106,.5); box-shadow: 0 12px 48px rgba(0,0,0,.55); }
 .rec-card-featured:active { transform: scale(.995); }
 .rcf-poster { width: 160px; flex-shrink: 0; }
 .rcf-poster img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -755,7 +868,7 @@ select option { background: var(--bg-2); color: var(--t-1); }
 .rcf-why { font-size: 13px; color: var(--t-2); line-height: 1.65; flex: 1; margin-bottom: 20px; }
 .rcf-footer { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .rcf-score { font-size: 11.5px; font-weight: 700; color: var(--t-3); background: var(--bg-2); border: 1px solid var(--b-1); border-radius: 5px; padding: 4px 8px; }
-.rcf-cta { font-size: 12px; font-weight: 700; color: var(--gold); border: 1px solid rgba(184,134,70,.5); border-radius: 5px; padding: 6px 14px; transition: background .15s, color .15s, transform 100ms ease-out; }
+.rcf-cta { font-size: 12px; font-weight: 700; color: var(--gold); border: 1px solid rgba(212,149,106,.5); border-radius: 5px; padding: 6px 14px; transition: background .15s, color .15s, transform 100ms ease-out; }
 .rcf-cta:active { transform: scale(.96); }
 .rec-card-featured:hover .rcf-cta { background: var(--gold); color: #000; }
 
@@ -922,7 +1035,7 @@ select option { background: var(--bg-2); color: var(--t-1); }
 .rb-mc   { color: var(--accent2); }
 .rb-tmdb { color: var(--accent2); }
 
-.my-rating-section { margin-bottom: 20px; padding: 18px 16px; background: rgba(184,134,70,.06); border-radius: var(--r-md); border: 1px solid rgba(184,134,70,.15); }
+.my-rating-section { margin-bottom: 20px; padding: 18px 16px; background: rgba(212,149,106,.06); border-radius: var(--r-md); border: 1px solid rgba(212,149,106,.15); }
 .my-rating-section label { font-size: 10px; color: var(--gold); display: block; margin-bottom: 11px; letter-spacing: .5px; font-weight: 700; opacity: .8; }
 .star-input { display: flex; gap: 2px; }
 .star-input .star { font-size: 24px; cursor: pointer; color: var(--bg-4); transition: color .1s, transform .1s; }
@@ -963,8 +1076,8 @@ select option { background: var(--bg-2); color: var(--t-1); }
 .member-avatar { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10.5px; font-weight: 700; color: #000; flex-shrink: 0; background: var(--gold); }
 .member-name { font-size: 12.5px; font-weight: 600; flex: 1; }
 .member-you { font-size: 9.5px; color: var(--gold); font-weight: 700; background: rgba(232,160,48,.15); padding: 2px 6px; border-radius: 4px; }
-.member-compare-btn { font-size: 11px; font-weight: 600; color: var(--gold); background: rgba(184,134,70,.12); border: 1px solid rgba(184,134,70,.25); border-radius: 5px; padding: 3px 9px; cursor: pointer; transition: background .15s; white-space: nowrap; }
-.member-compare-btn:hover { background: rgba(184,134,70,.22); }
+.member-compare-btn { font-size: 11px; font-weight: 600; color: var(--gold); background: rgba(212,149,106,.12); border: 1px solid rgba(212,149,106,.25); border-radius: 5px; padding: 3px 9px; cursor: pointer; transition: background .15s; white-space: nowrap; }
+.member-compare-btn:hover { background: rgba(212,149,106,.22); }
 
 /* Compatibility view */
 .compat-back { font-size: 12px; color: var(--t-3); cursor: pointer; margin-bottom: 14px; display: inline-flex; align-items: center; gap: 5px; }
@@ -1021,7 +1134,7 @@ select option { background: var(--bg-2); color: var(--t-1); }
 .auth-step h2 { font-size: 17px; font-weight: 700; margin-bottom: 5px; }
 .auth-step p  { font-size: 12.5px; color: var(--t-3); margin-bottom: 18px; line-height: 1.5; }
 .auth-input { width: 100%; padding: 11px 16px; font-size: 14.5px; border-radius: var(--r-sm); border: 1px solid var(--b-2); background: var(--bg-2); margin-bottom: 10px; text-align: center; }
-.auth-input:focus { border-color: rgba(184,134,70,.5); background: var(--bg-3); box-shadow: 0 0 0 3px rgba(184,134,70,.07); }
+.auth-input:focus { border-color: rgba(212,149,106,.5); background: var(--bg-3); box-shadow: 0 0 0 3px rgba(212,149,106,.07); }
 .auth-btn { width: 100%; padding: 12px; background: var(--gold); color: #000; border-radius: var(--r-sm); font-size: 14px; font-weight: 700; cursor: pointer; border: none; transition: background .15s ease-out, transform 120ms ease-out; margin-bottom: 9px; }
 .auth-btn:hover { background: var(--gold2); }
 .auth-btn:active { transform: scale(.98); }
@@ -1105,14 +1218,15 @@ select option { background: var(--bg-2); color: var(--t-1); }
 
 /* Responsive */
 @media (max-width: 760px) {
-  #nav { flex-wrap: wrap; height: auto; padding: 9px 14px; gap: 7px 10px; }
+  #sidebar { display: none; }
+  #app { margin-left: 0 !important; padding-top: var(--top-nav-h, 94px); }
+  #nav { display: flex !important; flex-wrap: wrap; height: auto; padding: 9px 14px; gap: 7px 10px; }
   #nav .nav-tabs { display: none; }
   .logo { order: 1; flex: 1; font-size: 19px; }
   .nav-actions { order: 2; flex-shrink: 0; }
   .btn-add-nav { display: none; }
   #omnisearch-wrap { order: 3; flex: 0 0 100%; max-width: none; }
   #mobile-nav { display: flex; }
-  #app { padding-top: var(--top-nav-h, 94px); }
   #pane-inicio { padding-bottom: calc(var(--mob-nav) + env(safe-area-inset-bottom,0px) + 12px); }
   #pane-biblioteca { padding: 16px 14px calc(var(--mob-nav) + env(safe-area-inset-bottom,0px) + 24px); }
   #pane-adn { padding: 24px 14px calc(var(--mob-nav) + env(safe-area-inset-bottom,0px) + 24px); }
@@ -1218,9 +1332,52 @@ select option { background: var(--bg-2); color: var(--t-1); }
 </div>
 
 <!-- APP -->
+<aside id="sidebar">
+  <div class="sb-logo-wrap">
+    <span class="sb-logo-full">Archivo</span>
+    <svg class="sb-logo-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+  </div>
+  <nav class="sb-nav">
+    <div class="sb-item active" data-tab="inicio">
+      <svg class="sb-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      <span class="sb-label">Inicio</span>
+    </div>
+    <div class="sb-item" data-tab="biblioteca">
+      <svg class="sb-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+      <span class="sb-label">Biblioteca</span>
+    </div>
+    <div class="sb-item" data-tab="descubri">
+      <svg class="sb-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+      <span class="sb-label">Descubrí</span>
+    </div>
+    <div class="sb-item" data-tab="adn">
+      <svg class="sb-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22V12m0 0c0-4 6-6 6-10a6 6 0 0 0-12 0c0 4 6 6 6 10z"/></svg>
+      <span class="sb-label">ADN</span>
+    </div>
+    <div class="sb-divider"></div>
+    <div class="sb-item" onclick="openGroupModal()">
+      <svg class="sb-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      <span class="sb-label">Mi grupo</span>
+    </div>
+  </nav>
+  <div class="sb-bottom">
+    <button class="sb-add-btn" onclick="openSearchModal()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      <span class="sb-add-label">Agregar</span>
+    </button>
+    <div class="sb-user" onclick="toggleUserMenu()">
+      <div class="sb-avatar" id="sb-avatar">?</div>
+      <div class="sb-user-name" id="sb-user-name">—</div>
+    </div>
+    <div class="sb-compact-btn" onclick="toggleSidebarCompact()" title="Colapsar sidebar">
+      <svg id="sb-compact-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </div>
+  </div>
+</aside>
+
 <div id="app">
 
-  <!-- NAV -->
+  <!-- NAV (mobile only — shown via CSS on <760px) -->
   <nav id="nav">
     <div class="logo">Archivo</div>
     <div class="nav-tabs">
@@ -1238,7 +1395,6 @@ select option { background: var(--bg-2); color: var(--t-1); }
       <div id="omni-dropdown"></div>
     </div>
     <div class="nav-actions">
-      <button class="btn-add-nav" onclick="openSearchModal()">+ Agregar</button>
       <div id="user-menu-wrap">
         <div class="user-avatar" id="user-avatar-btn" onclick="toggleUserMenu()" title="Iniciar sesión">?</div>
         <div id="user-dropdown">
@@ -1276,11 +1432,10 @@ select option { background: var(--bg-2); color: var(--t-1); }
       </div>
     </div>
     <div class="inicio-body">
+      <div id="inicio-progress" class="inicio-sec"></div>
       <div id="inicio-carousel" class="inicio-sec"></div>
       <div id="inicio-week" class="inicio-sec"></div>
-      <div id="inicio-metrics" class="inicio-sec"></div>
       <div id="inicio-identity" class="inicio-sec"></div>
-      <div id="inicio-progress" class="inicio-sec"></div>
       <div id="inicio-recent" class="inicio-sec"></div>
       <div id="inicio-recs" class="inicio-sec" style="display:none"></div>
     </div>
@@ -1354,7 +1509,7 @@ select option { background: var(--bg-2); color: var(--t-1); }
   <div class="pane" id="pane-descubri">
     <div class="descubri-header">
       <div class="descubri-title">Descubrí</div>
-      <div class="descubri-sub">Recomendaciones basadas en lo que amás</div>
+      <div class="descubri-sub" id="descubri-sub">Recomendaciones basadas en lo que amás</div>
     </div>
     <div class="disc-type-pills">
       <div class="disc-pill active" data-dtype="movies" onclick="switchDiscType('movies')">Películas</div>
@@ -1368,8 +1523,7 @@ select option { background: var(--bg-2); color: var(--t-1); }
   <div class="pane" id="pane-adn">
     <div id="adn-genre-glow"></div>
     <div class="adn-header">
-      <div class="adn-eyebrow">Tu identidad cultural</div>
-      <div class="adn-title" id="adn-title">ADN Cultural</div>
+      <div class="adn-eyebrow" id="adn-eyebrow">ADN · Cultural</div>
     </div>
     <div id="adn-content"></div>
   </div>
@@ -1404,9 +1558,8 @@ select option { background: var(--bg-2); color: var(--t-1); }
   <div id="more-drawer-bg" onclick="closeMoreDrawer()"></div>
   <div id="more-drawer-panel">
     <div class="drawer-handle"></div>
-    <div class="drawer-item nav-tab" data-tab="descubri" onclick="drawerNav('descubri')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><span class="di-label">Descubrí</span></div>
-    <div class="drawer-item nav-tab" data-tab="adn" onclick="drawerNav('adn')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22V12m0 0c0-4 6-6 6-10a6 6 0 0 0-12 0c0 4 6 6 6 10z"/></svg><span class="di-label">ADN Cultural</span></div>
-    <div class="drawer-item" onclick="openGroupModal();closeMoreDrawer()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><span class="di-label">Grupo</span></div>
+    <div class="drawer-item" onclick="openGroupModal();closeMoreDrawer()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><span class="di-label">Mi grupo</span></div>
+    <div class="drawer-item" onclick="openModal('modal-import');closeMoreDrawer()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg><span class="di-label">Importar CSV</span></div>
   </div>
 </div>
 
@@ -1709,7 +1862,7 @@ function renderInicio() {
           const isB = item.type==='book';
           const src = item.poster_path ? (isB ? item.poster_path : `${TMDB_IMG}w185${item.poster_path}`) : null;
           const img = src ? `<img src="${src}" alt="${item.title}" loading="lazy">` : `<div class="car-ph" style="background:${bookColor(item.title)}">${bookInitial(item.title)}</div>`;
-          return `<div class="car-card" onclick="openDetail('${item.id}')">${img}<div class="car-title">${item.title}</div></div>`;
+          return `<div class="car-card" onclick="openDetail('${item.id}')">${img}</div>`;
         }).join('')}
       </div>`;
   } else { carouselEl.innerHTML = ''; }
@@ -1733,10 +1886,7 @@ function renderInicio() {
       </div>`;
   } else { weekEl.innerHTML = ''; }
 
-  // Metrics inline
-  // Stats block removed from Home — lives in ADN now
-  const metricsEl = document.getElementById('inicio-metrics');
-  if (metricsEl) metricsEl.innerHTML = '';
+  // inicio-metrics removed from DOM — no-op
 
   // Identity module (quick version of ADN archetype)
   const identityEl = document.getElementById('inicio-identity');
@@ -1760,6 +1910,8 @@ function renderInicio() {
     else if (_topGenre==='Terror') _arch='El buscador de adrenalina';
     else if (_topGenre==='Ciencia ficción'||_topGenre==='Ciencia Ficción') _arch='El explorador de ideas';
     else if (_avgF&&parseFloat(_avgF)>=8) _arch='El crítico selectivo';
+    // Cache for Descubrí subtitle (overrides ADN cache if ADN not loaded yet)
+    if (!window._cachedArchetype) { window._cachedArchetype=_arch; window._cachedTopGenre=_topGenre; window._cachedTopDecade=_topDecade; }
     let _desc = _topGenre&&_topDecade ? `Preferís ${_topGenre.toLowerCase()} de los ${_topDecade}s.` : _topGenre ? `Tenés fuerte inclinación por ${_topGenre.toLowerCase()}.` : 'Tu biblioteca refleja un gusto ecléctico.';
     if (_diffF!=null) _desc += _diffF>=0 ? ` Sos ${_diffF.toFixed(1)} puntos más generoso que IMDb.` : ` Sos ${Math.abs(_diffF).toFixed(1)} puntos más exigente que IMDb.`;
     identityEl.innerHTML = `
@@ -2276,14 +2428,46 @@ function renderADN() {
     'Fantasía':'#6B4FA6','Fantasy':'#6B4FA6',
     'Misterio':'#4A6B6B','Mystery':'#4A6B6B','Crime':'#4A6B6B',
   };
-  const glowColor = topGenre ? (GENRE_GLOW[topGenre] || '#B88646') : '#B88646';
+  const glowColor = topGenre ? (GENRE_GLOW[topGenre] || '#D4956A') : '#D4956A';
   const glowEl = document.getElementById('adn-genre-glow');
   if (glowEl) {
     glowEl.style.background = glowColor;
-    setTimeout(() => { glowEl.style.opacity = '.09'; }, 80);
+    setTimeout(() => { glowEl.style.opacity = '1'; }, 80);
   }
 
-  // Build stats line parts
+  // Cache globally for Descubrí subtitle
+  window._cachedArchetype = archetype;
+  window._cachedTopGenre  = topGenre;
+  window._cachedTopDecade = topDecade;
+
+  // Update ADN eyebrow with personalized label
+  const eyebrowEl = document.getElementById('adn-eyebrow');
+  if (eyebrowEl) {
+    const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    const now = new Date();
+    const userName = window._cachedUserName || 'Vos';
+    eyebrowEl.textContent = `${userName} · ${meses[now.getMonth()]} ${now.getFullYear()}`;
+  }
+
+  // Build stats DM Mono row
+  const statsRowHtml = `
+    <div class="adn-stats-row">
+      <div class="adn-stat"><div class="adn-stat-val gold">${watched.length}</div><div class="adn-stat-lbl">Títulos</div></div>
+      ${avg ? `<div class="adn-stat"><div class="adn-stat-val">${avg}</div><div class="adn-stat-lbl">Prom. Rating</div></div>` : ''}
+      ${totalHours ? `<div class="adn-stat"><div class="adn-stat-val">${totalHours}</div><div class="adn-stat-lbl">Horas vistas</div></div>` : ''}
+      ${diffImdb ? `<div class="adn-stat"><div class="adn-stat-val" style="color:${parseFloat(diffImdb)>=0?'var(--green)':'var(--red)'}">${parseFloat(diffImdb)>=0?'+':''}${diffImdb}</div><div class="adn-stat-lbl">vs IMDb</div></div>` : ''}
+    </div>`;
+
+  // Type toggle
+  const typeToggleHtml = `
+    <div class="adn-type-toggle" id="adn-type-toggle">
+      <div class="adn-type-pill active" onclick="adnSwitchType(this,'all')">Todos</div>
+      ${movies.length ? `<div class="adn-type-pill" onclick="adnSwitchType(this,'movie')">Películas</div>` : ''}
+      ${series.length ? `<div class="adn-type-pill" onclick="adnSwitchType(this,'tv')">Series</div>` : ''}
+      ${books.length  ? `<div class="adn-type-pill" onclick="adnSwitchType(this,'book')">Libros</div>` : ''}
+    </div>`;
+
+  // Build stats line parts (legacy small line)
   const statParts = [];
   if (movies.length) statParts.push(`<span>${movies.length}</span> película${movies.length!==1?'s':''}`);
   if (series.length) statParts.push(`<span>${series.length}</span> serie${series.length!==1?'s':''}`);
@@ -2304,6 +2488,9 @@ function renderADN() {
   }).join('');
 
   el.innerHTML = `
+    ${statsRowHtml}
+    ${typeToggleHtml}
+
     <div class="adn-profile-block">
       <div class="adn-profile-archetype">${archetype}</div>
       <div class="adn-profile-desc">${statement}</div>
@@ -2390,6 +2577,26 @@ function renderADN() {
         }).join('')}
       </div>
     </div>` : ''}`;
+}
+
+function adnSwitchType(el, type) {
+  document.querySelectorAll('.adn-type-pill').forEach(p=>p.classList.remove('active'));
+  el.classList.add('active');
+  // For now just re-render ADN with filtered data — simple approach: re-render full ADN
+  // In future: filter genres/decades sections by type
+  // We filter the adn-section bodies by toggling visibility
+  const contentEl = document.getElementById('adn-content');
+  if (!contentEl) return;
+  // Show/hide vs-IMDb section if type is books
+  const criterioSections = contentEl.querySelectorAll('.adn-section');
+  criterioSections.forEach(sec => {
+    const header = sec.querySelector('.adn-section-header');
+    if (!header) return;
+    const txt = header.textContent.toLowerCase();
+    if (txt.includes('criterio') || txt.includes('coincidencia') || txt.includes('diferencias')) {
+      sec.style.display = (type === 'book') ? 'none' : '';
+    }
+  });
 }
 
 // ============================================================
@@ -2503,6 +2710,7 @@ async function renderDisc() {
   if (morePicks.length) html += `<div class="disc-section"><div class="disc-section-title">Más opciones</div><div class="disc-section-why">Otras coincidencias de tu biblioteca</div><div class="recs-list">${morePicks.map((r,i)=>recCardList(r,i+300,i+1)).join('')}</div></div>`;
 
   discCache[cacheKey] = html; el.innerHTML = html;
+  updateDescubriSubtitle();
 }
 
 async function renderBookDisc() {
@@ -2621,11 +2829,12 @@ function switchTab(tab) {
   currentTab = tab;
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
   document.querySelectorAll('.mn-tab[data-tab]').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  document.querySelectorAll('.sb-item[data-tab]').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
   document.querySelectorAll('.pane').forEach(p => p.classList.remove('active'));
   const pane = document.getElementById(`pane-${tab}`);
   if (pane) pane.classList.add('active');
   window.scrollTo({ top: 0, behavior: 'instant' });
-  if (tab === 'descubri') renderDisc();
+  if (tab === 'descubri') { renderDisc(); updateDescubriSubtitle(); }
   if (tab === 'adn') renderADN();
 }
 
@@ -2635,6 +2844,26 @@ document.querySelectorAll('.nav-tab').forEach(t => {
 document.querySelectorAll('.mn-tab[data-tab]').forEach(t => {
   t.addEventListener('click', () => { if (t.dataset.tab) switchTab(t.dataset.tab); });
 });
+document.querySelectorAll('.sb-item[data-tab]').forEach(t => {
+  t.addEventListener('click', () => { if (t.dataset.tab) switchTab(t.dataset.tab); });
+});
+
+function toggleSidebarCompact() {
+  const sb = document.getElementById('sidebar');
+  const app = document.getElementById('app');
+  sb.classList.toggle('compact');
+}
+
+function updateDescubriSubtitle() {
+  const el = document.querySelector('.descubri-sub');
+  if (!el) return;
+  const arch = window._cachedArchetype || '';
+  const genre = window._cachedTopGenre || '';
+  const decade = window._cachedTopDecade || '';
+  if (arch) {
+    el.textContent = `Para ${arch}${genre?' · '+genre:''}${decade?' · '+decade+'s':''}`;
+  }
+}
 
 function drawerNav(tab) { closeMoreDrawer(); switchTab(tab); }
 function openMoreDrawer()  { document.getElementById('more-drawer').classList.add('open'); }
@@ -3105,9 +3334,17 @@ async function claimNullItems(){try{await fetch(`${SUPABASE_URL}/rest/v1/watchli
 function updateUserAvatar(profile){
   const btn=document.getElementById('user-avatar-btn');if(!btn)return;
   const name=profile.display_name||currentUser.email||'?';
-  btn.textContent=name.charAt(0).toUpperCase();btn.style.display='flex';btn.title=name;
+  const initial=name.charAt(0).toUpperCase();
+  btn.textContent=initial;btn.style.display='flex';btn.title=name;
   const ne=document.getElementById('ud-name'),ee=document.getElementById('ud-email');
   if(ne)ne.textContent=name;if(ee)ee.textContent=currentUser.email||'';
+  // Update sidebar avatar + user name
+  const sbAv=document.getElementById('sb-avatar');
+  const sbName=document.getElementById('sb-user-name');
+  if(sbAv)sbAv.textContent=initial;
+  if(sbName)sbName.textContent=name;
+  // Cache for ADN eyebrow
+  window._cachedUserName = name.split(' ')[0];
 }
 
 function showAuthStep(step){document.querySelectorAll('.auth-step').forEach(s=>s.classList.remove('active'));const el=document.getElementById(`auth-step-${step}`);if(el)el.classList.add('active');}
