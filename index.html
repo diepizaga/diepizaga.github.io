@@ -1825,26 +1825,90 @@ function olCover(coverId, size='M') {
   return coverId ? `https://covers.openlibrary.org/b/id/${coverId}-${size}.jpg` : null;
 }
 async function booksSearch(q) {
-  const r = await fetch(`https://openlibrary.org/search.json?q=${encodeURIComponent(q)}&limit=12&fields=key,title,author_name,first_publish_year,cover_i,subject,number_of_pages_median`);
-  if (!r.ok) return [];
-  const d = await r.json();
-  return (d.docs||[]).filter(it=>it.title).map(it=>({
-    id: it.key,            // e.g. "/works/OL18417W"
-    _type: 'book',
-    title: it.title,
-    author: (it.author_name||[]).slice(0,2).join(', '),
-    year: it.first_publish_year ? String(it.first_publish_year) : '',
-    cover: olCover(it.cover_i),
-    categories: (it.subject||[]).slice(0,5),
-    pageCount: it.number_of_pages_median||null,
-    description: null,
-    google_rating: null,
-    preview_link: `https://openlibrary.org${it.key}`,
-  }));
+  // Search Open Library + Google Books in parallel
+  const [olRes, gbRes] = await Promise.allSettled([
+    fetch(`https://openlibrary.org/search.json?q=${encodeURIComponent(q)}&limit=12&fields=key,title,author_name,first_publish_year,cover_i,subject,number_of_pages_median`).then(r=>r.ok?r.json():{docs:[]}),
+    fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=12&printType=books&langRestrict=es`).then(r=>r.ok?r.json():{items:[]}),
+  ]);
+
+  const seen = new Set(); // deduplicate by normalized title+author
+  const results = [];
+
+  // Open Library results
+  const olDocs = olRes.status==='fulfilled' ? (olRes.value.docs||[]) : [];
+  olDocs.filter(it=>it.title).forEach(it => {
+    const key = (it.title+' '+(it.author_name||[])[0]).toLowerCase().slice(0,40);
+    if (seen.has(key)) return; seen.add(key);
+    results.push({
+      id: it.key,
+      _source: 'ol',
+      _type: 'book',
+      title: it.title,
+      author: (it.author_name||[]).slice(0,2).join(', '),
+      year: it.first_publish_year ? String(it.first_publish_year) : '',
+      cover: olCover(it.cover_i),
+      categories: (it.subject||[]).slice(0,5),
+      pageCount: it.number_of_pages_median||null,
+      description: null,
+      google_rating: null,
+      preview_link: `https://openlibrary.org${it.key}`,
+    });
+  });
+
+  // Google Books results — fill gaps not covered by OL
+  const gbItems = gbRes.status==='fulfilled' ? (gbRes.value.items||[]) : [];
+  gbItems.forEach(it => {
+    const info = it.volumeInfo || {};
+    if (!info.title) return;
+    const key = (info.title+' '+(info.authors||[])[0]).toLowerCase().slice(0,40);
+    if (seen.has(key)) return; seen.add(key);
+    const thumb = info.imageLinks?.thumbnail?.replace('http:','https:') || null;
+    results.push({
+      id: it.id,   // Google Books volume id
+      _source: 'gb',
+      _type: 'book',
+      title: info.title,
+      author: (info.authors||[]).slice(0,2).join(', '),
+      year: info.publishedDate ? info.publishedDate.slice(0,4) : '',
+      cover: thumb,
+      categories: (info.categories||[]).slice(0,5),
+      pageCount: info.pageCount||null,
+      description: info.description||null,
+      google_rating: info.averageRating||null,
+      preview_link: info.previewLink||'',
+    });
+  });
+
+  return results.slice(0, 16);
 }
 
 async function booksDetail(id) {
-  // id is like "/works/OL18417W"
+  // Google Books id: short alphanumeric (no slash). Open Library: starts with "/"
+  if (!id.startsWith('/')) {
+    // Google Books detail
+    try {
+      const d = await fetch(`https://www.googleapis.com/books/v1/volumes/${id}`).then(r=>r.json());
+      const info = d.volumeInfo || {};
+      const thumb = info.imageLinks?.thumbnail?.replace('http:','https:') || null;
+      const large = info.imageLinks?.large?.replace('http:','https:') || info.imageLinks?.medium?.replace('http:','https:') || thumb;
+      return {
+        id, _source:'gb', _type:'book',
+        title: info.title || '',
+        author: (info.authors||[]).slice(0,2).join(', '),
+        year: info.publishedDate ? info.publishedDate.slice(0,4) : '',
+        cover: thumb,
+        cover_large: large,
+        categories: (info.categories||[]).slice(0,5),
+        pageCount: info.pageCount||null,
+        description: info.description||null,
+        google_rating: info.averageRating||null,
+        preview_link: info.previewLink||'',
+        publisher: (info.publisher||null),
+      };
+    } catch { return {id,_type:'book',title:'',author:'',year:'',cover:null,cover_large:null,categories:[],pageCount:null,description:null,google_rating:null}; }
+  }
+
+  // Open Library id: "/works/OL..."
   const [work, editions] = await Promise.all([
     fetch(`https://openlibrary.org${id}.json`).then(r=>r.json()).catch(()=>({})),
     fetch(`https://openlibrary.org${id}/editions.json?limit=1`).then(r=>r.json()).catch(()=>({entries:[]})),
@@ -1860,7 +1924,7 @@ async function booksDetail(id) {
     } catch {}
   }
   return {
-    id, _type:'book',
+    id, _source:'ol', _type:'book',
     title: work.title || '',
     author,
     year: work.first_publish_date ? work.first_publish_date.slice(-4) : '',
