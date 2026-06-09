@@ -1,4 +1,4 @@
-<!-- build: 2026-06-08T01:00 -->
+<!-- build: 2026-06-08T02:00 -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -9,11 +9,11 @@
 <title>Archivo</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400;1,600&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;1,400;1,500&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=DM+Mono:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root {
-  --bg-0: #050505;
-  --bg-1: #101010;
+  --bg-0: #08090a;
+  --bg-1: #111415;
   --bg-2: #171717;
   --bg-3: #1E1E1E;
   --bg-4: #2A2A2A;
@@ -39,7 +39,7 @@
   --r-lg: 14px;
   --r-xl: 18px;
 
-  --serif: 'Cormorant Garamond', Georgia, serif;
+  --serif: 'EB Garamond', Georgia, serif;
   --sans:  'DM Sans', system-ui, -apple-system, sans-serif;
   --mono:  'DM Mono', 'Courier New', monospace;
 
@@ -1377,9 +1377,125 @@ select option { background: var(--bg-2); color: var(--t-1); }
   .adn-profile-desc { font-size: 14px; }
   .identity-archetype { font-size: 26px !important; }
 }
+
+/* ── MIDNIGHT EDITORIAL THEME ─────────────────────────────────────────────── */
+
+/* Film grain overlay */
+.film-grain {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  pointer-events: none; z-index: 9999; opacity: 0.035;
+  background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="4" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/></filter><rect width="300" height="300" filter="url(%23n)" opacity="1"/></svg>');
+  background-size: 300px 300px;
+  animation: grain-shift 0.5s steps(1) infinite;
+}
+@keyframes grain-shift {
+  0%   { background-position: 0 0; }
+  20%  { background-position: -60px -40px; }
+  40%  { background-position: 80px 20px; }
+  60%  { background-position: -20px 90px; }
+  80%  { background-position: 50px -70px; }
+  100% { background-position: -80px 50px; }
+}
+
+/* Glass panel utility */
+.glass-panel {
+  background: rgba(17,20,21,.75);
+  backdrop-filter: blur(40px); -webkit-backdrop-filter: blur(40px);
+  border: 0.5px solid rgba(143,145,148,.18);
+}
+
+/* Mono label utility */
+.mono-label {
+  font-family: 'JetBrains Mono', 'DM Mono', monospace;
+  letter-spacing: 0.12em; text-transform: uppercase;
+}
+
+/* Copper pulse animation */
+@keyframes pulse-copper {
+  0%, 100% { opacity: 0.75; }
+  50%       { opacity: 1; text-shadow: 0 0 18px rgba(212,149,106,.35); }
+}
+.animate-copper { animation: pulse-copper 4s ease-in-out infinite; }
+
+/* Copper / violet glow helpers */
+.copper-glow { box-shadow: 0 0 50px -10px rgba(212,149,106,.18); }
+.violet-glow { box-shadow: 0 0 50px -10px rgba(124,58,237,.14); }
+
+/* Gallery cards: grayscale at rest → full color on hover */
+.card .poster,
+.car-card img,
+.bib-card .card-img {
+  filter: grayscale(55%) brightness(0.85);
+  transition: filter .55s cubic-bezier(.4,0,.2,1), transform .4s cubic-bezier(.16,1,.3,1);
+}
+.card:hover .poster,
+.car-card:hover img,
+.bib-card:hover .card-img {
+  filter: grayscale(0%) brightness(1);
+  transform: scale(1.03);
+}
+
+/* Hero: cinematic overlay */
+.hero-overlay {
+  background: linear-gradient(
+    to bottom,
+    rgba(8,9,10,.25) 0%,
+    rgba(8,9,10,.0)  18%,
+    rgba(8,9,10,.65) 58%,
+    rgba(8,9,10,1)   88%
+  ) !important;
+}
+.hero-bg { filter: brightness(0.82) saturate(0.72); }
+
+/* Hero: vertical editorial watermark */
+.hero-wordmark {
+  position: absolute;
+  left: 18px; top: 0; bottom: 0;
+  display: flex; align-items: flex-end; justify-content: flex-start;
+  padding-bottom: 5rem;
+  pointer-events: none; user-select: none; z-index: 2;
+}
+.hero-wordmark span {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: clamp(44px, 9vw, 72px);
+  color: rgba(255,255,255,.06);
+  line-height: 1;
+  letter-spacing: -2px;
+}
+
+/* Mobile nav labels: JetBrains Mono */
+.mn-label {
+  font-family: 'JetBrains Mono', 'DM Mono', monospace !important;
+  font-size: 7.5px !important;
+  letter-spacing: 0.12em !important;
+  text-transform: uppercase !important;
+}
+
+/* Modal: glass treatment */
+.modal {
+  background: rgba(14,15,16,.96) !important;
+  backdrop-filter: blur(40px) !important;
+  -webkit-backdrop-filter: blur(40px) !important;
+}
+
+/* Cards: sharper radius + copper hover border */
+.card:hover {
+  border-color: rgba(212,149,106,.25) !important;
+  box-shadow: 0 10px 44px rgba(0,0,0,.75) !important;
+}
+
+/* Identity module: copper glow */
+.identity-module { box-shadow: 0 0 60px -16px rgba(212,149,106,.14); }
+
+/* Sidebar logo: italic serif */
+.sb-logo-full { font-style: italic !important; }
 </style>
 </head>
 <body>
+<div class="film-grain"></div>
 
 <!-- AUTH -->
 <div id="auth-screen">
@@ -1530,6 +1646,7 @@ select option { background: var(--bg-2); color: var(--t-1); }
     <div id="hero-wrap" class="hero-wrap">
       <div id="hero-bg" class="hero-bg"></div>
       <div class="hero-overlay"></div>
+      <div class="hero-wordmark"><span>Archivo</span></div>
       <div class="hero-body">
         <div class="hero-eyebrow" id="hero-eyebrow">Último agregado</div>
         <div class="hero-title" id="hero-title">Tu biblioteca cultural</div>
@@ -1670,9 +1787,11 @@ select option { background: var(--bg-2); color: var(--t-1); }
     <div class="mn-fab-spacer"><div class="mob-fab" onclick="openSearchModal()">+</div></div>
     <div class="mn-tab" data-tab="descubri">
       <svg class="mn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+      <span class="mn-label">Find</span>
     </div>
     <div class="mn-tab" data-tab="adn">
       <svg class="mn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22V12m0 0c0-4 6-6 6-10a6 6 0 0 0-12 0c0 4 6 6 6 10z"/></svg>
+      <span class="mn-label">DNA</span>
     </div>
   </div>
 </nav>
