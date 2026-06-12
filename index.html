@@ -2465,7 +2465,7 @@ function openDetailModal(item, isEdit) {
           <div class="det-genres">${genres}</div>
         </div>
       </div>
-      ${isBook && item._bookDetail?.preview_link ? `<div style="margin-bottom:14px"><a href="${escAttr(item._bookDetail.preview_link)}" target="_blank" style="font-size:12.5px;color:var(--gold)">Ver en ${item._bookDetail._source==='gb'?'Google Books':'Open Library'} →</a></div>` : (!isBook ? `<div id="watch-providers-section" style="margin-bottom:14px"></div>` : '')}
+      ${isBook ? (() => { const gbid = item.google_books_id || item._bookDetail?.google_books_id; const previewUrl = gbid ? `https://books.google.com/books?id=${encodeURIComponent(gbid)}` : (item._bookDetail?.preview_link || ''); const source = gbid ? 'Google Books' : (item._bookDetail?._source==='gb' ? 'Google Books' : 'Open Library'); return previewUrl ? `<div style="margin-bottom:14px"><a href="${escAttr(previewUrl)}" target="_blank" style="font-size:12.5px;color:var(--gold)">Ver en ${source} →</a></div>` : ''; })() : `<div id="watch-providers-section" style="margin-bottom:14px"></div>`}
       ${item.overview?`<p class="det-overview">${esc(item.overview)}</p>`:''}
       ${ratingsSection}
       <div class="my-rating-section">
