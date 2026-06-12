@@ -1549,7 +1549,9 @@ function toggleInsights() { insightsOpen = !insightsOpen; renderBibInsights(); }
 
 function renderBibInsights() {
   const el = $id('bib-insights'); if (!el) return;
-  const pool = (libType==='all' ? items : items.filter(i=>i.type===libType)).filter(i=>i.status!=='watchlist');
+  // Solo por tipo — en "Todo" mezcla libros con cine y no aporta
+  if (libType === 'all') { el.innerHTML = ''; return; }
+  const pool = items.filter(i=>i.type===libType && i.status!=='watchlist');
   if (pool.length < 3) { el.innerHTML = ''; return; }
   const rated = pool.filter(i=>i.my_rating);
   const label = { all:'Todo el archivo', movie:'Películas', tv:'Series', book:'Libros' }[libType];
@@ -1615,7 +1617,8 @@ function updateTicker() {
     window._cachedArchetype || null,
   ].filter(Boolean);
   const seq = parts.join(' — ');
-  el.innerHTML = `<span>${esc(seq)}</span><span aria-hidden="true">${esc(seq)}</span>`;
+  // Copias suficientes para que el loop llene cualquier ancho de pantalla sin huecos
+  el.innerHTML = Array.from({length:8}, (_,i)=>`<span${i?' aria-hidden="true"':''}>${esc(seq)}</span>`).join('');
 }
 
 // ============================================================
@@ -1818,9 +1821,12 @@ function renderADN() {
   }
 
   // Goodreads (libros con google_rating, 1-5 → ×2)
-  const withGoodreads = books.filter(i => i.my_rating && i.google_rating);
+  // El rating de Google Books (1-5) se guarda en tmdb_rating al agregar el libro;
+  // google_rating queda como fallback por si existe como columna propia
+  const gbStars = i => parseFloat(i.google_rating ?? i.tmdb_rating);
+  const withGoodreads = books.filter(i => i.my_rating && (i.google_rating ?? i.tmdb_rating));
   const avgGoodreads10 = withGoodreads.length
-    ? (withGoodreads.reduce((s,i) => s + parseFloat(i.google_rating)*2, 0) / withGoodreads.length).toFixed(1) : null;
+    ? (withGoodreads.reduce((s,i) => s + gbStars(i)*2, 0) / withGoodreads.length).toFixed(1) : null;
   const booksRated = books.filter(i => i.my_rating);
   const avgBooks = booksRated.length
     ? (booksRated.reduce((s,i) => s + parseFloat(i.my_rating), 0) / booksRated.length).toFixed(1) : null;
