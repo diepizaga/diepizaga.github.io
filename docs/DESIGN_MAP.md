@@ -177,6 +177,68 @@ Durante el diseño de **Bloque B**, la auditoría de columnas de `profiles` afir
 
 **Regla general que deja esto para el resto del proyecto:** el esquema real de la base (verificado con `select=<columna>` contra el endpoint de datos, nunca contra el endpoint OpenAPI que requiere `service_role`) es la única fuente de verdad sobre qué columnas existen — las referencias del código son una hipótesis a verificar, no evidencia por sí solas.
 
+### Modelo de identidad (diseño, 30-jul-2026)
+
+Antes de tocar código se resolvió el modelo, no las columnas puntuales:
+
+```
+auth.users (Supabase Auth — fuente de verdad de la cuenta)
+    id · email · password · session
+
+              ↓ (FK profiles_id_fkey, ON DELETE CASCADE)
+
+profiles (Archivo — solo lo que auth.users no puede exponer entre usuarios)
+    id · username · created_at
+```
+
+- Archivo solo necesita un dato de identidad propio: un **nombre visible**, mostrado a vos mismo y a compañeros de un grupo compartido.
+- `email`/contraseña/sesión son responsabilidad exclusiva de `auth.users` — no se duplican en `profiles`. `currentUser.email` ya está disponible en memoria sin consulta extra.
+- **Decisión: sin cambio de esquema.** Se reutiliza la columna `username` ya existente (confirmado sin `UNIQUE`, solo `PRIMARY KEY(id)` y la FK a `auth.users`). **En Archivo, `username` representa el nombre visible del usuario — no un handle público ni único.** Es la única semántica que tiene esa columna en este producto.
+- Crear una columna nueva (`display_name`) se descartó: la única ventaja real hubiera sido evitar esta nota de documentación, a cambio de una migración innecesaria sobre una tabla con 0 filas. Las políticas de RLS no se ven afectadas por la elección (están scopeadas por `id`, no por nombre de columna).
+
+### Diseño por flujos funcionales (aprobado 30-jul-2026)
+
+**Flujo 1 — Alta automática del perfil**
+- Objetivo: que el perfil se cree realmente al loguearse o registrarse, sin fallar en silencio.
+- Estado actual: `loadProfile()` (`index.html:2718`) y `signInWithPassword()` (`index.html:2809`) escriben `{display_name, email}` — ambas columnas inexistentes, ambos POST fallan. `.catch(()=>{})` solo atrapa fallas de red; el resultado de `signInWithPassword()` tampoco se chequea. El bug queda invisible porque `loadProfile()` igual devuelve un `fallback` armado en JS.
+- Estado esperado: ambos POST mandan `{id, username}`. **Ningún error de persistencia puede quedar silencioso, sea cual sea su origen** (HTTP, red, o cualquier otro) — no alcanza con chequear `r.ok`; el manejo de errores debe cubrir cualquier forma en que la escritura pueda fallar.
+- Riesgos: bajo — es agregar verificación, no cambiar lógica de negocio.
+- Alcance: `loadProfile()`, `signInWithPassword()`.
+- Validaciones: login real → fila creada en `profiles` con `username` poblado; signup de prueba → mismo resultado por el segundo camino.
+- Rollback: revertir el cambio de código; no toca esquema ni políticas.
+
+**Flujo 2 — Edición del nombre visible**
+- Objetivo: que "Cambiar mi nombre" persista de verdad.
+- Estado actual: `changeDisplayName()` (`index.html:2842`) hace `PATCH {display_name}` — falla sin chequeo, pero actualiza `currentUser._profile` en memoria igual, mostrando éxito falso hasta la próxima sesión.
+- Estado esperado: `PATCH {username}`, con el mismo principio del Flujo 1 (ningún fallo de persistencia queda silencioso).
+- Riesgos: mínimo.
+- Alcance: `changeDisplayName()`.
+- Validaciones: cambiar nombre → recargar/re-loguear → confirmar que persiste, no solo que se ve bien antes de recargar.
+- Rollback: revertir el cambio de código.
+
+**Flujo 3 — Lectura del perfil propio**
+- Objetivo: que la app lea el nombre real persistido, no un valor derivado en memoria.
+- Estado actual: `updateUserAvatar()` (`index.html:2727`) lee `profile.display_name`; siempre recibe el `fallback` en memoria porque nunca existió una fila real.
+- Estado esperado: `updateUserAvatar()` lee `profile.username`. **`profiles.username` pasa a ser la única fuente de verdad del nombre visible.** El objeto `fallback` de `loadProfile()` existe únicamente para mantener operativa la sesión si la persistencia falla en ese momento — no es una segunda fuente de verdad, es una degradación temporal mientras dura la sesión.
+- Riesgos: bajo.
+- Alcance: `updateUserAvatar()`, forma del objeto `fallback`.
+- Validaciones: con el Flujo 1 validado, confirmar que el nombre mostrado viene de la fila real, no del prefijo del email.
+- Rollback: revertir el cambio de código.
+
+**Flujo 4 — Visualización de miembros de un grupo**
+- Objetivo: que el nombre de cada miembro se resuelva desde el dato real.
+- Estado actual: `renderGroupMembers()`/`renderGroupCompareList()` (`index.html:2926`, `:2954`) piden `profiles(display_name,email)` — columnas inexistentes; fallaría directamente si Grupo tuviera datos reales.
+- Estado esperado: joins piden `profiles(username)`; resolución de nombre pasa a `p.username || 'Anónimo'`. **Sin fallback a email** — si no hay `username`, el resultado esperado es "Anónimo", coherente con el modelo de identidad (email no pertenece a este dato ni se expone entre usuarios).
+- Riesgos: bajo. Cambio de comportamiento menor y deliberado: un miembro sin `username` se ve como "Anónimo" en vez de con su email.
+- Alcance: las dos queries + las dos líneas de resolución de `name`.
+- Validaciones: Grupo no tiene uso real hoy — validar con cuenta de prueba adicional en un grupo compartido, o diferir la validación funcional completa sin que eso bloquee el resto.
+- Rollback: revertir el cambio de código.
+
+**Flujo 5 — Compatibilidad y comparación entre miembros**
+- Objetivo: ninguno — sin cambios.
+- Estado actual/esperado: `compareWithMember()` recibe el nombre ya resuelto como parámetro del Flujo 4; solo consulta `watchlist`, nunca `profiles`.
+- Riesgos/Alcance/Validaciones/Rollback: n/a — hereda el resultado del Flujo 4.
+
 ---
 
 ## Bloque D — Aislamiento de `group_members` vía invitación validada server-side
