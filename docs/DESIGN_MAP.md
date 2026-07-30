@@ -107,6 +107,8 @@ El destino de `cinelog.git`/`origin` (deprecar Pages / mantener sincronizado / b
 
 `profiles` tiene 0 filas hoy pese a que `loadProfile()` intenta crear el perfil en cada login (`index.html:2718`). Causa probable: el `fetch(...).catch(()=>{})` de esa creación solo atrapa fallas de red, no errores HTTP — un fallo silencioso ahí nunca se habría notado. **Decisión explícita de Diego: esto no amplía el alcance de Bloque B.** Se valida como parte del checklist de implementación (crear un perfil real y confirmar que la fila se crea) pero no se diagnostica ni se corrige acá. Si la implementación confirma que la creación automática falla de verdad, se abre un bloque nuevo e independiente para ese problema. Si funciona correctamente, el hallazgo se cierra como validado sin generar trabajo adicional.
 
+**Actualización (30-jul-2026):** se confirmó que falla de verdad — ver **Bloque K** más abajo. De paso, la auditoría de columnas de `profiles` hecha en este mismo bloque B (que daba por existentes `display_name` y `email`) resultó **incorrecta** — corregida y explicada en Bloque K, sección "Corrección de auditoría".
+
 ---
 
 ## Bloque C — Corregir el bypass `user_id IS NULL` en `watchlist`
@@ -144,6 +146,36 @@ Diagnóstico: no existe ninguna señal de identidad en una fila con `user_id = N
 1. Primero: revertir el gating del frontend si genera un problema de UX (ej. demora perceptible al abrir la app).
 2. Segundo: revertir el cambio de políticas (`own_data`/`group_read`) si algo depende de un caso no anticipado.
 3. Último recurso: quitar el constraint `NOT NULL` si bloquea algún flujo no previsto.
+
+---
+
+## Bloque K — Corrección de la creación automática de perfil
+
+- **Objetivo:** que `loadProfile()` cree correctamente la fila de perfil de cada usuario en `profiles` — hoy falla siempre, silenciosamente.
+- **Problema que resuelve:** `profiles` tiene 0 filas pese a que la función corre en cada login desde que existe. Salió a la luz al validar el Bloque B: `createGroup()` (ya corregido para mandar `created_by`) falla porque `groups.created_by` tiene una foreign key hacia `profiles.id`, y Diego no tiene fila ahí.
+- **Origen:** no es una regresión de esta sesión ni del Bloque B — está roto desde el primer commit que introdujo el feature (`1953096`, 06-jun-2026). Ver más abajo, "Corrección de auditoría".
+- **Cómo se descubrió (cronología completa, para trazabilidad):**
+  1. Validando Bloque B, crear un grupo de prueba dio `403` con `Prefer: return=representation`.
+  2. Se descartaron metódicamente: texto de la política `groups_insert`, tipo de dato de `created_by`, JWT/identidad, mecanismo de `auth.uid()` (confirmado funcionando via lectura real de `watchlist`), triggers en `groups`, y rol/comando de la política (`polcmd`/`polroles` verificados por SQL de solo lectura) — todos descartados con evidencia.
+  3. Sacar `Prefer: return=representation` reveló el error real: `409`, `23503`, foreign key `groups_created_by_fkey` — *"Key is not present in table profiles"*.
+  4. Con permiso explícito de Diego, se reprodujo el POST real de `loadProfile()` — reveló `PGRST204: "Could not find the 'display_name' column of 'profiles' in the schema cache"`.
+  5. Sondeo columna por columna (mismo método que `owner_id`/`created_by`) confirmó que `display_name` y `email` no existen.
+- **Estado:** Auditoría completada (30-jul-2026). Diseño no arrancado todavía.
+
+### Corrección de auditoría (transparencia, 30-jul-2026)
+
+Durante el diseño de **Bloque B**, la auditoría de columnas de `profiles` afirmó que `display_name` y `email` existían, citando "consultas de datos" como evidencia. Eso era **incorrecto**: lo que realmente se hizo en ese momento fue un `grep` sobre el código fuente (confirmando que el código *usa* esos nombres), no una consulta contra la base real — se redactó como si fueran equivalentes, y no lo eran. No se detectó en su momento porque el diseño de `profiles_read` de Bloque B se apoya en `id`, no en `display_name`/`email`, así que nada de lo implementado después ejerció esa suposición hasta que, en este bloque, se probó el INSERT real.
+
+**Esquema real de `profiles`, confirmado columna por columna contra la base (fuente de verdad — no el código):**
+
+| Columna | ¿Existe? |
+|---|---|
+| `id` | ✅ |
+| `username` | ✅ (existe, el código nunca la usa hoy) |
+| `created_at` | ✅ |
+| `display_name`, `email`, `full_name`, `nickname`, `avatar_url`, `updated_at`, `name`, `nombre`, `bio` | ❌ |
+
+**Regla general que deja esto para el resto del proyecto:** el esquema real de la base (verificado con `select=<columna>` contra el endpoint de datos, nunca contra el endpoint OpenAPI que requiere `service_role`) es la única fuente de verdad sobre qué columnas existen — las referencias del código son una hipótesis a verificar, no evidencia por sí solas.
 
 ---
 
