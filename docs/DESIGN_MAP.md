@@ -312,7 +312,21 @@ Revisando el código completo: `role` se **lee en un solo lugar** de toda la app
 - **Esfuerzo:** Bajo.
 - **Dependencias:** ninguna.
 - **Documentos de auditoría que lo respaldan:** PRODUCT_AUDIT.md § 6.
-- **Estado:** Pendiente.
+- **Estado:** Finalizado (30-jul-2026).
+
+### Reverificación antes de implementar
+
+Confirmado con evidencia fresca que el hallazgo seguía vigente (ninguno de los bloques B/K/L/F tocó este código): `director` no se escribe en ningún alta, `tmdbDetail()` nunca pide créditos a TMDB, y la columna `director` no existe en `watchlist` (`42703`).
+
+### Decisión: remover, no poblar
+
+Costo de poblarla (ampliar esquema, cambiar el flujo de alta, migración del histórico) desproporcionado frente al valor de una sola sección de ADN. Mismo criterio que `role` en Bloque L: antes de ampliar el modelo, preguntar si el producto lo necesita — acá la respuesta fue no, por ahora. Si en el futuro se decide profundizar el análisis cultural del ADN (directores, actores, compositores), se reabre como una ampliación deliberada del modelo, no como este arreglo puntual.
+
+### Hallazgo adicional, resuelto en el mismo cambio (no ameritó bloque aparte)
+
+"Autores favoritos" (la sección equivalente para libros, que comparte contenedor DOM con "Directores") **tampoco estaba funcionando** — el contenedor solo se insertaba en el HTML si `topDirs.length > 0`, algo que nunca pasaba, así que el elemento nunca existía y `adnSwitchType()` no podía encontrarlo ni para libros. Como es la misma pieza de código que había que tocar para sacar "Directores favoritos", se resolvió en el mismo cambio: el contenedor ahora está siempre presente en el HTML (oculto por defecto), y `adnSwitchType()` lo muestra/completa correctamente al filtrar por Libros.
+
+**Validado en el navegador:** sección oculta en "Todo"/"Películas"/"Series"; al filtrar "Libros" muestra datos reales (Anna Todd, Stephenie Meyer, John Katzenbach, Timur Vermes, J. K. Rowling) — funcionando por primera vez. Sin errores de consola.
 
 ---
 

@@ -1739,17 +1739,6 @@ function renderADN() {
   books.forEach(b=>{ if(b.author) b.author.split(',').forEach(a=>{ const k=a.trim(); if(k) ac[k]=(ac[k]||0)+1; }); });
   const topAuthor = Object.entries(ac).sort((a,b)=>b[1]-a[1])[0]?.[0] || null;
 
-  const dirMap={};
-  watched.filter(i=>i.type!=='book'&&i.director).forEach(i=>{
-    const k=(i.director||'').trim(); if(!k) return;
-    if(!dirMap[k]) dirMap[k]={count:0,topItem:null};
-    dirMap[k].count++;
-    if(!dirMap[k].topItem||(i.my_rating&&(!dirMap[k].topItem.my_rating||parseFloat(i.my_rating)>parseFloat(dirMap[k].topItem.my_rating))))
-      dirMap[k].topItem=i;
-  });
-  const topDirs = Object.entries(dirMap).sort((a,b)=>b[1].count-a[1].count).slice(0,5)
-    .map(([name,{count,topItem}])=>({name,count,topItem}));
-
   // Arquetipo + statement
   let archetype = '';
   let statement = '';
@@ -1889,21 +1878,10 @@ function renderADN() {
       <div class="adn-genres">${genreChipsHTML(topGenres)}</div>
     </div>` : ''}
 
-    ${topDirs.length ? `
-    <div class="adn-section" id="adn-directors-section">
-      <div class="adn-section-header" id="adn-directors-header">Directores favoritos</div>
-      <div id="adn-director-list">
-        ${topDirs.map((d,i)=>{
-          const img = d.topItem?.poster_path ? `<img src="${TMDB_IMG}w92${d.topItem.poster_path}" alt="" loading="lazy" onerror="this.style.display='none'">` : '';
-          return `<div class="director-row">
-            <span class="dir-rank">${i+1}</span>
-            <div class="dir-thumb">${img}</div>
-            <span class="dir-name">${esc(d.name)}</span>
-            <span class="dir-count">${d.count} film${d.count!==1?'s':''}</span>
-          </div>`;
-        }).join('')}
-      </div>
-    </div>` : ''}
+    <div class="adn-section" id="adn-directors-section" style="display:none">
+      <div class="adn-section-header" id="adn-directors-header"></div>
+      <div id="adn-director-list"></div>
+    </div>
 
     ${topDecades.length > 2 ? `
     <div class="adn-section">
@@ -2058,28 +2036,7 @@ function adnSwitchType(el, type) {
           </div>`).join('');
       } else dirSectionEl.style.display = 'none';
     } else {
-      const dMap = {};
-      subset.filter(i=>i.type!=='book'&&i.director).forEach(i => {
-        const k = (i.director||'').trim(); if (!k) return;
-        if (!dMap[k]) dMap[k] = {count:0, topItem:null};
-        dMap[k].count++;
-        if (!dMap[k].topItem || (i.my_rating && (!dMap[k].topItem.my_rating || parseFloat(i.my_rating)>parseFloat(dMap[k].topItem.my_rating))))
-          dMap[k].topItem = i;
-      });
-      const topD = Object.entries(dMap).sort((a,b)=>b[1].count-a[1].count).slice(0,5);
-      if (topD.length) {
-        if (dirHeaderEl) dirHeaderEl.textContent = 'Directores favoritos';
-        dirSectionEl.style.display = '';
-        dirListEl.innerHTML = topD.map(([name,{count,topItem}],i) => {
-          const img = topItem?.poster_path ? `<img src="${TMDB_IMG}w92${topItem.poster_path}" alt="" loading="lazy" onerror="this.style.display='none'">` : '';
-          return `<div class="director-row">
-            <span class="dir-rank">${i+1}</span>
-            <div class="dir-thumb">${img}</div>
-            <span class="dir-name">${esc(name)}</span>
-            <span class="dir-count">${count} film${count!==1?'s':''}</span>
-          </div>`;
-        }).join('');
-      } else dirSectionEl.style.display = 'none';
+      dirSectionEl.style.display = 'none';
     }
   }
 }
