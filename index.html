@@ -1008,6 +1008,10 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
         Importar CSV
       </button>
+      <button class="us-item" onclick="closeModal('modal-user');exportData()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Exportar datos
+      </button>
       <button class="us-item" onclick="changeDisplayName()">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
         Cambiar mi nombre
@@ -2859,6 +2863,20 @@ async function changeDisplayName() {
     renderInicio(); updateTicker();
     showToast('Nombre actualizado', 'success');
   } catch (e) { console.error('No se pudo guardar el nombre:', e); showToast('Error al guardar el nombre', 'error'); }
+}
+
+function exportData() {
+  const payload = { version: 1, exported_at: new Date().toISOString(), items };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `archivo-export-${new Date().toISOString().slice(0,10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  showToast('Archivo exportado', 'success');
 }
 
 function openUserSheet() {

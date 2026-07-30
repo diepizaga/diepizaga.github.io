@@ -325,7 +325,13 @@ Revisando el código completo: `role` se **lee en un solo lugar** de toda la app
 - **Esfuerzo:** Bajo-Medio.
 - **Dependencias:** ninguna.
 - **Documentos de auditoría que lo respaldan:** PRODUCT_AUDIT.md § 6.
-- **Estado:** Pendiente.
+- **Estado:** Finalizado (30-jul-2026).
+
+### Diseño e implementación
+
+Solución mínima: `items` ya está cargado en memoria en cada sesión — sin fetch nuevo, sin backend. `exportData()` serializa a JSON con estructura versionada (`{version: 1, exported_at, items}`, no solo el array crudo) para poder evolucionar el formato sin romper compatibilidad hacia atrás, y dispara una descarga vía Blob + `<a download>`. Nombre de archivo con fecha: `archivo-export-YYYY-MM-DD.json`. Botón "Exportar datos" en el menú de cuenta, junto a "Importar CSV".
+
+**Validado:** con datos reales (1000 ítems), estructura del payload correcta, sin errores en consola al ejecutar la función completa (Blob + descarga).
 
 ---
 
