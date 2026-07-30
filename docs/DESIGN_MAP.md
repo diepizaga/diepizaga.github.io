@@ -253,14 +253,40 @@ profiles (Archivo — solo lo que auth.users no puede exponer entre usuarios)
 
 ---
 
-## Bloque L — Creación de grupo: `INSERT ... RETURNING` bloqueado por `groups_read`
+## Bloque L — Grupo: alta y unión sin ampliar la superficie de lectura
 
-- **Objetivo:** que `createGroup()` pueda crear un grupo y obtener su `id` de vuelta sin que la falta de membresía (todavía no creada) lo bloquee.
-- **Problema que resuelve:** `createGroup()` usa `Prefer: return=representation` para leer el `id` del grupo recién creado. Esa lectura pasa por `groups_read`, que exige ser miembro — y en el instante del insert, todavía no lo sos (la membresía se crea en una segunda request, después). Postgres trata `INSERT ... RETURNING` como una operación atómica: si la lectura de vuelta falla por RLS, se revierte el insert completo. Resultado: crear un grupo falla siempre, en cualquier cuenta, la primera vez.
-- **Cómo se descubrió:** al revalidar Bloque B después de cerrar Bloque K (el bug de la FK a `profiles` quedó resuelto, pero crear un grupo seguía fallando). Confirmado con evidencia: el mismo insert con `Prefer: return=minimal` da `201` (éxito limpio); con `return=representation` da `403` con el mismo mensaje genérico de RLS que ya habíamos visto antes (`"new row violates row-level security policy"`) — el mismo mensaje sirve tanto para un `WITH CHECK` fallido como para una lectura de `RETURNING` bloqueada, son indistinguibles por el mensaje solo.
-- **Hallazgo adicional relacionado:** `groups` tampoco tiene ninguna política de **DELETE** — ni siquiera el creador de un grupo puede borrarlo vía la API normal. Confirmado al intentar limpiar un grupo de prueba: el `DELETE` devolvió `200` sin afectar ninguna fila (RLS filtra en silencio cuando no hay política aplicable, sin error).
-- **No pertenece a Bloque K** (no es de identidad/perfiles) ni se mezcla con el diseño ya cerrado de Bloque B — bloque nuevo e independiente, mismo criterio "un problema, un bloque".
-- **Estado:** Auditado (30-jul-2026). Diseño no arrancado.
+- **Objetivo:** que crear un grupo y unirse a un grupo funcionen, sin que ninguna operación previa a la membresía exponga más que lo indispensable.
+- **Problema que resolvía:** `createGroup()` usa `Prefer: return=representation` para leer el grupo recién creado — esa lectura pasaba por `groups_read`, que exigía ser miembro (todavía no lo sos en el instante del insert). Postgres trata `INSERT ... RETURNING` como atómico: si la lectura de vuelta falla por RLS, se revierte el insert completo. `joinGroup()` tenía el mismo problema de fondo: para buscar un grupo por código de invitación necesitaba `groups_read`, que también exige membresía — con lo cual nunca podía encontrar ningún grupo, ni con el código correcto.
+- **Cómo se descubrió:** al revalidar Bloque B después de cerrar Bloque K. Confirmado con evidencia: el mismo insert con `return=minimal` daba `201` limpio; con `return=representation` daba `403` con el mismo mensaje genérico de RLS que ya conocíamos.
+- **Modelo de dominio definido antes del diseño técnico:** quién puede leer un grupo antes de ser miembro (nadie, en general — solo el creador ve el suyo), quién puede crear uno (cualquier usuario autenticado), quién puede descubrir uno por código (nadie por lectura general — solo mediante una operación puntual de "resolver invitación"), cuándo se pasa a ser miembro (al crear, o al unirse con código válido), y qué operaciones necesitan membresía previa (todo excepto crear y resolver una invitación).
+- **Comparación explícita antes de decidir la implementación:** para crear grupo, ajustar `groups_read` alcanza y no cede nada (Opción A). Para unirse, RLS no puede expresar "mostrale este grupo a un no-miembro solo si conoce el código correcto" — cualquier política lo bastante permisiva para eso también permite listar todos los grupos a cualquier cuenta. Se optó por una función `SECURITY DEFINER` mínima, de solo lectura, únicamente para esa pieza puntual (Opción B acotada) — no se reemplazó todo el dominio por funciones.
+- **Diseño aprobado, con estos criterios explícitos:** la función representa el concepto **"resolver una invitación"**, no un wrapper de `SELECT ... WHERE invite_code`. Hoy la validez se reduce a "existe el código"; el día que haya expiración o límite de usos, la condición se amplía adentro de la función sin que el llamador cambie. La función **no debe acumular lógica de negocio ajena** (cupos, permisos, auditoría) — si aparece esa necesidad, se evalúa en ese momento si sigue perteneciendo acá o amerita otra abstracción.
+- **Implementado:**
+  ```sql
+  -- groups_read: TO authenticated (no public), agrega OR created_by = auth.uid()
+  -- resolve_invitation(p_code text) RETURNS TABLE(id uuid, name text), SECURITY DEFINER,
+  --   REVOKE de PUBLIC, GRANT solo a authenticated
+  ```
+  `joinGroup()` cambia su primera consulta para usar `rpc/resolve_invitation` en vez del `GET` directo. `createGroup()` no necesitó ningún cambio de código.
+- **Validado con evidencia real:**
+  - `groups` INSERT + `return=representation` → `201`, fila completa (el problema de RETURNING está resuelto).
+  - `resolve_invitation` con código inexistente → `[]`. Con código real → `{id, name}` exacto, nada más.
+  - `invite_code` confirmado `UNIQUE` a nivel de schema (`groups_invite_code_key`) — no hace falta `LIMIT 1`, la garantía es más fuerte que eso.
+  - `GET groups?select=*` sin filtro, sin membresías → sigue vacío (no se amplió la superficie de lectura hacia otros usuarios).
+- **Rollback:** revertir `joinGroup()` al GET directo; `DROP FUNCTION resolve_invitation`; revertir `groups_read` a su forma original. Este último paso **solo reintroduce el bug funcional de `createGroup()` — no reabre ningún hallazgo de seguridad (SEC-1/SEC-3)**, porque `OR created_by = auth.uid()` nunca amplió visibilidad hacia otros usuarios.
+- **Estado:** Finalizado (30-jul-2026).
+
+### Hallazgo relacionado, NO resuelto acá (mismo criterio: un problema, un bloque)
+
+Al completar la validación (agregar la membresía del creador), apareció un tercer caso del mismo patrón que `owner_id`/`display_name`: **`group_members.role` no existe.** Las únicas columnas reales de `group_members` son `group_id` y `user_id` — sin `role`, sin `id`, sin `created_at`. El código asume `role` en 3 lugares (`createGroup()` escribe `'owner'`, `joinGroup()` escribe `'member'`, `renderGroupMembers()` muestra un badge "admin" si `role === 'owner'`).
+
+**Pregunta de auditoría respondida antes de cerrar este hallazgo (pedido explícito de Diego): ¿el producto necesita distinguir owner/member como dato propio, o es una suposición de código nunca implementada?**
+
+Revisando el código completo: `role` se **lee en un solo lugar** de toda la app (el badge "admin"). Nada más depende de esa distinción — ningún permiso, ninguna función bloqueada a "solo el owner puede...". Y **`groups.created_by` ya captura exactamente esa misma información** (quién creó el grupo). No hace falta ningún dato nuevo: "¿es esta persona el owner?" se responde comparando `member.user_id === group.created_by`, sin duplicar nada.
+
+**Conclusión de la auditoría: `role` no es un concepto que el producto necesite como dato almacenado — es una suposición de código que nunca se implementó en el esquema, y lo único que sustentaba (el badge) ya es derivable de un dato que existe.** Queda como hallazgo pendiente, sin bloque ni alcance técnico asignado todavía — esa decisión (sacar `role` del código vs. agregar la columna) se toma en su propia auditoría/diseño, no acá.
+
+**Housekeeping pendiente (Diego, vía dashboard):** quedaron grupos de prueba sin limpiar ("Prueba Bloque K 3", "Validacion Grupo L") — no se pueden borrar vía API (sin política de DELETE en `groups`, hallazgo ya registrado aparte).
 
 ---
 

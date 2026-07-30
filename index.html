@@ -3097,9 +3097,9 @@ async function joinGroup() {
   const code = input.value.trim().toUpperCase();
   if (code.length < 4) { showToast('Ingresá el código', 'error'); return; }
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/groups?invite_code=eq.${code}&select=*`, { headers: getAuthHeaders() });
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/resolve_invitation`, { method:'POST', headers: getAuthHeaders(), body: JSON.stringify({ p_code: code }) });
     const gs = await r.json();
-    if (!gs.length) { showToast('Código inválido', 'error'); return; }
+    if (!r.ok || !gs.length) { showToast('Código inválido', 'error'); return; }
     const g = gs[0];
     await fetch(`${SUPABASE_URL}/rest/v1/group_members`, { method:'POST', headers:{...getAuthHeaders(),'Prefer':'resolution=ignore-duplicates,return=minimal'}, body: JSON.stringify({ group_id: g.id, user_id: currentUser.id, role:'member' }) });
     currentGroup = g;
