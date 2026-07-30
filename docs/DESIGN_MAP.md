@@ -53,7 +53,20 @@ Estados posibles: **Pendiente** / **En diseño** / **Implementando** / **Validan
 - **Esfuerzo:** Bajo.
 - **Dependencias:** ninguna para el recableo de tracking y el borrado de `.bak`. La limpieza completa (dejar de usar `origin` del todo) depende de tu decisión sobre el destino de `cinelog.git` (MASTER_AUDIT § 5).
 - **Documentos de auditoría que lo respaldan:** MASTER_AUDIT.md § 2 (EP-3, EP-4), § 5.
-- **Estado:** Pendiente.
+- **Estado:** Finalizado (2026-07-30), con alcance acotado explícitamente por Diego.
+
+### Ejecutado
+
+- `main` reseteado a `root/main` (`c83d62c`) y tracking configurado a `root` — el repo ya no arrastra la historia stale de `origin`/`cinelog.git`.
+- `.gitignore` agregado (backups, los 3 scripts con credenciales, `.DS_Store`).
+- `index.html.bak` e `index_old_backup.html` eliminados.
+- `docs/` (las 4 auditorías/plan) versionado por primera vez.
+- Working tree confirmado idéntico a lo publicado en `https://diepizaga.github.io/` después de todo el proceso.
+- 2 commits locales, **no pusheados** — queda pendiente de autorización explícita cuando corresponda.
+
+### Diferido explícitamente (no bloquea el resto del proyecto)
+
+El destino de `cinelog.git`/`origin` (deprecar Pages / mantener sincronizado / borrar) queda como decisión administrativa pendiente, sin fecha. No condiciona la implementación de B/C ni ningún otro bloque.
 
 ---
 
@@ -208,3 +221,4 @@ Estos hallazgos están registrados y no se pierden, pero no tienen suficiente de
 - **2026-07-30:** Diseño de Bloque B aprobado. Regla de disciplina de alcance confirmada explícitamente: un hallazgo detectado *durante* el diseño o la implementación de un bloque (ej. `profiles` en 0 filas) no amplía el alcance de ese bloque — se valida/observa dentro de él, y si resulta ser un problema real, se abre un bloque nuevo e independiente. Arranca el diseño de Bloque C.
 - **2026-07-30:** Diseño de Bloque C aprobado, con un cambio de dirección respecto de la propuesta inicial: se descarta el mecanismo de "claim" server-side (no hay forma de demostrar propiedad de una fila huérfana) a favor de prevenir su creación de raíz + constraint `NOT NULL`. Confirmado sin filas huérfanas existentes en producción. Con B y C diseñados, sigue el housekeeping de Bloque A, y después implementación por etapas.
 - **2026-07-30:** Checklist de pre-implementación corrido sobre B y C antes de ejecutar Bloque A. Encontrados y corregidos dos huecos: dependencia de B desactualizada (ya resuelta, seguía marcada pendiente) y ausencia total de criterio de éxito/rollback en C (agregados). A partir de acá, el ciclo de ejecución es Implementación → Validación → Commit, por bloque, sin mezclar etapas.
+- **2026-07-30:** Bloque A ejecutado y finalizado, con alcance acotado explícitamente: tracking + `.gitignore` + borrado de `.bak` + versionado de `docs/`. Destino de `cinelog.git` diferido sin bloquear el proyecto. **Hallazgo nuevo durante la ejecución (ver MASTER_AUDIT § 2, EP-7): `import_movies.py` contiene la `service_role` key de Supabase** (no la `anon key`) — severidad crítica, distinta e independiente de todo lo demás, pendiente de que Diego la regenere. No bloquea el inicio de la implementación de Bloque B.

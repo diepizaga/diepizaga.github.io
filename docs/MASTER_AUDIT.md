@@ -23,10 +23,11 @@ Ninguna de las tres áreas tiene correcciones de código aplicadas todavía, sal
 |---|---|---|---|
 | EP-1 | **Crítico** | Token PAT de GitHub embebido en texto plano en `.git/config`; además expuesto en esta conversación por un error mío de redirección de shell. | **Resuelto** — revocado por Diego, confirmado con `401` vía API de GitHub. |
 | EP-2 | **Crítico** | Contraseña de Supabase (`die.zaga@gmail.com`) hardcodeada en `migrate_titles.py` y `migrate_books_rating.py`; confirmado que era la contraseña **vigente** de la cuenta (mismo proyecto Supabase que usa la app en producción). | **Resuelto** — cambiada por Diego vía flujo de "olvidé mi contraseña" de la propia app. |
-| EP-3 | **Alto** | Confusión de repos: dos remotes locales (`origin`→`cinelog.git`, `root`→`diepizaga.github.io.git`) con historias divergentes (22 commits únicos en uno, 43 en el otro), sirviendo dos URLs públicas distintas con contenido distinto. | **Resuelto** (identificación) — Diego confirmó que `root`/`diepizaga.github.io.git` es el repo canónico (la PWA que usa a diario). Ningún trabajo se perdió: el rediseño v3 ya estaba commiteado ahí. `origin`/`cinelog.git` está confirmado como stale (sin actividad real desde 07/08-jun). **Recableo de tracking y destino de `origin` quedan pendientes — ver sección 5.** |
-| EP-4 | **Medio** | `index.html.bak` / `index_old_backup.html`: verificados idénticos entre sí y con su contenido completamente cubierto por HEAD + el v3 actual (comparación por conjunto de funciones, no solo por hash). | Verificado, seguro de borrar — pendiente de ejecución (ver sección 5). |
+| EP-3 | **Alto** | Confusión de repos: dos remotes locales (`origin`→`cinelog.git`, `root`→`diepizaga.github.io.git`) con historias divergentes (22 commits únicos en uno, 43 en el otro), sirviendo dos URLs públicas distintas con contenido distinto. | **Resuelto** — `main` reseteado a `root/main` y tracking configurado a `root` (Bloque A, 30-jul). Destino de `origin`/`cinelog.git` queda **diferido explícitamente**, sin bloquear el proyecto. |
+| EP-4 | **Medio** | `index.html.bak` / `index_old_backup.html`: verificados idénticos entre sí y con su contenido completamente cubierto por HEAD + el v3 actual (comparación por conjunto de funciones, no solo por hash). | **Resuelto** — eliminados en Bloque A (30-jul), `.gitignore` agregado para prevenir backups futuros. |
 | EP-5 | **Medio** | `books_rating_backup_2026-06-12.json` vacío (`[]`). | Verificado como comportamiento esperado — el script solo escribe al backup los libros con match exitoso; cero matches ese día, no una migración sin respaldo. No requiere acción. |
 | EP-6 | **Bajo** | `titulos_backup_2026-06-12.json` (922 registros) confirma que la migración es-ES→es-AR de títulos **sí corrió** en junio. | Corrige un supuesto anterior ("migración pendiente"); no requiere acción. |
+| EP-7 | **Crítico** | `import_movies.py` contiene la clave **`service_role`** de Supabase (no la `anon key`) en texto plano — a diferencia de la `anon key`, esta ignora RLS por completo y da acceso total de lectura/escritura a cualquier tabla. Nunca estuvo en git (script siempre untracked), pero quedó expuesta en esta conversación al leer el archivo durante el Bloque A (30-jul). | **Pendiente** — Diego debe regenerarla desde el dashboard de Supabase (Settings → API → service_role secret). Independiente de EP-1/EP-2, no bloquea el diseño ni la implementación de B/C. |
 
 ---
 
@@ -71,23 +72,25 @@ Detalle completo en [PRODUCT_AUDIT.md](PRODUCT_AUDIT.md). Severidad asignada ac�
 
 Nada de esto bloquea el cierre de la auditoría — quedan registrados para resolver en la etapa de diseño o cuando corresponda.
 
-### Requieren tu decisión (no son técnicos, son de producto/alcance)
-- **Tracking de `main`:** recablear la rama local para que trackee `root` (`diepizaga.github.io.git`) en vez de `origin`.
-- **Destino de `origin`/`cinelog.git`:** deprecar el deploy (apagar Pages), mantenerlo sincronizado, o borrar el repo.
+**Nota (30-jul-2026):** la mayoría de lo que estaba abierto acá se resolvió durante el Bloque 0 (visión de producto) y el Bloque A (housekeeping) — ver [DESIGN_MAP.md](DESIGN_MAP.md) para el detalle de cada decisión. Esta sección queda solo con lo genuinamente pendiente hoy.
+
+### Resueltas (referencia, detalle en DESIGN_MAP.md)
+- Tracking de `main` → recableado a `root` (Bloque A).
+- `.bak` → eliminados, `.gitignore` creado (Bloque A).
+- Auto-registro abierto → resuelto direccionalmente por Bloque 0 (visión: invitación y confianza, nunca registro público abierto).
+- Alcance de Grupo → resuelto por Bloque 0 (no se usa hoy, no debe condicionar prioridades).
+- Ambición de producto / escala esperada → resueltas por Bloque 0 (ver DESIGN_MAP.md).
+- Texto SQL de las políticas de `profiles`/`groups`/`group_members` → obtenido y revisado (diseño de Bloque B).
+- Conteo real de filas en `watchlist` para `user_id IS NULL` → confirmado en 0 (diseño de Bloque C).
+
+### Todavía requieren tu decisión
+- **Destino de `origin`/`cinelog.git`:** deprecar el deploy, mantenerlo sincronizado, o borrar el repo — **diferido explícitamente por Diego (30-jul)**, no bloquea el proyecto.
 - **Los 3 scripts `.py` con credenciales:** dejarlos ignorados en `.gitignore` tal cual, o sanearlos para leer credenciales de variables de entorno.
-- **Auto-registro abierto (PROD-1 / precondición de SEC-2 y SEC-3):** mantenerlo abierto o restringirlo — define buena parte del diseño de la corrección de seguridad.
-- **Alcance de Grupo:** ¿se usa hoy? Cambia la prioridad relativa de SEC-3/PROD-2/PROD-6.
-- **Ambición de producto:** ¿estrictamente personal + círculo cerrado, o hay intención de que otros lo usen? Incide sobre PROD-1, PROD-7 (exportación) y la superficie de auth en general.
-- **Expectativa de escala:** ¿cientos o miles de ítems? Incide sobre la prioridad real de PROD-9.
 
-### Requieren tu validación en el dashboard de Supabase (no pude verificarlas desde acá)
-- Conteo real de filas en `profiles`, `groups`, `group_members` (Table Editor).
+### Todavía requieren tu validación en el dashboard de Supabase
+- Conteo real de filas en `profiles`, `groups`, `group_members` (Table Editor) — sigue sin confirmarse (distinto del conteo de `watchlist`, que sí se hizo).
 - Si "Confirm email" está deshabilitado en Authentication → Settings (inferido del código, no confirmado).
-- Texto SQL exacto (`USING`/`WITH CHECK`) de las políticas de `profiles`, `groups`, `group_members` — solo se revisó nombre y comando, no el texto completo (a diferencia de `watchlist`, que sí se revisó completo).
-
-### Ejecución mecánica pendiente (diseñada, no ejecutada — no requiere nueva decisión, solo el ok para tocar el repo)
-- Borrar `index.html.bak` e `index_old_backup.html` (EP-4).
-- Crear `.gitignore` (backups, scripts con credenciales, `.bak`).
+- **Nuevo (EP-7): regenerar la `service_role` key** expuesta en `import_movies.py` — Settings → API → service_role secret.
 
 ---
 
