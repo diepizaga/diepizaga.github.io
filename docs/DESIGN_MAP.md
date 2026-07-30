@@ -160,7 +160,7 @@ Diagnóstico: no existe ninguna señal de identidad en una fila con `user_id = N
   3. Sacar `Prefer: return=representation` reveló el error real: `409`, `23503`, foreign key `groups_created_by_fkey` — *"Key is not present in table profiles"*.
   4. Con permiso explícito de Diego, se reprodujo el POST real de `loadProfile()` — reveló `PGRST204: "Could not find the 'display_name' column of 'profiles' in the schema cache"`.
   5. Sondeo columna por columna (mismo método que `owner_id`/`created_by`) confirmó que `display_name` y `email` no existen.
-- **Estado:** Auditoría completada (30-jul-2026). Diseño no arrancado todavía.
+- **Estado:** Finalizado (30-jul-2026). Auditoría → modelo de identidad → diseño por 5 flujos → implementación → validación, completo. Ver "Implementación y validación" más abajo.
 
 ### Corrección de auditoría (transparencia, 30-jul-2026)
 
@@ -238,6 +238,29 @@ profiles (Archivo — solo lo que auth.users no puede exponer entre usuarios)
 - Objetivo: ninguno — sin cambios.
 - Estado actual/esperado: `compareWithMember()` recibe el nombre ya resuelto como parámetro del Flujo 4; solo consulta `watchlist`, nunca `profiles`.
 - Riesgos/Alcance/Validaciones/Rollback: n/a — hereda el resultado del Flujo 4.
+
+### Implementación y validación (30-jul-2026)
+
+- **Flujo 1:** implementado (`loadProfile()`, `signInWithPassword()`). Validado con datos reales: la fila de perfil se crea de verdad (`{id, username: "die.zaga", created_at, avatar_color}` — `avatar_color` es una columna con default propio, no usada por el código, anotada sin acción). Sin errores en consola.
+- **Flujo 2:** implementado (`changeDisplayName()`). Primera validación en el navegador de vista previa automatizado falló por una limitación de esa herramienta (`window.prompt()` no soportado ahí — ver nota abajo), no del código. Revalidado en Safari real: cambio de nombre persiste después de recargar. **Validado.**
+- **Flujo 3:** implementado (`updateUserAvatar()`). Validado junto con el Flujo 1 — el nombre mostrado viene de la fila real.
+- **Flujo 4:** implementado (los dos joins + resolución de nombre). **Validación funcional diferida** tal como estaba previsto en el diseño — Grupo no tiene datos reales hoy, no hay forma de probarlo con un segundo miembro real. No bloquea el cierre del bloque.
+- **Flujo 5:** sin cambios, nada que validar.
+
+**Nota sobre herramientas de prueba:** el navegador automatizado usado para preview tiene `window.prompt()` explícitamente deshabilitado (`Error: prompt() is not supported`) — no soporta diálogos nativos bloqueantes. No afecta a usuarios reales en ningún navegador normal. Cualquier flujo que dependa de `prompt()`/`confirm()`/`alert()` nativos necesita validarse en un navegador real, no en ese panel.
+
+**Estado final: Bloque K finalizado (30-jul-2026).** Flujos 1, 2 y 3 implementados y validados con evidencia real. Flujo 4 implementado, validación funcional diferida (sin datos de Grupo reales). Flujo 5 sin cambios.
+
+---
+
+## Bloque L — Creación de grupo: `INSERT ... RETURNING` bloqueado por `groups_read`
+
+- **Objetivo:** que `createGroup()` pueda crear un grupo y obtener su `id` de vuelta sin que la falta de membresía (todavía no creada) lo bloquee.
+- **Problema que resuelve:** `createGroup()` usa `Prefer: return=representation` para leer el `id` del grupo recién creado. Esa lectura pasa por `groups_read`, que exige ser miembro — y en el instante del insert, todavía no lo sos (la membresía se crea en una segunda request, después). Postgres trata `INSERT ... RETURNING` como una operación atómica: si la lectura de vuelta falla por RLS, se revierte el insert completo. Resultado: crear un grupo falla siempre, en cualquier cuenta, la primera vez.
+- **Cómo se descubrió:** al revalidar Bloque B después de cerrar Bloque K (el bug de la FK a `profiles` quedó resuelto, pero crear un grupo seguía fallando). Confirmado con evidencia: el mismo insert con `Prefer: return=minimal` da `201` (éxito limpio); con `return=representation` da `403` con el mismo mensaje genérico de RLS que ya habíamos visto antes (`"new row violates row-level security policy"`) — el mismo mensaje sirve tanto para un `WITH CHECK` fallido como para una lectura de `RETURNING` bloqueada, son indistinguibles por el mensaje solo.
+- **Hallazgo adicional relacionado:** `groups` tampoco tiene ninguna política de **DELETE** — ni siquiera el creador de un grupo puede borrarlo vía la API normal. Confirmado al intentar limpiar un grupo de prueba: el `DELETE` devolvió `200` sin afectar ninguna fila (RLS filtra en silencio cuando no hay política aplicable, sin error).
+- **No pertenece a Bloque K** (no es de identidad/perfiles) ni se mezcla con el diseño ya cerrado de Bloque B — bloque nuevo e independiente, mismo criterio "un problema, un bloque".
+- **Estado:** Auditado (30-jul-2026). Diseño no arrancado.
 
 ---
 

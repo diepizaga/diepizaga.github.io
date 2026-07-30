@@ -2714,8 +2714,10 @@ async function loadProfile() {
     if (!r.ok) return null;
     const d = await r.json();
     if (d.length > 0) return d[0];
-    const fallback = { display_name: currentUser.email?.split('@')[0]||'Usuario', email: currentUser.email };
-    fetch(`${SUPABASE_URL}/rest/v1/profiles`, { method:'POST', headers:{...getAuthHeaders(),'Prefer':'resolution=merge-duplicates,return=minimal'}, body: JSON.stringify({ id: currentUser.id, ...fallback }) }).catch(()=>{});
+    const fallback = { username: currentUser.email?.split('@')[0]||'Usuario' };
+    fetch(`${SUPABASE_URL}/rest/v1/profiles`, { method:'POST', headers:{...getAuthHeaders(),'Prefer':'resolution=merge-duplicates,return=minimal'}, body: JSON.stringify({ id: currentUser.id, ...fallback }) })
+      .then(r => { if (!r.ok) return r.text().then(t => { throw new Error(t); }); })
+      .catch(e => console.error('No se pudo crear el perfil de usuario:', e));
     return fallback;
   } catch { return null; }
 }
@@ -2725,7 +2727,7 @@ async function claimNullItems() {
 }
 
 function updateUserAvatar(profile) {
-  const name = profile.display_name || currentUser.email || '?';
+  const name = profile.username || currentUser.email || '?';
   const initial = name.charAt(0).toUpperCase();
   window._cachedUserName = name.split(' ')[0];
   ['sb-avatar','tb-avatar','us-avatar'].forEach(id => { const el=$id(id); if(el) el.textContent = initial; });
@@ -2806,7 +2808,8 @@ async function signInWithPassword(email, password, nameForProfile) {
   currentUser = data.user;
   localStorage.setItem('cinelog_session', JSON.stringify({ access_token: data.access_token, refresh_token: data.refresh_token, user: data.user }));
   if (nameForProfile) {
-    await fetch(`${SUPABASE_URL}/rest/v1/profiles`, { method: 'POST', headers: { ...getAuthHeaders(), 'Prefer': 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ id: currentUser.id, display_name: nameForProfile, email: currentUser.email }) });
+    const pr = await fetch(`${SUPABASE_URL}/rest/v1/profiles`, { method: 'POST', headers: { ...getAuthHeaders(), 'Prefer': 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ id: currentUser.id, username: nameForProfile }) });
+    if (!pr.ok) console.error('No se pudo crear el perfil de usuario:', await pr.text());
   }
   await onSignedIn();
 }
@@ -2841,20 +2844,21 @@ async function confirmPasswordReset(recoveryToken) {
 
 async function changeDisplayName() {
   if (!currentUser) return;
-  const cur = currentUser._profile?.display_name || '';
+  const cur = currentUser._profile?.username || '';
   const name = prompt('Tu nombre para mostrar:', cur);
   if (!name || !name.trim() || name.trim() === cur) return;
   try {
-    await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${currentUser.id}`, {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${currentUser.id}`, {
       method: 'PATCH',
       headers: { ...getAuthHeaders(), 'Prefer': 'return=minimal' },
-      body: JSON.stringify({ display_name: name.trim() })
+      body: JSON.stringify({ username: name.trim() })
     });
-    currentUser._profile = { ...(currentUser._profile || {}), display_name: name.trim() };
+    if (!r.ok) throw new Error(await r.text());
+    currentUser._profile = { ...(currentUser._profile || {}), username: name.trim() };
     updateUserAvatar(currentUser._profile);
     renderInicio(); updateTicker();
     showToast('Nombre actualizado', 'success');
-  } catch { showToast('Error al guardar el nombre', 'error'); }
+  } catch (e) { console.error('No se pudo guardar el nombre:', e); showToast('Error al guardar el nombre', 'error'); }
 }
 
 function openUserSheet() {
@@ -2923,7 +2927,7 @@ async function renderGroupMembers() {
     return;
   }
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/group_members?group_id=eq.${currentGroup.id}&select=user_id,role,profiles(display_name,email)`, { headers: getAuthHeaders() });
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/group_members?group_id=eq.${currentGroup.id}&select=user_id,role,profiles(username)`, { headers: getAuthHeaders() });
     const members = await r.json();
     const code = currentGroup.invite_code || '—';
     el.innerHTML = `
@@ -2934,7 +2938,7 @@ async function renderGroupMembers() {
       </div>
       <div class="member-list">
         ${members.map(m => {
-          const p = m.profiles || {}, name = p.display_name || p.email || 'Anónimo', isMe = m.user_id === currentUser.id;
+          const p = m.profiles || {}, name = p.username || 'Anónimo', isMe = m.user_id === currentUser.id;
           return `<div class="member-item">
             <div class="avatar">${esc(name.charAt(0).toUpperCase())}</div>
             <div class="member-name">${esc(name)}</div>
@@ -2951,12 +2955,12 @@ async function renderGroupCompareList() {
   if (!currentGroup) { el.innerHTML = `<div class="loading-block">Necesitás estar en un grupo.</div>`; return; }
   el.innerHTML = `<div class="loading-block">Cargando miembros…</div>`;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/group_members?group_id=eq.${currentGroup.id}&select=user_id,role,profiles(display_name,email)`, { headers: getAuthHeaders() });
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/group_members?group_id=eq.${currentGroup.id}&select=user_id,role,profiles(username)`, { headers: getAuthHeaders() });
     const members = await r.json();
     const others = members.filter(m => m.user_id !== currentUser.id);
     if (!others.length) { el.innerHTML = `<div class="loading-block">Todavía no hay otros miembros. ¡Compartí el código!</div>`; return; }
     el.innerHTML = `<p style="font-size:12.5px;color:var(--t-3);margin-bottom:12px">Elegí con quién compararte:</p>${others.map(m => {
-      const p = m.profiles || {}, name = p.display_name || p.email || 'Anónimo';
+      const p = m.profiles || {}, name = p.username || 'Anónimo';
       return `<div class="compat-member-card" onclick="compareWithMember('${m.user_id}','${escAttr(name).replace(/'/g,"\\'")}')">
         <div class="avatar" style="width:32px;height:32px;font-size:13px">${esc(name.charAt(0).toUpperCase())}</div>
         <div style="flex:1"><div style="font-size:13.5px;font-weight:700">${esc(name)}</div><div style="font-size:11.5px;color:var(--t-3)">Compatibilidad y recomendaciones</div></div>
@@ -3112,7 +3116,7 @@ async function createGroup() {
   if (!name) { showToast('Ingresá un nombre', 'error'); return; }
   const code = Math.random().toString(36).substring(2,8).toUpperCase();
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/groups`, { method:'POST', headers:{...getAuthHeaders(),'Prefer':'return=representation'}, body: JSON.stringify({ name, invite_code: code, owner_id: currentUser.id }) });
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/groups`, { method:'POST', headers:{...getAuthHeaders(),'Prefer':'return=representation'}, body: JSON.stringify({ name, invite_code: code, created_by: currentUser.id }) });
     if (!r.ok) { showToast('Error al crear', 'error'); return; }
     const gs = await r.json();
     const g = Array.isArray(gs) ? gs[0] : gs;
