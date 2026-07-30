@@ -79,7 +79,21 @@ El destino de `cinelog.git`/`origin` (deprecar Pages / mantener sincronizado / b
 - **Esfuerzo:** Bajo-Medio — las políticas ya existen, falta revisarlas, activarlas y validar con uso real.
 - **Dependencias:** ninguna abierta — el texto SQL exacto de las 9 políticas ya se obtuvo y se revisó (ver "Diseño aprobado" abajo). Este campo estaba desactualizado hasta 2026-07-30.
 - **Documentos de auditoría que lo respaldan:** SECURITY_AUDIT_RLS.md § Riesgo 1.
-- **Estado:** Diseño aprobado (2026-07-30) — pendiente de implementación (después de Bloque C, antes housekeeping de Bloque A).
+- **Estado:** Backend implementado y validado (2026-07-30). Falta el cambio de frontend (`owner_id` → `created_by`) como paso independiente.
+
+### Ejecutado — parte backend
+
+1. Aplicado en Supabase (SQL Editor): `profiles_read` reescrita, RLS habilitado en las 3 tablas.
+2. **Incidente no anticipado, encontrado en la validación**: `HTTP 500`, `42P17 infinite recursion detected in policy for relation "group_members"`. Causa: `gm_read` (política preexistente, no tocada por el diseño original) se autoconsulta contra `group_members` — mientras esa tabla no tenía RLS, la autoconsulta no pasaba por ninguna política; al activarla, Postgres entra en un ciclo al re-evaluar `gm_read` para resolver la subconsulta interna. Afectaba a las tres tablas (`profiles_read` y `groups_read` consultan `group_members` por dentro).
+3. **Corrección aplicada**: función `public.my_group_ids()` (`SECURITY DEFINER`) que lee `group_members` sin pasar por RLS, evitando el ciclo. `gm_read`, `groups_read` y `profiles_read` reescritas para usarla en vez de autoconsultarse. Es el patrón estándar documentado por Supabase para este caso — no es una improvisación.
+4. **Validado:** las 3 tablas vuelven a `200 []` con el `anon key` (antes daban `500`). `watchlist.group_read` (no tocada, pertenece al Bloque C) se revisó por las dudas — nunca se rompió, y se beneficia del mismo arreglo al dejar de haber ciclo en `group_members`.
+
+### Validación del backend — completada (2026-07-30)
+- [x] Confirmado en Table Editor: `profiles`/`groups`/`group_members` ya no muestran "UNRESTRICTED".
+- [x] Probado con cuenta real: perfil, nombre y funcionamiento general correctos, sin regresión.
+
+### Pendiente — frontend (paso independiente, no arrancado)
+- [ ] `createGroup()` ([index.html:3115](../index.html#L3115)): cambiar `owner_id` → `created_by` en el body del POST. Único cambio de este paso — sin mezclar otras mejoras.
 
 ### Diseño aprobado
 
