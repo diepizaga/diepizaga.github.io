@@ -379,6 +379,24 @@ Confirmado con evidencia fresca que las dos limitaciones seguían vigentes antes
 
 ---
 
+## Bloque M — Estabilización de la aplicación
+
+**Cambio de metodología (30-jul-2026), vigente a partir de acá:** este bloque opera distinto a todos los anteriores. No se documenta un diseño previo por cada bug — se identifica la causa, se corrige, se valida y se sigue, todo dentro de este mismo bloque, sin abrir uno nuevo por cada hallazgo. Solo se frena a diseñar aparte si un bug revela un problema estructural serio (modelo de datos, seguridad, o una funcionalidad importante) — el resto se resuelve directamente.
+
+- **Objetivo:** corregir los problemas visibles que afectan el uso diario — no agregar features ni seguir documentando deuda técnica.
+- **Orden de trabajo:**
+  1. Bugs funcionales (pantallas que no responden, loaders infinitos, errores de flujo).
+  2. Bugs de UI/UX (layout roto, tarjetas superpuestas, problemas de PWA).
+  3. Rendimiento.
+  4. Deuda técnica pendiente, solo si aporta valor real — al final, no antes.
+- **Estado:** Abierto (30-jul-2026). Log de lo corregido más abajo, a medida que se cierra cada cosa.
+
+### Log de correcciones
+
+*(se completa a medida que se resuelve cada bug)*
+
+---
+
 ## Bloques diferidos — sin diseño formal por ahora
 
 Estos hallazgos están registrados y no se pierden, pero no tienen suficiente definición o urgencia para ser un bloque activo de diseño ahora mismo.
