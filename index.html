@@ -2440,7 +2440,7 @@ function openDetailModal(item, isEdit) {
           <div class="det-genres">${genres}</div>
         </div>
       </div>
-      ${isBook ? (() => { const gbid = item.google_books_id || item._bookDetail?.google_books_id; const previewUrl = gbid ? `https://books.google.com/books?id=${encodeURIComponent(gbid)}` : (item._bookDetail?.preview_link || ''); const source = gbid ? 'Google Books' : (item._bookDetail?._source==='gb' ? 'Google Books' : 'Open Library'); return previewUrl ? `<div style="margin-bottom:14px"><a href="${escAttr(previewUrl)}" target="_blank" style="font-size:12.5px;color:var(--gold)">Ver en ${source} →</a></div>` : ''; })() : `<div id="watch-providers-section" style="margin-bottom:14px"></div>`}
+      ${isBook ? (() => { const gbid = item.google_books_id || item._bookDetail?.google_books_id; const previewUrl = gbid ? `https://books.google.com/books?id=${encodeURIComponent(gbid)}` : (item._bookDetail?.preview_link || ''); const source = gbid ? 'Google Books' : (item._bookDetail?._source==='gb' ? 'Google Books' : 'Open Library'); return previewUrl ? `<div style="margin-bottom:14px"><a href="${escAttr(previewUrl)}" target="_blank" style="font-size:12.5px;color:var(--gold)">Ver en ${source} →</a></div>` : ''; })() : `<div id="watch-providers-section" style="margin-bottom:14px;min-height:56px"><div style="background:var(--bg-2);border-radius:var(--r-md);padding:12px 14px;border:1px solid var(--b-1);opacity:.5"><div style="font-size:10.5px;font-weight:700;color:var(--t-3);letter-spacing:.8px;text-transform:uppercase">Buscando dónde verla…</div></div></div>`}
       ${item.overview?`<p class="det-overview">${esc(item.overview)}</p>`:''}
       ${ratingsSection}
       <div class="my-rating-section">
@@ -2485,9 +2485,9 @@ async function loadWatchProviders(tmdbId, type) {
   try {
     const r = await fetch(`https://api.themoviedb.org/3/${type==='tv'?'tv':'movie'}/${tmdbId}/watch/providers`, { headers:{Authorization:`Bearer ${TMDB_TOKEN}`} });
     const d = await r.json(); const ar = d.results?.AR;
-    if (!ar) { el.innerHTML=''; return; }
+    if (!ar) { el.innerHTML=''; el.style.minHeight='0'; return; }
     const flatrate=ar.flatrate||[], rent=ar.rent||[], buy=ar.buy||[];
-    if (!flatrate.length&&!rent.length&&!buy.length) { el.innerHTML=''; return; }
+    if (!flatrate.length&&!rent.length&&!buy.length) { el.innerHTML=''; el.style.minHeight='0'; return; }
     const rp=list=>list.map(p=>`<img src="https://image.tmdb.org/t/p/w45${p.logo_path}" title="${escAttr(p.provider_name)}" alt="${escAttr(p.provider_name)}" style="width:30px;height:30px;border-radius:7px;object-fit:cover">`).join('');
     el.innerHTML=`<div style="background:var(--bg-2);border-radius:var(--r-md);padding:12px 14px;border:1px solid var(--b-1)">
       <div style="font-size:10.5px;font-weight:700;color:var(--t-3);letter-spacing:.8px;text-transform:uppercase;margin-bottom:9px">Dónde verla en Argentina</div>
@@ -2495,7 +2495,7 @@ async function loadWatchProviders(tmdbId, type) {
       ${rent.length?`<div style="margin-bottom:7px;display:flex;align-items:center;gap:9px"><span style="font-size:11px;color:var(--t-3);width:54px">Alquiler</span><div style="display:flex;gap:6px">${rp(rent)}</div></div>`:''}
       ${buy.length?`<div style="display:flex;align-items:center;gap:9px"><span style="font-size:11px;color:var(--t-3);width:54px">Compra</span><div style="display:flex;gap:6px">${rp(buy)}</div></div>`:''}
     </div>`;
-  } catch { el.innerHTML = ''; }
+  } catch { el.innerHTML = ''; el.style.minHeight = '0'; }
 }
 
 function setRating(val) {
@@ -2631,11 +2631,28 @@ dropArea.addEventListener('drop', e=>{
 // ============================================================
 // MODALES + TOAST
 // ============================================================
-function openModal(id)  { $id(id).classList.add('open'); }
+function openModal(id) {
+  $id(id).classList.add('open');
+  // iOS: fija el body en su scroll actual para que no se filtre el scroll de fondo
+  // mientras el modal esta abierto (si no, al cerrar aparece "saltado" a otra posicion).
+  if (!document.body.style.position) {
+    document.body.dataset.scrollY = window.scrollY;
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${window.scrollY}px`;
+    document.body.style.width = '100%';
+  }
+}
 function closeModal(id) {
   $id(id).classList.remove('open');
   if (id==='modal-search') { $id('ms-input').value=''; $id('ms-results').innerHTML=''; }
   if (id==='modal-detail') { currentRating=null; editingItem=null; pendingItem=null; }
+  if (!document.querySelector('.modal-overlay.open')) {
+    const y = parseInt(document.body.dataset.scrollY || '0');
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.width = '';
+    window.scrollTo(0, y);
+  }
 }
 document.querySelectorAll('.modal-overlay').forEach(o=>o.addEventListener('click',e=>{ if(e.target===o) closeModal(o.id); }));
 document.addEventListener('keydown',e=>{ if(e.key==='Escape') document.querySelectorAll('.modal-overlay.open').forEach(m=>closeModal(m.id)); });
