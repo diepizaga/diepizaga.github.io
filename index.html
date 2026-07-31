@@ -973,7 +973,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
     <button class="modal-close" onclick="closeModal('modal-import')">✕</button>
     <div class="modal-body">
       <h2>Importar desde CSV</h2>
-      <p>El archivo debe tener una columna <strong>title</strong>. Opcionales: <strong>year, rating, type</strong>.</p>
+      <p>El archivo debe tener una columna <strong>title</strong>. Opcionales: <strong>year, rating, type</strong> (movie/tv/book).</p>
       <div class="import-area" id="import-drop" onclick="document.getElementById('import-file').click()">
         <div style="font-size:28px;margin-bottom:8px">📄</div>
         <p>Click para elegir el CSV o arrastralo acá</p>
@@ -2532,8 +2532,12 @@ async function replaceItem(id, title) {
 // ============================================================
 function parseCsvLine(line) {
   const cols = []; let cur = '', inQ = false;
-  for (const ch of line) {
-    if (ch === '"') { inQ = !inQ; continue; }
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQ && line[i+1] === '"') { cur += '"'; i++; continue; } // comilla escapada ("") dentro de un campo
+      inQ = !inQ; continue;
+    }
     if (ch === ',' && !inQ) { cols.push(cur); cur = ''; continue; }
     cur += ch;
   }
@@ -2575,14 +2579,24 @@ async function runImport() {
     btn.textContent = `Importando ${idx+1}/${importRows.length}…`;
     try {
       const tRaw = (row.type||row.tipo||'').toLowerCase();
-      const type = tRaw.includes('tv')||tRaw.includes('serie') ? 'tv' : 'movie';
-      const results = await tmdbSearch(title.trim(), type);
-      if (!results.length) { fail++; continue; }
-      const r = results[0], rtype = (r.media_type||type)==='movie'?'movie':'tv';
-      if (items.find(i=>i.tmdb_id===r.id&&i.type===rtype)) { ok++; continue; }
-      const d = await tmdbDetail(r.id, rtype);
-      const omdb = await omdbGetRatings(d.original_title||d.title||d.name, (d.release_date||d.first_air_date||'').slice(0,4), d.external_ids?.imdb_id);
-      const it = buildTmdbItem(d, omdb, r.id, rtype);
+      let it;
+      if (tRaw.includes('libro')||tRaw.includes('book')) {
+        const results = await booksSearch(title.trim());
+        if (!results.length) { fail++; continue; }
+        const r = results[0];
+        if (items.find(i=>i.google_books_id===r.id)) { ok++; continue; }
+        const b = await booksDetail(r.id);
+        it = buildBookItem(b);
+      } else {
+        const type = tRaw.includes('tv')||tRaw.includes('serie') ? 'tv' : 'movie';
+        const results = await tmdbSearch(title.trim(), type);
+        if (!results.length) { fail++; continue; }
+        const r = results[0], rtype = (r.media_type||type)==='movie'?'movie':'tv';
+        if (items.find(i=>i.tmdb_id===r.id&&i.type===rtype)) { ok++; continue; }
+        const d = await tmdbDetail(r.id, rtype);
+        const omdb = await omdbGetRatings(d.original_title||d.title||d.name, (d.release_date||d.first_air_date||'').slice(0,4), d.external_ids?.imdb_id);
+        it = buildTmdbItem(d, omdb, r.id, rtype);
+      }
       it.my_rating = row.rating ? parseFloat(row.rating) : null;
       const clean = Object.fromEntries(Object.entries(it).filter(([k,v])=>!k.startsWith('_')&&v!==null&&v!==undefined));
       if (currentUser?.id) clean.user_id = currentUser.id;

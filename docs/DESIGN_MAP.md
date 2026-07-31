@@ -358,9 +358,13 @@ Solución mínima: `items` ya está cargado en memoria en cada sesión — sin f
 - **Esfuerzo:** Bajo-Medio — el fix del parser es casi trivial y puede resolverse solo, sin esperar el soporte de libros.
 - **Dependencias:** ninguna.
 - **Documentos de auditoría que lo respaldan:** PRODUCT_AUDIT.md § 3, § 4.
-- **Estado:** Pendiente.
+- **Estado:** Finalizado (30-jul-2026).
 
----
+### Reverificación e implementación
+
+Confirmado con evidencia fresca que las dos limitaciones seguían vigentes antes de tocar código (nada las había resuelto indirectamente). `parseCsvLine()` ahora hace lookahead sobre `""` para preservar comillas literales en vez de perderlas en silencio. `runImport()` detecta `type: libro/book` y recorre `booksSearch → booksDetail → buildBookItem`, en paralelo a la rama existente de películas/series.
+
+**Validado:** parser probado con comillas escapadas y coma dentro de campo — preserva ambos correctamente. Rama de libros probada de punta a punta hasta la construcción del ítem final (detección → búsqueda real → detalle real → objeto limpio, con `type:'book'`, autor, género y rating de la fila) — sin ejecutar el `POST` final, porque el mecanismo de persistencia ya está cubierto por el flujo de películas/series existente y no cambió en este bloque. Decisión explícita de Diego: no escribir un dato de prueba en su biblioteca real solo para repetir una validación ya cubierta.
 
 ## Bloque H — `tmdb_rating` con semántica doble
 
@@ -371,7 +375,7 @@ Solución mínima: `items` ya está cargado en memoria en cada sesión — sin f
 - **Esfuerzo:** Medio.
 - **Dependencias:** ninguna decisión pendiente, pero el costo de migración es alto en relación al beneficio.
 - **Documentos de auditoría que lo respaldan:** PRODUCT_AUDIT.md § 3, § 4.
-- **Estado:** Pendiente.
+- **Estado:** Reclasificado (30-jul-2026) — **deuda técnica planificada, no bloque activo del roadmap.** No rompe funcionalidad hoy; el costo de migración no se justifica todavía. Se retoma si aparece una razón concreta (ej. un bug real ligado a la ambigüedad, o una necesidad de producto que la vuelva relevante), no por calendario.
 
 ---
 
