@@ -393,7 +393,8 @@ Confirmado con evidencia fresca que las dos limitaciones seguían vigentes antes
 
 ### Log de correcciones
 
-*(se completa a medida que se resuelve cada bug)*
+- **30-jul-2026 — Condición de carrera en Descubrí (`renderDisc`/`renderBookDisc`).** Cambiar rápido entre Películas/Series/Libros disparaba llamadas async superpuestas sin protección; la que terminaba último pisaba el contenido, sin importar qué pestaña estuviera activa — reproducido con evidencia (pestaña "series" activa, contenido de "películas" en pantalla). Fix: snapshot de `discType` al entrar, se descarta la respuesta si el usuario ya cambió de pestaña antes de que termine.
+- **30-jul-2026 — Misma condición de carrera en el buscador (`doSearch`).** Tipear rápido podía dejar en pantalla resultados de una búsqueda anterior más lenta, pisando los de la búsqueda actual. Reproducido y corregido con el mismo patrón (se descarta la respuesta si el input ya no coincide con la query que la originó).
 
 ---
 

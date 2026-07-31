@@ -2046,6 +2046,7 @@ function adnSwitchType(el, type) {
 // ============================================================
 async function renderDisc() {
   const el = $id('disc-content'); if (!el) return;
+  const requestedType = discType; // snapshot: si el usuario cambia de pestaña antes de que termine, esta respuesta queda obsoleta
   updateDescubriSubtitle();
   if (discType === 'books') { await renderBookDisc(); return; }
   const type = discType === 'series' ? 'tv' : 'movie';
@@ -2075,6 +2076,7 @@ async function renderDisc() {
       });
     } catch {}
   }));
+  if (discType !== requestedType) return; // el usuario ya cambió de pestaña, esta respuesta quedó obsoleta
 
   const sorted = Object.values(scoreMap).filter(r=>r.data.poster_path).sort((a,b)=>b.score-a.score);
   if (!sorted.length) { el.innerHTML = `<div class="empty-state"><h3>Nada por ahora</h3><p>No encontramos recomendaciones. Agregá más ${label}.</p></div>`; return; }
@@ -2146,6 +2148,7 @@ async function renderDisc() {
 
 async function renderBookDisc() {
   const el = $id('disc-content'); if (!el) return;
+  const requestedType = discType; // snapshot: si el usuario cambia de pestaña antes de que termine, esta respuesta queda obsoleta
   if (discCache.books) { el.innerHTML = discCache.books; return; }
   el.innerHTML = `<div class="loading-block"><div class="spinner" style="margin:0 auto 10px"></div>Buscando libros…</div>`;
 
@@ -2165,6 +2168,7 @@ async function renderBookDisc() {
   await Promise.all([...topAuthors.map(a=>`inauthor:"${a}"`), ...topGenres.slice(0,2).map(g=>`subject:"${g}"`)].slice(0,5).map(async q => {
     try { const r=await booksSearch(q); r.forEach(b=>{if(!readIds.has(b.id)&&!allBooks.find(x=>x.id===b.id))allBooks.push(b);}); } catch {}
   }));
+  if (discType !== requestedType) return; // el usuario ya cambió de pestaña, esta respuesta quedó obsoleta
 
   if (!allBooks.length) { el.innerHTML = `<div class="empty-state"><h3>Nada por ahora</h3><p>No encontramos recomendaciones de libros.</p></div>`; return; }
 
@@ -2322,9 +2326,11 @@ function renderTmdbResults(results) {
 async function doSearch(q) {
   const c = $id('ms-results');
   const noRes = '<div class="loading-block">Sin resultados</div>';
+  const isStale = () => ($id('ms-input')?.value.trim() || '') !== q; // el usuario ya siguió tipeando, esta respuesta quedó obsoleta
   try {
     if (searchType === 'book') {
       const results = await booksSearch(q);
+      if (isStale()) return;
       c.innerHTML = results.length ? renderBookResults(results) : noRes;
       return;
     }
@@ -2333,6 +2339,7 @@ async function doSearch(q) {
         tmdbSearch(q, 'multi').catch(()=>[]),
         booksSearch(q).catch(()=>[])
       ]);
+      if (isStale()) return;
       if (!tmdbRes.length && !bookRes.length) { c.innerHTML = noRes; return; }
       let html = '';
       if (tmdbRes.length) html += renderTmdbResults(tmdbRes.slice(0,8));
@@ -2344,8 +2351,9 @@ async function doSearch(q) {
       return;
     }
     const results = await tmdbSearch(q, searchType);
+    if (isStale()) return;
     c.innerHTML = results.length ? renderTmdbResults(results) : noRes;
-  } catch(e) { c.innerHTML = `<div class="loading-block" style="color:var(--red)">Error de búsqueda. Probá de nuevo.</div>`; }
+  } catch(e) { if (!isStale()) c.innerHTML = `<div class="loading-block" style="color:var(--red)">Error de búsqueda. Probá de nuevo.</div>`; }
 }
 
 async function selectBookResult(bookId) {
