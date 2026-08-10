@@ -1107,8 +1107,19 @@ async function sbFetch(path, opts = {}, _retried = false) {
 }
 
 async function loadItems() {
-  try { items = await sbFetch('watchlist?order=created_at.desc'); renderAll(); }
-  catch(e) { showToast('Error cargando datos', 'error'); }
+  try {
+    // PostgREST corta en 1000 filas por respuesta; paginamos hasta traer TODA la biblioteca.
+    // offset = all.length avanza por lo realmente traído; se corta al recibir una página incompleta.
+    const PAGE = 1000;
+    let all = [];
+    while (true) {
+      const page = await sbFetch(`watchlist?order=created_at.desc&limit=${PAGE}&offset=${all.length}`);
+      all = all.concat(page);
+      if (page.length < PAGE) break;
+    }
+    items = all;
+    renderAll();
+  } catch(e) { showToast('Error cargando datos', 'error'); }
 }
 
 async function saveItem(data) {
