@@ -389,7 +389,7 @@ Confirmado con evidencia fresca que las dos limitaciones seguían vigentes antes
   2. Bugs de UI/UX (layout roto, tarjetas superpuestas, problemas de PWA).
   3. Rendimiento.
   4. Deuda técnica pendiente, solo si aporta valor real — al final, no antes.
-- **Estado:** Abierto (30-jul-2026). Log de lo corregido más abajo, a medida que se cierra cada cosa.
+- **Estado:** Cerrado y **desplegado** (30-jul-2026). Regresión completa en verde sobre todos los flujos principales; `index.html` publicado a producción (subida manual de Diego) y verificado en vivo. Con esto se cierra la etapa de estabilización técnica de Archivo. Log de lo corregido más abajo. **Próxima etapa: auditoría de producto/UX (foco fuera del backend).**
 
 ### Log de correcciones
 
