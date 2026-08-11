@@ -810,14 +810,14 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
     <div id="bib-insights"></div>
     <div class="bib-controls">
       <select id="filter-status" onchange="rerenderBib()">
-        <option value="">Estado: todos</option>
+        <option value="">Estado</option>
         <option value="watched">Visto / leído</option>
         <option value="watching">En curso</option>
         <option value="watchlist">Pendiente</option>
       </select>
       <select id="filter-genre" onchange="rerenderBib()"><option value="">Género: todos</option></select>
       <select id="filter-decade" onchange="rerenderBib()">
-        <option value="">Década: todas</option>
+        <option value="">Década</option>
         <option value="2020">2020s</option>
         <option value="2010">2010s</option>
         <option value="2000">2000s</option>
@@ -973,7 +973,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
     <button class="modal-close" onclick="closeModal('modal-import')">✕</button>
     <div class="modal-body">
       <h2>Importar desde CSV</h2>
-      <p>El archivo debe tener una columna <strong>title</strong>. Opcionales: <strong>year, rating, type</strong>.</p>
+      <p>El archivo debe tener una columna <strong>title</strong>. Opcionales: <strong>year, rating, type</strong> (movie/tv/book).</p>
       <div class="import-area" id="import-drop" onclick="document.getElementById('import-file').click()">
         <div style="font-size:28px;margin-bottom:8px">📄</div>
         <p>Click para elegir el CSV o arrastralo acá</p>
@@ -1007,6 +1007,10 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
       <button class="us-item" onclick="closeModal('modal-user');openModal('modal-import')">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
         Importar CSV
+      </button>
+      <button class="us-item" onclick="closeModal('modal-user');exportData()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Exportar datos
       </button>
       <button class="us-item" onclick="changeDisplayName()">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
@@ -1103,8 +1107,19 @@ async function sbFetch(path, opts = {}, _retried = false) {
 }
 
 async function loadItems() {
-  try { items = await sbFetch('watchlist?order=created_at.desc'); renderAll(); }
-  catch(e) { showToast('Error cargando datos', 'error'); }
+  try {
+    // PostgREST corta en 1000 filas por respuesta; paginamos hasta traer TODA la biblioteca.
+    // offset = all.length avanza por lo realmente traído; se corta al recibir una página incompleta.
+    const PAGE = 1000;
+    let all = [];
+    while (true) {
+      const page = await sbFetch(`watchlist?order=created_at.desc&limit=${PAGE}&offset=${all.length}`);
+      all = all.concat(page);
+      if (page.length < PAGE) break;
+    }
+    items = all;
+    renderAll();
+  } catch(e) { showToast('Error cargando datos', 'error'); }
 }
 
 async function saveItem(data) {
@@ -1735,17 +1750,6 @@ function renderADN() {
   books.forEach(b=>{ if(b.author) b.author.split(',').forEach(a=>{ const k=a.trim(); if(k) ac[k]=(ac[k]||0)+1; }); });
   const topAuthor = Object.entries(ac).sort((a,b)=>b[1]-a[1])[0]?.[0] || null;
 
-  const dirMap={};
-  watched.filter(i=>i.type!=='book'&&i.director).forEach(i=>{
-    const k=(i.director||'').trim(); if(!k) return;
-    if(!dirMap[k]) dirMap[k]={count:0,topItem:null};
-    dirMap[k].count++;
-    if(!dirMap[k].topItem||(i.my_rating&&(!dirMap[k].topItem.my_rating||parseFloat(i.my_rating)>parseFloat(dirMap[k].topItem.my_rating))))
-      dirMap[k].topItem=i;
-  });
-  const topDirs = Object.entries(dirMap).sort((a,b)=>b[1].count-a[1].count).slice(0,5)
-    .map(([name,{count,topItem}])=>({name,count,topItem}));
-
   // Arquetipo + statement
   let archetype = '';
   let statement = '';
@@ -1885,21 +1889,10 @@ function renderADN() {
       <div class="adn-genres">${genreChipsHTML(topGenres)}</div>
     </div>` : ''}
 
-    ${topDirs.length ? `
-    <div class="adn-section" id="adn-directors-section">
-      <div class="adn-section-header" id="adn-directors-header">Directores favoritos</div>
-      <div id="adn-director-list">
-        ${topDirs.map((d,i)=>{
-          const img = d.topItem?.poster_path ? `<img src="${TMDB_IMG}w92${d.topItem.poster_path}" alt="" loading="lazy" onerror="this.style.display='none'">` : '';
-          return `<div class="director-row">
-            <span class="dir-rank">${i+1}</span>
-            <div class="dir-thumb">${img}</div>
-            <span class="dir-name">${esc(d.name)}</span>
-            <span class="dir-count">${d.count} film${d.count!==1?'s':''}</span>
-          </div>`;
-        }).join('')}
-      </div>
-    </div>` : ''}
+    <div class="adn-section" id="adn-directors-section" style="display:none">
+      <div class="adn-section-header" id="adn-directors-header"></div>
+      <div id="adn-director-list"></div>
+    </div>
 
     ${topDecades.length > 2 ? `
     <div class="adn-section">
@@ -2054,28 +2047,7 @@ function adnSwitchType(el, type) {
           </div>`).join('');
       } else dirSectionEl.style.display = 'none';
     } else {
-      const dMap = {};
-      subset.filter(i=>i.type!=='book'&&i.director).forEach(i => {
-        const k = (i.director||'').trim(); if (!k) return;
-        if (!dMap[k]) dMap[k] = {count:0, topItem:null};
-        dMap[k].count++;
-        if (!dMap[k].topItem || (i.my_rating && (!dMap[k].topItem.my_rating || parseFloat(i.my_rating)>parseFloat(dMap[k].topItem.my_rating))))
-          dMap[k].topItem = i;
-      });
-      const topD = Object.entries(dMap).sort((a,b)=>b[1].count-a[1].count).slice(0,5);
-      if (topD.length) {
-        if (dirHeaderEl) dirHeaderEl.textContent = 'Directores favoritos';
-        dirSectionEl.style.display = '';
-        dirListEl.innerHTML = topD.map(([name,{count,topItem}],i) => {
-          const img = topItem?.poster_path ? `<img src="${TMDB_IMG}w92${topItem.poster_path}" alt="" loading="lazy" onerror="this.style.display='none'">` : '';
-          return `<div class="director-row">
-            <span class="dir-rank">${i+1}</span>
-            <div class="dir-thumb">${img}</div>
-            <span class="dir-name">${esc(name)}</span>
-            <span class="dir-count">${count} film${count!==1?'s':''}</span>
-          </div>`;
-        }).join('');
-      } else dirSectionEl.style.display = 'none';
+      dirSectionEl.style.display = 'none';
     }
   }
 }
@@ -2085,6 +2057,7 @@ function adnSwitchType(el, type) {
 // ============================================================
 async function renderDisc() {
   const el = $id('disc-content'); if (!el) return;
+  const requestedType = discType; // snapshot: si el usuario cambia de pestaña antes de que termine, esta respuesta queda obsoleta
   updateDescubriSubtitle();
   if (discType === 'books') { await renderBookDisc(); return; }
   const type = discType === 'series' ? 'tv' : 'movie';
@@ -2114,6 +2087,7 @@ async function renderDisc() {
       });
     } catch {}
   }));
+  if (discType !== requestedType) return; // el usuario ya cambió de pestaña, esta respuesta quedó obsoleta
 
   const sorted = Object.values(scoreMap).filter(r=>r.data.poster_path).sort((a,b)=>b.score-a.score);
   if (!sorted.length) { el.innerHTML = `<div class="empty-state"><h3>Nada por ahora</h3><p>No encontramos recomendaciones. Agregá más ${label}.</p></div>`; return; }
@@ -2185,6 +2159,7 @@ async function renderDisc() {
 
 async function renderBookDisc() {
   const el = $id('disc-content'); if (!el) return;
+  const requestedType = discType; // snapshot: si el usuario cambia de pestaña antes de que termine, esta respuesta queda obsoleta
   if (discCache.books) { el.innerHTML = discCache.books; return; }
   el.innerHTML = `<div class="loading-block"><div class="spinner" style="margin:0 auto 10px"></div>Buscando libros…</div>`;
 
@@ -2204,6 +2179,7 @@ async function renderBookDisc() {
   await Promise.all([...topAuthors.map(a=>`inauthor:"${a}"`), ...topGenres.slice(0,2).map(g=>`subject:"${g}"`)].slice(0,5).map(async q => {
     try { const r=await booksSearch(q); r.forEach(b=>{if(!readIds.has(b.id)&&!allBooks.find(x=>x.id===b.id))allBooks.push(b);}); } catch {}
   }));
+  if (discType !== requestedType) return; // el usuario ya cambió de pestaña, esta respuesta quedó obsoleta
 
   if (!allBooks.length) { el.innerHTML = `<div class="empty-state"><h3>Nada por ahora</h3><p>No encontramos recomendaciones de libros.</p></div>`; return; }
 
@@ -2361,9 +2337,11 @@ function renderTmdbResults(results) {
 async function doSearch(q) {
   const c = $id('ms-results');
   const noRes = '<div class="loading-block">Sin resultados</div>';
+  const isStale = () => ($id('ms-input')?.value.trim() || '') !== q; // el usuario ya siguió tipeando, esta respuesta quedó obsoleta
   try {
     if (searchType === 'book') {
       const results = await booksSearch(q);
+      if (isStale()) return;
       c.innerHTML = results.length ? renderBookResults(results) : noRes;
       return;
     }
@@ -2372,6 +2350,7 @@ async function doSearch(q) {
         tmdbSearch(q, 'multi').catch(()=>[]),
         booksSearch(q).catch(()=>[])
       ]);
+      if (isStale()) return;
       if (!tmdbRes.length && !bookRes.length) { c.innerHTML = noRes; return; }
       let html = '';
       if (tmdbRes.length) html += renderTmdbResults(tmdbRes.slice(0,8));
@@ -2383,8 +2362,9 @@ async function doSearch(q) {
       return;
     }
     const results = await tmdbSearch(q, searchType);
+    if (isStale()) return;
     c.innerHTML = results.length ? renderTmdbResults(results) : noRes;
-  } catch(e) { c.innerHTML = `<div class="loading-block" style="color:var(--red)">Error de búsqueda. Probá de nuevo.</div>`; }
+  } catch(e) { if (!isStale()) c.innerHTML = `<div class="loading-block" style="color:var(--red)">Error de búsqueda. Probá de nuevo.</div>`; }
 }
 
 async function selectBookResult(bookId) {
@@ -2471,7 +2451,7 @@ function openDetailModal(item, isEdit) {
           <div class="det-genres">${genres}</div>
         </div>
       </div>
-      ${isBook ? (() => { const gbid = item.google_books_id || item._bookDetail?.google_books_id; const previewUrl = gbid ? `https://books.google.com/books?id=${encodeURIComponent(gbid)}` : (item._bookDetail?.preview_link || ''); const source = gbid ? 'Google Books' : (item._bookDetail?._source==='gb' ? 'Google Books' : 'Open Library'); return previewUrl ? `<div style="margin-bottom:14px"><a href="${escAttr(previewUrl)}" target="_blank" style="font-size:12.5px;color:var(--gold)">Ver en ${source} →</a></div>` : ''; })() : `<div id="watch-providers-section" style="margin-bottom:14px"></div>`}
+      ${isBook ? (() => { const gbid = item.google_books_id || item._bookDetail?.google_books_id; const previewUrl = gbid ? `https://books.google.com/books?id=${encodeURIComponent(gbid)}` : (item._bookDetail?.preview_link || ''); const source = gbid ? 'Google Books' : (item._bookDetail?._source==='gb' ? 'Google Books' : 'Open Library'); return previewUrl ? `<div style="margin-bottom:14px"><a href="${escAttr(previewUrl)}" target="_blank" style="font-size:12.5px;color:var(--gold)">Ver en ${source} →</a></div>` : ''; })() : `<div id="watch-providers-section" style="margin-bottom:14px;min-height:56px"><div style="background:var(--bg-2);border-radius:var(--r-md);padding:12px 14px;border:1px solid var(--b-1);opacity:.5"><div style="font-size:10.5px;font-weight:700;color:var(--t-3);letter-spacing:.8px;text-transform:uppercase">Buscando dónde verla…</div></div></div>`}
       ${item.overview?`<p class="det-overview">${esc(item.overview)}</p>`:''}
       ${ratingsSection}
       <div class="my-rating-section">
@@ -2516,9 +2496,9 @@ async function loadWatchProviders(tmdbId, type) {
   try {
     const r = await fetch(`https://api.themoviedb.org/3/${type==='tv'?'tv':'movie'}/${tmdbId}/watch/providers`, { headers:{Authorization:`Bearer ${TMDB_TOKEN}`} });
     const d = await r.json(); const ar = d.results?.AR;
-    if (!ar) { el.innerHTML=''; return; }
+    if (!ar) { el.innerHTML=''; el.style.minHeight='0'; return; }
     const flatrate=ar.flatrate||[], rent=ar.rent||[], buy=ar.buy||[];
-    if (!flatrate.length&&!rent.length&&!buy.length) { el.innerHTML=''; return; }
+    if (!flatrate.length&&!rent.length&&!buy.length) { el.innerHTML=''; el.style.minHeight='0'; return; }
     const rp=list=>list.map(p=>`<img src="https://image.tmdb.org/t/p/w45${p.logo_path}" title="${escAttr(p.provider_name)}" alt="${escAttr(p.provider_name)}" style="width:30px;height:30px;border-radius:7px;object-fit:cover">`).join('');
     el.innerHTML=`<div style="background:var(--bg-2);border-radius:var(--r-md);padding:12px 14px;border:1px solid var(--b-1)">
       <div style="font-size:10.5px;font-weight:700;color:var(--t-3);letter-spacing:.8px;text-transform:uppercase;margin-bottom:9px">Dónde verla en Argentina</div>
@@ -2526,7 +2506,7 @@ async function loadWatchProviders(tmdbId, type) {
       ${rent.length?`<div style="margin-bottom:7px;display:flex;align-items:center;gap:9px"><span style="font-size:11px;color:var(--t-3);width:54px">Alquiler</span><div style="display:flex;gap:6px">${rp(rent)}</div></div>`:''}
       ${buy.length?`<div style="display:flex;align-items:center;gap:9px"><span style="font-size:11px;color:var(--t-3);width:54px">Compra</span><div style="display:flex;gap:6px">${rp(buy)}</div></div>`:''}
     </div>`;
-  } catch { el.innerHTML = ''; }
+  } catch { el.innerHTML = ''; el.style.minHeight = '0'; }
 }
 
 function setRating(val) {
@@ -2571,8 +2551,12 @@ async function replaceItem(id, title) {
 // ============================================================
 function parseCsvLine(line) {
   const cols = []; let cur = '', inQ = false;
-  for (const ch of line) {
-    if (ch === '"') { inQ = !inQ; continue; }
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQ && line[i+1] === '"') { cur += '"'; i++; continue; } // comilla escapada ("") dentro de un campo
+      inQ = !inQ; continue;
+    }
     if (ch === ',' && !inQ) { cols.push(cur); cur = ''; continue; }
     cur += ch;
   }
@@ -2614,14 +2598,24 @@ async function runImport() {
     btn.textContent = `Importando ${idx+1}/${importRows.length}…`;
     try {
       const tRaw = (row.type||row.tipo||'').toLowerCase();
-      const type = tRaw.includes('tv')||tRaw.includes('serie') ? 'tv' : 'movie';
-      const results = await tmdbSearch(title.trim(), type);
-      if (!results.length) { fail++; continue; }
-      const r = results[0], rtype = (r.media_type||type)==='movie'?'movie':'tv';
-      if (items.find(i=>i.tmdb_id===r.id&&i.type===rtype)) { ok++; continue; }
-      const d = await tmdbDetail(r.id, rtype);
-      const omdb = await omdbGetRatings(d.original_title||d.title||d.name, (d.release_date||d.first_air_date||'').slice(0,4), d.external_ids?.imdb_id);
-      const it = buildTmdbItem(d, omdb, r.id, rtype);
+      let it;
+      if (tRaw.includes('libro')||tRaw.includes('book')) {
+        const results = await booksSearch(title.trim());
+        if (!results.length) { fail++; continue; }
+        const r = results[0];
+        if (items.find(i=>i.google_books_id===r.id)) { ok++; continue; }
+        const b = await booksDetail(r.id);
+        it = buildBookItem(b);
+      } else {
+        const type = tRaw.includes('tv')||tRaw.includes('serie') ? 'tv' : 'movie';
+        const results = await tmdbSearch(title.trim(), type);
+        if (!results.length) { fail++; continue; }
+        const r = results[0], rtype = (r.media_type||type)==='movie'?'movie':'tv';
+        if (items.find(i=>i.tmdb_id===r.id&&i.type===rtype)) { ok++; continue; }
+        const d = await tmdbDetail(r.id, rtype);
+        const omdb = await omdbGetRatings(d.original_title||d.title||d.name, (d.release_date||d.first_air_date||'').slice(0,4), d.external_ids?.imdb_id);
+        it = buildTmdbItem(d, omdb, r.id, rtype);
+      }
       it.my_rating = row.rating ? parseFloat(row.rating) : null;
       const clean = Object.fromEntries(Object.entries(it).filter(([k,v])=>!k.startsWith('_')&&v!==null&&v!==undefined));
       if (currentUser?.id) clean.user_id = currentUser.id;
@@ -2648,11 +2642,28 @@ dropArea.addEventListener('drop', e=>{
 // ============================================================
 // MODALES + TOAST
 // ============================================================
-function openModal(id)  { $id(id).classList.add('open'); }
+function openModal(id) {
+  $id(id).classList.add('open');
+  // iOS: fija el body en su scroll actual para que no se filtre el scroll de fondo
+  // mientras el modal esta abierto (si no, al cerrar aparece "saltado" a otra posicion).
+  if (!document.body.style.position) {
+    document.body.dataset.scrollY = window.scrollY;
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${window.scrollY}px`;
+    document.body.style.width = '100%';
+  }
+}
 function closeModal(id) {
   $id(id).classList.remove('open');
   if (id==='modal-search') { $id('ms-input').value=''; $id('ms-results').innerHTML=''; }
   if (id==='modal-detail') { currentRating=null; editingItem=null; pendingItem=null; }
+  if (!document.querySelector('.modal-overlay.open')) {
+    const y = parseInt(document.body.dataset.scrollY || '0');
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.width = '';
+    window.scrollTo(0, y);
+  }
 }
 document.querySelectorAll('.modal-overlay').forEach(o=>o.addEventListener('click',e=>{ if(e.target===o) closeModal(o.id); }));
 document.addEventListener('keydown',e=>{ if(e.key==='Escape') document.querySelectorAll('.modal-overlay.open').forEach(m=>closeModal(m.id)); });
@@ -2714,8 +2725,10 @@ async function loadProfile() {
     if (!r.ok) return null;
     const d = await r.json();
     if (d.length > 0) return d[0];
-    const fallback = { display_name: currentUser.email?.split('@')[0]||'Usuario', email: currentUser.email };
-    fetch(`${SUPABASE_URL}/rest/v1/profiles`, { method:'POST', headers:{...getAuthHeaders(),'Prefer':'resolution=merge-duplicates,return=minimal'}, body: JSON.stringify({ id: currentUser.id, ...fallback }) }).catch(()=>{});
+    const fallback = { username: currentUser.email?.split('@')[0]||'Usuario' };
+    fetch(`${SUPABASE_URL}/rest/v1/profiles`, { method:'POST', headers:{...getAuthHeaders(),'Prefer':'resolution=merge-duplicates,return=minimal'}, body: JSON.stringify({ id: currentUser.id, ...fallback }) })
+      .then(r => { if (!r.ok) return r.text().then(t => { throw new Error(t); }); })
+      .catch(e => console.error('No se pudo crear el perfil de usuario:', e));
     return fallback;
   } catch { return null; }
 }
@@ -2725,7 +2738,7 @@ async function claimNullItems() {
 }
 
 function updateUserAvatar(profile) {
-  const name = profile.display_name || currentUser.email || '?';
+  const name = profile.username || currentUser.email || '?';
   const initial = name.charAt(0).toUpperCase();
   window._cachedUserName = name.split(' ')[0];
   ['sb-avatar','tb-avatar','us-avatar'].forEach(id => { const el=$id(id); if(el) el.textContent = initial; });
@@ -2806,7 +2819,8 @@ async function signInWithPassword(email, password, nameForProfile) {
   currentUser = data.user;
   localStorage.setItem('cinelog_session', JSON.stringify({ access_token: data.access_token, refresh_token: data.refresh_token, user: data.user }));
   if (nameForProfile) {
-    await fetch(`${SUPABASE_URL}/rest/v1/profiles`, { method: 'POST', headers: { ...getAuthHeaders(), 'Prefer': 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ id: currentUser.id, display_name: nameForProfile, email: currentUser.email }) });
+    const pr = await fetch(`${SUPABASE_URL}/rest/v1/profiles`, { method: 'POST', headers: { ...getAuthHeaders(), 'Prefer': 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ id: currentUser.id, username: nameForProfile }) });
+    if (!pr.ok) console.error('No se pudo crear el perfil de usuario:', await pr.text());
   }
   await onSignedIn();
 }
@@ -2841,20 +2855,35 @@ async function confirmPasswordReset(recoveryToken) {
 
 async function changeDisplayName() {
   if (!currentUser) return;
-  const cur = currentUser._profile?.display_name || '';
+  const cur = currentUser._profile?.username || '';
   const name = prompt('Tu nombre para mostrar:', cur);
   if (!name || !name.trim() || name.trim() === cur) return;
   try {
-    await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${currentUser.id}`, {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${currentUser.id}`, {
       method: 'PATCH',
       headers: { ...getAuthHeaders(), 'Prefer': 'return=minimal' },
-      body: JSON.stringify({ display_name: name.trim() })
+      body: JSON.stringify({ username: name.trim() })
     });
-    currentUser._profile = { ...(currentUser._profile || {}), display_name: name.trim() };
+    if (!r.ok) throw new Error(await r.text());
+    currentUser._profile = { ...(currentUser._profile || {}), username: name.trim() };
     updateUserAvatar(currentUser._profile);
     renderInicio(); updateTicker();
     showToast('Nombre actualizado', 'success');
-  } catch { showToast('Error al guardar el nombre', 'error'); }
+  } catch (e) { console.error('No se pudo guardar el nombre:', e); showToast('Error al guardar el nombre', 'error'); }
+}
+
+function exportData() {
+  const payload = { version: 1, exported_at: new Date().toISOString(), items };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `archivo-export-${new Date().toISOString().slice(0,10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  showToast('Archivo exportado', 'success');
 }
 
 function openUserSheet() {
@@ -2923,7 +2952,7 @@ async function renderGroupMembers() {
     return;
   }
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/group_members?group_id=eq.${currentGroup.id}&select=user_id,role,profiles(display_name,email)`, { headers: getAuthHeaders() });
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/group_members?group_id=eq.${currentGroup.id}&select=user_id,role,profiles(username)`, { headers: getAuthHeaders() });
     const members = await r.json();
     const code = currentGroup.invite_code || '—';
     el.innerHTML = `
@@ -2934,7 +2963,7 @@ async function renderGroupMembers() {
       </div>
       <div class="member-list">
         ${members.map(m => {
-          const p = m.profiles || {}, name = p.display_name || p.email || 'Anónimo', isMe = m.user_id === currentUser.id;
+          const p = m.profiles || {}, name = p.username || 'Anónimo', isMe = m.user_id === currentUser.id;
           return `<div class="member-item">
             <div class="avatar">${esc(name.charAt(0).toUpperCase())}</div>
             <div class="member-name">${esc(name)}</div>
@@ -2951,12 +2980,12 @@ async function renderGroupCompareList() {
   if (!currentGroup) { el.innerHTML = `<div class="loading-block">Necesitás estar en un grupo.</div>`; return; }
   el.innerHTML = `<div class="loading-block">Cargando miembros…</div>`;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/group_members?group_id=eq.${currentGroup.id}&select=user_id,role,profiles(display_name,email)`, { headers: getAuthHeaders() });
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/group_members?group_id=eq.${currentGroup.id}&select=user_id,role,profiles(username)`, { headers: getAuthHeaders() });
     const members = await r.json();
     const others = members.filter(m => m.user_id !== currentUser.id);
     if (!others.length) { el.innerHTML = `<div class="loading-block">Todavía no hay otros miembros. ¡Compartí el código!</div>`; return; }
     el.innerHTML = `<p style="font-size:12.5px;color:var(--t-3);margin-bottom:12px">Elegí con quién compararte:</p>${others.map(m => {
-      const p = m.profiles || {}, name = p.display_name || p.email || 'Anónimo';
+      const p = m.profiles || {}, name = p.username || 'Anónimo';
       return `<div class="compat-member-card" onclick="compareWithMember('${m.user_id}','${escAttr(name).replace(/'/g,"\\'")}')">
         <div class="avatar" style="width:32px;height:32px;font-size:13px">${esc(name.charAt(0).toUpperCase())}</div>
         <div style="flex:1"><div style="font-size:13.5px;font-weight:700">${esc(name)}</div><div style="font-size:11.5px;color:var(--t-3)">Compatibilidad y recomendaciones</div></div>
@@ -3093,9 +3122,9 @@ async function joinGroup() {
   const code = input.value.trim().toUpperCase();
   if (code.length < 4) { showToast('Ingresá el código', 'error'); return; }
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/groups?invite_code=eq.${code}&select=*`, { headers: getAuthHeaders() });
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/resolve_invitation`, { method:'POST', headers: getAuthHeaders(), body: JSON.stringify({ p_code: code }) });
     const gs = await r.json();
-    if (!gs.length) { showToast('Código inválido', 'error'); return; }
+    if (!r.ok || !gs.length) { showToast('Código inválido', 'error'); return; }
     const g = gs[0];
     await fetch(`${SUPABASE_URL}/rest/v1/group_members`, { method:'POST', headers:{...getAuthHeaders(),'Prefer':'resolution=ignore-duplicates,return=minimal'}, body: JSON.stringify({ group_id: g.id, user_id: currentUser.id, role:'member' }) });
     currentGroup = g;
@@ -3112,7 +3141,7 @@ async function createGroup() {
   if (!name) { showToast('Ingresá un nombre', 'error'); return; }
   const code = Math.random().toString(36).substring(2,8).toUpperCase();
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/groups`, { method:'POST', headers:{...getAuthHeaders(),'Prefer':'return=representation'}, body: JSON.stringify({ name, invite_code: code, owner_id: currentUser.id }) });
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/groups`, { method:'POST', headers:{...getAuthHeaders(),'Prefer':'return=representation'}, body: JSON.stringify({ name, invite_code: code, created_by: currentUser.id }) });
     if (!r.ok) { showToast('Error al crear', 'error'); return; }
     const gs = await r.json();
     const g = Array.isArray(gs) ? gs[0] : gs;
