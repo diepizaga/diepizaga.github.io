@@ -420,7 +420,7 @@ Confirmado con evidencia fresca que las dos limitaciones seguían vigentes antes
 - **Esfuerzo:** Bajo-Medio, variable por sub-problema (ver abajo).
 - **Dependencias:** ninguna.
 - **Documentos que lo respaldan:** UX_AUDIT.md.
-- **Estado:** Implementado y validado (15-ago-2026), pendiente de deploy manual. Alcance confirmado: **no incluye** buscar por actor/director/autor (ver más abajo).
+- **Estado:** Finalizado e implementado (15-ago-2026), commit `b14b3a9`. Pendiente solo el deploy manual de Diego (no bloquea el resto de la Etapa 2). Alcance confirmado: **no incluye** buscar por actor/director/autor (ver más abajo).
 
 ### Implementado
 
@@ -461,10 +461,53 @@ Causa identificada en `tmdbDetail()` (index.html:1158-1171): la función pide el
 - **Opción A (recomendada):** agregar `titleES` como paso intermedio en la cascada (`AR → ES → EN`) para título y, explícitamente (no por spread implícito), para género también.
 - Alcance acotado a la ficha de agregar/editar. El buscador interno de Biblioteca (que también sufre este problema, hallazgo #6) es Prioridad 4 — no se toca en este bloque.
 
-### Pregunta de producto a resolver acá: ¿buscar por actor/director/autor?
+### Pregunta de producto resuelta acá: ¿buscar por actor/director/autor?
 
 Hallazgo técnico relevante: `tmdbSearch()` ya recibe resultados de tipo persona desde `search/multi` (TMDB los devuelve mezclados con películas/series) y el código los descarta explícitamente (`x.media_type!=='person'`, index.html:1152). Es decir, la búsqueda por actor/director en TMDB **ya está a un filtro de distancia**, no es una integración nueva — el costo real no es "conectar con una API nueva" sino diseñar qué pasa cuando el resultado elegido es una persona (ej. mostrar su filmografía vía `/person/{id}/combined_credits` y dejar elegir un título desde ahí). Para libros, Open Library/Google Books ya traen `author_name` en los resultados de búsqueda (index.html:1204), así que ahí el dato también está disponible, falta decidir si se expone como filtro.
 **Respuesta de Diego (15-ago-2026):** tiene mucho valor real, no es un "nice to have" — pero no entra en el Bloque N. Primero el flujo de buscar y agregar tiene que quedar sólido; después se arma un bloque específico de exploración (actor/director/autor, filmografías). Queda anotado como **próximo bloque de la Etapa 2 una vez cerrado N** (sin nombre de letra asignado todavía, sin diseño — el hallazgo técnico de arriba, `media_type!=='person'` descartado en `tmdbSearch()`, es el punto de partida cuando llegue el turno).
+
+---
+
+## Bloque O — Reducir la sensación de movimiento de la interfaz
+
+- **Objetivo:** que la interfaz deje de sentirse en movimiento constante — Prioridad 2 de la Etapa 2.
+- **Problema que resuelve:** UX_AUDIT.md hallazgo #3 (ticker), más regla de producto vigente desde acá para toda la etapa (ver abajo).
+- **Valor:** Alto — Prioridad 2 explícita.
+- **Riesgo:** Bajo — cambios de UI/CSS aislados, no tocan datos ni flujos.
+- **Esfuerzo:** Bajo-Medio.
+- **Dependencias:** ninguna.
+- **Documentos que lo respaldan:** UX_AUDIT.md.
+- **Estado:** Implementado y validado (15-ago-2026), pendiente deploy manual.
+
+**Regla de producto fijada por Diego para toda la Etapa 2 (no solo este bloque):** cualquier movimiento permanente que no aporte información imprescindible se elimina — no se reemplaza una animación por otra solución cosmética. Ampliación de alcance explícita: no limitarse al hallazgo ya escrito, identificar y eliminar cualquier causa de sensación de inestabilidad (reflows, cambios de altura, scrolls inesperados, modales que empujan contenido, overlays que mueven el fondo, layouts que cambian con el teclado, loaders que mueven la posición de la pantalla). **Nota de alcance:** "layouts que cambian con el teclado" se solapa con el hallazgo #2 de UX_AUDIT.md, que la prioridad original (Prioridad 5) dejaba para el final — por indicación directa de Diego en este bloque, se adelantó y resolvió acá; cuando llegue el turno de Prioridad 5 puede que quede menos pendiente de lo previsto.
+
+### Investigación antes de proponer (para no limitar el bloque solo al hallazgo ya escrito)
+
+Revisé el resto de fuentes de movimiento de la app antes de acotar el alcance a la barra: las 39 transiciones CSS del archivo son casi todas de foco/hover (`.15s`-`.4s` en color/borde/transform de tarjetas y botones), disparadas por interacción del usuario, no movimiento ambiental — no encontré evidencia de que generen la sensación de inestabilidad que describiste. `switchTab()` ya resetea el scroll de forma instantánea (`behavior:'instant'`), sin salto animado. El único movimiento verdaderamente constante e independiente de la interacción del usuario es el ticker — por eso el bloque queda acotado a él.
+
+### El ticker, mirado de cerca
+
+`updateTicker()` (index.html:1627) arma el texto con: cantidad de películas, series, libros, promedio de calificación, pendientes, y el arquetipo ("El explorador ecléctico"). Casi todo esto **ya está mostrado en otro lado, sin movimiento**: películas/series/libros/promedio están en el bloque "En números" de Inicio; el arquetipo tiene su propia sección completa en ADN. Lo único que no vi repetido en ningún otro lado es el conteo de "pendientes".
+
+- **Opción A (recomendada):** eliminar el ticker por completo. Es información duplicada, envuelta en el único movimiento perpetuo de toda la app — exactamente lo que señalaste. Si "pendientes" es un dato que querés seguir viendo siempre visible, se puede sumar como quinta tarjeta en "En números" (Inicio), sin animación.
+- **Opción B:** mantener el texto pero sacarle la animación (`animation: tick 60s linear infinite` → estático). Conserva el detalle editorial del masthead sin el movimiento, a costa de mantener información duplicada.
+- **Opción C:** dejar la barra pero pausada por defecto (`animation-play-state: paused`), sin quitarla del todo.
+
+Mi lectura con el litmus test que fijaste ("¿hace que usar Archivo todos los días sea más rápido o más agradable?"): es información redundante en movimiento constante, no aporta nada que Inicio y ADN no den ya sin moverse — Opción A. Antes de tocar código quiero tu confirmación puntual sobre esto porque es sacar un elemento visual identitario del diseño (masthead editorial), no solo un fix.
+
+**Confirmado por Diego (15-ago-2026): Opción A, eliminar por completo, sin dejarlo estático.**
+
+### Implementado
+
+- **Ticker eliminado del todo:** markup (`.ticker-wrap`/`#mh-ticker`), CSS (incluida `@keyframes tick`) y la función `updateTicker()` con sus 3 llamadas removidos. El masthead queda estático.
+- **"Pendientes" reubicado:** nueva quinta tarjeta en "En números" (Inicio), estática, sin animación — grid pasa de `repeat(4,1fr)` a `repeat(5,1fr)` en desktop; en mobile se mantiene `repeat(2,1fr)` y la quinta tarjeta ocupa el ancho completo de su fila (`grid-column:1/-1`). Validado visualmente en desktop y mobile: 5 tarjetas parejas en desktop, 2+2+1 en mobile, sin overflow ni recorte.
+- **Reflow de Descubrí al cambiar de pestaña (Películas/Series/Libros):** `switchDiscType()` reemplazaba todo el contenido por un loader chico mientras cargaba, sin resetear el scroll — si el usuario estaba scrolleado más abajo, quedaba mirando espacio vacío. Fix: `window.scrollTo({top:0, behavior:'instant'})` al cambiar de tipo, mismo patrón que ya usa `switchTab()`. Validado: scroll baja a 800px, se cambia de tipo, scroll vuelve a 0 antes de que el loader aparezca.
+- **Fondo corriéndose al abrir un modal (desktop):** el bloqueo de scroll del body (`position:fixed`, agregado en Bloque M para iOS) hace desaparecer la scrollbar del documento sin compensar su ancho — el header y el resto del contenido se corrían ~4px a la derecha al abrir cualquier modal, y volvían a su lugar al cerrar. Fix: medir el ancho de la scrollbar antes de fijar el body y compensarlo con `padding-right` mientras el modal está abierto. Validado con evidencia real: posición del header idéntica antes/durante/después de abrir un modal (1436px en los tres momentos, antes saltaba a 1440px al abrir).
+- **Teclado tapando contenido en mobile (hallazgo #2 de UX_AUDIT.md, adelantado):** no había ningún manejo de `visualViewport` en toda la app. Fix de dos partes: (1) `window.visualViewport.addEventListener('resize', ...)` mantiene una variable CSS (`--kb-vh`) con el alto real del viewport visual, y el modal en mobile usa `max-height: min(92svh, calc(var(--kb-vh)*.92))` en vez de solo `92svh` — así la hoja se achica junto con el teclado en vez de quedar tapada. (2) al enfocar cualquier campo dentro de un modal abierto, se lo trae a la vista con `scrollIntoView` después de un breve delay (tiempo de animación del teclado). Validado: simulando un viewport visual de 400px, el modal se ajusta a 368px (92%) correctamente; enfocar "Notas" en el modal real hace que el campo y los botones de acción queden visibles en pantalla.
+
+### Investigado y descartado (sin evidencia de problema real)
+
+Las 39 transiciones CSS del archivo son de foco/hover (disparadas por el usuario, no ambientales) — no se tocaron. Biblioteca (grilla/lista) y ADN renderizan de forma síncrona desde datos ya en memoria, sin el patrón "loader chico → contenido grande" que sí tenía Descubrí — no aplica el mismo fix ahí. El parpadeo de pósters de Biblioteca (hallazgo #5) es carga de imágenes, no reflow de layout — sigue siendo Prioridad 4, no se tocó acá.
 
 ---
 

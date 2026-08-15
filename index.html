@@ -186,18 +186,6 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
 }
 .mh-add:hover { background: var(--acc2); }
 
-/* ticker */
-.ticker-wrap { border-top: 1px solid var(--hair); overflow: hidden; }
-#mh-ticker {
-  display: flex; width: max-content; padding: 7px 0;
-  font-family: var(--mono); font-size: 10px; text-transform: uppercase;
-  letter-spacing: .22em; color: var(--paper3); white-space: nowrap;
-  animation: tick 60s linear infinite;
-}
-#mh-ticker span { padding-right: 5em; }
-#mh-ticker:empty { display: none; }
-@keyframes tick { from { transform: translateX(0); } to { transform: translateX(-50%); } }
-
 /* ── BOTTOM NAV (mobile) ────────────────────────────────── */
 #bottomnav {
   display: none; position: fixed; bottom: 0; left: 0; right: 0; z-index: 150;
@@ -263,7 +251,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
 #inicio-featured.inicio-sec { margin-bottom: 40px; }
 
 /* ── métricas ledger ────────────────────────────────────── */
-.metrics-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--hair); border: 1px solid var(--hair); }
+.metrics-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1px; background: var(--hair); border: 1px solid var(--hair); }
 .metric { background: var(--ink2); padding: 18px 20px; }
 .metric .m-val { font-family: var(--mono); font-size: 28px; line-height: 1; color: var(--paper); }
 .metric .m-val.gold { color: var(--acc); }
@@ -695,6 +683,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
   .grid-cards { grid-template-columns: repeat(3, 1fr); gap: 16px 9px; }
   .card-rate { display: none; }
   .metrics-row { grid-template-columns: repeat(2, 1fr); }
+  .metrics-row .metric:nth-child(5) { grid-column: 1 / -1; }
   .hero { min-height: 320px; }
   .hero-body { padding: 22px 18px 22px; }
   .ins-panels { grid-template-columns: 1fr 1fr; }
@@ -708,7 +697,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
   .rcf-poster img { height: 190px; object-position: center 28%; }
   .rcf-body { padding: 18px; }
   .modal-overlay { padding: 0; align-items: flex-end; }
-  .modal { border-radius: 12px 12px 0 0; max-width: 100%; max-height: 92svh; overflow-y: auto;
+  .modal { border-radius: 12px 12px 0 0; max-width: 100%; max-height: min(92svh, calc(var(--kb-vh, 1000px) * .92)); overflow-y: auto;
     margin: 0; transform: translateY(100%); transition: transform .28s var(--ease); }
   .modal-overlay.open .modal { transform: translateY(0); }
   .modal::before { content: ''; display: block; width: 36px; height: 4px; background: var(--hair2);
@@ -778,7 +767,6 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
       <button class="mh-add" onclick="openSearchModal()">+ Agregar</button>
     </nav>
   </div>
-  <div class="ticker-wrap"><div id="mh-ticker"></div></div>
 </header>
 
 <!-- APP -->
@@ -1302,7 +1290,6 @@ function renderAll() {
   renderBiblio();
   updateGenreFilter();
   renderADN();
-  updateTicker();
   discCache = { movies:null, series:null, books:null };
   if (currentTab === 'descubri') renderDisc();
 }
@@ -1444,12 +1431,14 @@ function renderInicio() {
     const books  = items.filter(i=>i.type==='book' && i.status!=='watchlist').length;
     const yr = new Date().getFullYear();
     const esteAnio = watched.filter(i=>i.created_at && new Date(i.created_at).getFullYear()===yr).length;
+    const pendientes = items.filter(i=>i.status==='watchlist').length;
     metEl.innerHTML = `${secHead('02', 'En números')}
       <div class="metrics-row">
         <div class="metric"><div class="m-val gold">${movies}</div><div class="m-lbl">Películas</div></div>
         <div class="metric"><div class="m-val">${series}</div><div class="m-lbl">Series</div></div>
         <div class="metric"><div class="m-val">${books}</div><div class="m-lbl">Libros</div></div>
         <div class="metric"><div class="m-val">${esteAnio}</div><div class="m-lbl">Este año</div></div>
+        <div class="metric"><div class="m-val">${pendientes}</div><div class="m-lbl">Pendientes</div></div>
       </div>`;
   }
 
@@ -1624,28 +1613,6 @@ function renderBibInsights() {
 // ============================================================
 // TICKER del masthead
 // ============================================================
-function updateTicker() {
-  const el = $id('mh-ticker'); if (!el) return;
-  if (!items.length) { el.innerHTML = ''; return; }
-  const m = items.filter(i=>i.type==='movie').length;
-  const s = items.filter(i=>i.type==='tv').length;
-  const b = items.filter(i=>i.type==='book').length;
-  const rated = items.filter(i=>i.my_rating);
-  const avg = rated.length ? (rated.reduce((a,i)=>a+parseFloat(i.my_rating),0)/rated.length).toFixed(1) : null;
-  const pend = items.filter(i=>i.status==='watchlist').length;
-  const parts = [
-    m ? `${m} película${m!==1?'s':''}` : null,
-    s ? `${s} serie${s!==1?'s':''}` : null,
-    b ? `${b} libro${b!==1?'s':''}` : null,
-    avg ? `promedio ${avg}` : null,
-    pend ? `${pend} pendiente${pend!==1?'s':''}` : null,
-    window._cachedArchetype || null,
-  ].filter(Boolean);
-  const seq = parts.join(' — ');
-  // Copias suficientes para que el loop llene cualquier ancho de pantalla sin huecos
-  el.innerHTML = Array.from({length:8}, (_,i)=>`<span${i?' aria-hidden="true"':''}>${esc(seq)}</span>`).join('');
-}
-
 // ============================================================
 // ADN CULTURAL
 // ============================================================
@@ -2230,6 +2197,9 @@ async function renderBookDisc() {
 function switchDiscType(t) {
   discType = t;
   document.querySelectorAll('.disc-pills .pill').forEach(p=>p.classList.toggle('active',p.dataset.dtype===t));
+  // el contenido colapsa a un loader chico mientras carga: si el usuario estaba scrolleado
+  // más abajo, quedaría mirando espacio vacío hasta que el contenido nuevo aparezca.
+  window.scrollTo({ top: 0, behavior: 'instant' });
   renderDisc();
 }
 
@@ -2672,10 +2642,14 @@ function openModal(id) {
   // iOS: fija el body en su scroll actual para que no se filtre el scroll de fondo
   // mientras el modal esta abierto (si no, al cerrar aparece "saltado" a otra posicion).
   if (!document.body.style.position) {
+    // en desktop, fijar el body hace desaparecer su scrollbar -- sin compensar ese
+    // ancho, todo el contenido (header incluido) se corre unos px hacia la derecha.
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
     document.body.dataset.scrollY = window.scrollY;
     document.body.style.position = 'fixed';
     document.body.style.top = `-${window.scrollY}px`;
     document.body.style.width = '100%';
+    if (scrollbarWidth > 0) document.body.style.paddingRight = `${scrollbarWidth}px`;
   }
 }
 function closeModal(id) {
@@ -2687,11 +2661,30 @@ function closeModal(id) {
     document.body.style.position = '';
     document.body.style.top = '';
     document.body.style.width = '';
+    document.body.style.paddingRight = '';
     window.scrollTo(0, y);
   }
 }
 document.querySelectorAll('.modal-overlay').forEach(o=>o.addEventListener('click',e=>{ if(e.target===o) closeModal(o.id); }));
 document.addEventListener('keydown',e=>{ if(e.key==='Escape') document.querySelectorAll('.modal-overlay.open').forEach(m=>closeModal(m.id)); });
+
+// El teclado nativo en mobile no achica el viewport de forma confiable en todos los
+// navegadores (svh/dvh no lo contemplan siempre) -- visualViewport sí, así que la
+// hoja del modal usa ese alto real para no quedar tapada por el teclado.
+if (window.visualViewport) {
+  const setKbVh = () => document.documentElement.style.setProperty('--kb-vh', `${window.visualViewport.height}px`);
+  setKbVh();
+  window.visualViewport.addEventListener('resize', setKbVh);
+}
+// Al enfocar un campo dentro de un modal abierto, lo trae a la vista dentro del
+// contenedor scrolleable del modal -- si no, el teclado puede taparlo sin que el
+// usuario note que tiene que scrollear manualmente para encontrarlo.
+document.addEventListener('focusin', e => {
+  const field = e.target.closest('input, textarea, select');
+  const modal = field?.closest('.modal-overlay.open .modal');
+  if (!modal) return;
+  setTimeout(() => field.scrollIntoView({ block: 'center', behavior: 'smooth' }), 300);
+});
 
 function showToast(msg, type='') {
   const t = $id('toast'); t.textContent = msg; t.className = `show ${type}`;
@@ -2892,7 +2885,7 @@ async function changeDisplayName() {
     if (!r.ok) throw new Error(await r.text());
     currentUser._profile = { ...(currentUser._profile || {}), username: name.trim() };
     updateUserAvatar(currentUser._profile);
-    renderInicio(); updateTicker();
+    renderInicio();
     showToast('Nombre actualizado', 'success');
   } catch (e) { console.error('No se pudo guardar el nombre:', e); showToast('Error al guardar el nombre', 'error'); }
 }
