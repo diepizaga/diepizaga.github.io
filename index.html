@@ -1196,6 +1196,65 @@ async function tmdbDetail(id, type) {
   return { ...resEN, ...resAR, title:bestTitle, name:bestTitle, genres, original_title:resEN.original_title||resEN.original_name||titleEN, overview:resAR.overview||resES.overview||resEN.overview };
 }
 
+// Traducción ES de los IDs de género de TMDB (recommendations trae genre_ids
+// numéricos, no nombres) -- mismos nombres finales que GENRE_CANON_EN_ES de
+// Biblioteca, verificado en vivo contra /genre/movie|tv/list: incluso el
+// endpoint oficial de géneros de TMDB devuelve en inglés las categorías
+// combinadas de serie (Action & Adventure, Sci-Fi & Fantasy, etc.), no es un
+// caso puntual de un show.
+const TMDB_GENRE_ID_ES = {
+  28:'Acción', 12:'Aventura', 16:'Animación', 35:'Comedia', 80:'Crimen', 99:'Documental',
+  18:'Drama', 10751:'Familia', 14:'Fantasía', 36:'Historia', 27:'Terror', 10402:'Música',
+  9648:'Misterio', 10749:'Romance', 878:'Ciencia ficción', 10770:'Película de TV',
+  53:'Suspense', 10752:'Bélica', 37:'Western',
+  10759:'Acción y aventura', 10762:'Infantil', 10763:'Noticias', 10764:'Reality',
+  10765:'Ciencia ficción y fantasía', 10766:'Telenovela', 10767:'Talk Show', 10768:'Guerra y política',
+};
+// Piso de calidad de Descubrí: fijo, no configurable (decisión de producto de
+// Diego, 15-ago-2026 -- "prefiero una buena decisión por defecto antes que
+// sumar opciones"). Medido con datos reales antes de elegir 50: con su perfil
+// de calificaciones, excluye solo ~2% de los candidatos -- saca el peor ruido
+// sin ser agresivo.
+const DISC_MIN_VOTES = 50;
+
+function discPopTier(voteCount) {
+  if (voteCount < 200) return 'niche';
+  if (voteCount < 1500) return 'mid';
+  return 'mainstream';
+}
+
+// Diversidad "dentro de tus gustos", no cuota artificial por género (pedido
+// explícito de Diego): si el historial está cargado hacia un género, eso se
+// refleja igual -- lo único que se evita es que ningún eje (género principal,
+// década, nivel de popularidad) domine más del ~40% de una misma lista, para
+// que no se sienta "la misma película repetida diez veces". Si no hay
+// suficientes candidatos variados, se completa igual con lo que mejor puntúa:
+// la coherencia con el perfil nunca pierde contra la diversidad.
+function diversifyPicks(pool, n) {
+  const cap = Math.max(2, Math.ceil(n * 0.4));
+  const axesOf = r => ({
+    genre: r.data.genre_ids?.[0],
+    decade: Math.floor((parseInt((r.data.release_date||r.data.first_air_date||'').slice(0,4))||0)/10)*10,
+    pop: discPopTier(r.data.vote_count||0),
+  });
+  const counts = { genre:{}, decade:{}, pop:{} };
+  const picked = []; const remaining = [...pool];
+  while (picked.length < n && remaining.length) {
+    let idx = remaining.findIndex(r => {
+      const a = axesOf(r);
+      return (counts.genre[a.genre]||0) < cap && (counts.decade[a.decade]||0) < cap && (counts.pop[a.pop]||0) < cap;
+    });
+    if (idx === -1) idx = 0; // ninguno pasa el límite: prioridad es no dejar huecos
+    const r = remaining.splice(idx,1)[0];
+    picked.push(r);
+    const a = axesOf(r);
+    counts.genre[a.genre]=(counts.genre[a.genre]||0)+1;
+    counts.decade[a.decade]=(counts.decade[a.decade]||0)+1;
+    counts.pop[a.pop]=(counts.pop[a.pop]||0)+1;
+  }
+  return picked.sort((x,y)=>y.score-x.score); // se eligió por diversidad, se muestra por puntaje
+}
+
 async function tmdbRecs(tmdbId, type) {
   const r = await fetch(`https://api.themoviedb.org/3/${type}/${tmdbId}/recommendations?language=es-AR&page=1`, { headers:{Authorization:`Bearer ${TMDB_TOKEN}`} });
   if (!r.ok) return [];
@@ -2135,11 +2194,16 @@ async function renderDisc() {
 
   const watchedIds = new Set(items.filter(i=>i.type===type).map(i=>i.tmdb_id));
   const scoreMap = {};
-  await Promise.all(topItems.slice(0,12).map(async item => {
+  // Las 20 fuentes, no 12: medido con datos reales, 20 en paralelo cuestan ~13%
+  // más que 12 (no es un costo lineal), y el texto de la sección ya decía "tus
+  // N mejor calificadas" usando las 20 -- antes se calculaban 8 de más y se tiraban.
+  await Promise.all(topItems.map(async item => {
     try {
       const recs = await tmdbRecs(item.tmdb_id, type);
       recs.forEach(r => {
-        if (watchedIds.has(r.id)||!r.poster_path) return;
+        // piso de calidad (DISC_MIN_VOTES) antes de que el candidato entre siquiera
+        // al puntaje -- aplica a las tres secciones por igual, es una sola regla.
+        if (watchedIds.has(r.id)||!r.poster_path||(r.vote_count||0)<DISC_MIN_VOTES) return;
         if (!scoreMap[r.id]) scoreMap[r.id] = {data:r,type,score:0,count:0,because:[]};
         scoreMap[r.id].score += parseFloat(item.my_rating)/10; scoreMap[r.id].count++;
         if (scoreMap[r.id].because.length < 2) scoreMap[r.id].because.push(item.title);
@@ -2148,15 +2212,33 @@ async function renderDisc() {
   }));
   if (discType !== requestedType) return; // el usuario ya cambió de pestaña, esta respuesta quedó obsoleta
 
-  const sorted = Object.values(scoreMap).filter(r=>r.data.poster_path).sort((a,b)=>b.score-a.score);
+  // empujón chico por calidad general (vote_average de TMDB), sin pisar la
+  // corroboración de tus propias calificaciones -- hasta +15% para un candidato
+  // con nota perfecta, nada para uno mediocre.
+  const sorted = Object.values(scoreMap)
+    .map(r => { r.score *= 1 + ((r.data.vote_average||0)/10)*0.15; return r; })
+    .sort((a,b)=>b.score-a.score);
   if (!sorted.length) { el.innerHTML = `<div class="empty-state"><h3>Nada por ahora</h3><p>No encontramos recomendaciones. Agregá más ${label}.</p></div>`; return; }
-
-  const topPicks  = sorted.filter(r=>r.score>=1.2).slice(0,12);
-  const morePicks = sorted.filter(r=>r.score<1.2).slice(0,14);
 
   const gc={};
   items.filter(i=>i.type===type&&i.my_rating>=8).forEach(i=>(i.genres||[]).forEach(g=>gc[g]=(gc[g]||0)+1));
   const topGenres = Object.entries(gc).sort((a,b)=>b[1]-a[1]).slice(0,3).map(g=>g[0]);
+
+  // "Más recomendadas": mismo puntaje de siempre, pero elegidas con diversifyPicks
+  // en vez de un slice directo -- evita que la lista se sienta repetida sin
+  // imponer cuota de género (ver DESIGN_MAP Bloque R).
+  const topPicks = diversifyPicks(sorted.filter(r=>r.score>=1.2), 12);
+
+  // "Por tus géneros favoritos" ahora filtra por género de verdad: candidatos
+  // cuyo genre_ids (traducido) se cruza con tus géneros mejor calificados, no
+  // "lo que sobró" del balde de arriba.
+  const topPickIds = new Set(topPicks.map(r=>r.data.id));
+  const genreCandidates = sorted.filter(r => !topPickIds.has(r.data.id) &&
+    (r.data.genre_ids||[]).some(gid => topGenres.includes(TMDB_GENRE_ID_ES[gid])));
+  const genrePicks = diversifyPicks(genreCandidates, 10);
+
+  const usedIds = new Set([...topPicks, ...genrePicks].map(r=>r.data.id));
+  const morePicks = sorted.filter(r=>!usedIds.has(r.data.id)).slice(0,14);
 
   const recFeatured = (r) => {
     const d=r.data, title=d.title||d.name, year=(d.release_date||d.first_air_date||'').slice(0,4);
@@ -2201,10 +2283,9 @@ async function renderDisc() {
       ${rest.length ? `<div class="recs-list">${rest.map((r,i)=>recRow(r,i+2)).join('')}</div>` : ''}
     </div>`;
   }
-  if (topGenres.length) {
-    const genreRecs = sorted.filter(r=>!topPicks.includes(r)).slice(0,10);
-    const [gFirst, ...gRest] = genreRecs;
-    if (gFirst) html += `<div class="disc-section">
+  if (genrePicks.length) {
+    const [gFirst, ...gRest] = genrePicks;
+    html += `<div class="disc-section">
       <div class="disc-section-title">Por tus géneros favoritos</div>
       <div class="disc-section-why">${topGenres.map(esc).join(' · ')}</div>
       ${recFeatured(gFirst)}

@@ -675,6 +675,75 @@ Estos hallazgos están registrados y no se pierden, pero no tienen suficiente de
 
 ---
 
+## Bloque R — Motor de recomendaciones con criterio propio
+
+*Dimensión de calidad que ataca: que Descubrí deje de ser un espejo del algoritmo de TMDB y empiece a reflejar un criterio propio de Archivo sobre el historial real del usuario.*
+
+- **Objetivo:** que cada sección de Descubrí (película/serie) haga lo que su nombre promete, y sumar criterios propios (género, década, rating, piso de calidad) encima del insumo de TMDB — no reemplazarlo.
+- **Problema que resuelve:** hallazgos de [DISCOVERY_AUDIT.md](DISCOVERY_AUDIT.md) — "Por tus géneros favoritos" no filtra por género; sin piso de calidad (`vote_count`); corte arbitrario de 12 sobre 20 sin justificación documentada.
+- **Valor:** Alto — es la pieza que Diego identificó como el paso de "agregador de TMDB" a "criterio propio", parte de la visión de "archivo cultural definitivo" (Bloque 0).
+- **Riesgo:** Bajo — todos los datos nuevos que hacen falta (género, año, `vote_count`, `vote_average`) ya vienen en la respuesta de `/recommendations` que se pide hoy. No requiere llamados nuevos a la API ni cambios de esquema.
+- **Esfuerzo:** Medio.
+- **Dependencias:** ninguna.
+- **Documentos que lo respaldan:** DISCOVERY_AUDIT.md.
+- **Estado:** Implementado y validado con datos reales, pendiente commit/push/deploy — ver detalle completo más abajo.
+- **Fuera de alcance, confirmado por Diego:** disponibilidad por plataformas — requiere una decisión de arquitectura distinta (cambiar de fuente de recomendaciones o multiplicar llamados), se trata como su propio frente futuro, no parte de este bloque.
+
+### Investigación adicional para este diseño (datos reales, no supuestos)
+
+- **TMDB ya devuelve todo lo necesario sin llamados nuevos:** confirmado con una consulta real — cada candidato de `/recommendations` trae `genre_ids`, `vote_count`, `vote_average` y `release_date`. Verifiqué también en vivo las listas oficiales de género de TMDB (`/genre/movie/list` y `/genre/tv/list`, es-AR): **incluso el endpoint oficial de géneros de TMDB devuelve en inglés las mismas categorías combinadas de serie que ya habíamos detectado en Bloque P** (Action & Adventure, Sci-Fi & Fantasy, War & Politics, Kids, News, Reality, Soap, Talk) — no es un caso puntual de un show, es un límite real y consistente de TMDB. El mapa de traducción de Bloque P (`GENRE_CANON_EN_ES`) se puede reusar tal cual, solo hace falta una versión indexada por ID numérico (los `genre_ids` de recomendaciones son números, no nombres).
+- **Costo real de usar 20 fuentes en vez de 12:** medido con tus datos reales (20 llamados en paralelo vs. 12): 411ms vs. 364ms — un 13% más, no un costo lineal (son requests en paralelo). Confirma la sospecha del audit: "casi gratis" era correcto, no una suposición.
+- **Distribución real de `vote_count` entre tus candidatos actuales** (20 fuentes, 192 candidatos únicos sin ver): mínimo 42, percentil 25 = 163, mediana = 569. Un piso de 50 excluiría solo 4 candidatos (2%); un piso de 100 excluiría 28 (15%). **Matiz honesto:** con tu perfil de calificaciones actual, la obscuridad extrema por cantidad de votos no es tan dominante como la hipótesis inicial suponía — un piso ayuda, pero probablemente no sea la explicación principal de "películas extremadamente desconocidas". Es más probable que sea una cuestión de **familiaridad** (una película real y con votos, pero que vos nunca escuchaste nombrar) que de obscuridad estadística.
+- **Distribución real por década** entre esos mismos 192 candidatos: de 1940s a 2020s, con peso real en décadas viejas (28 candidatos antes de 1980, ~15%). Confirma que la diversidad temporal ya existe en el pool — el diseño no debería filtrarla, solo decidir cómo tratarla.
+
+### Propuesta por cada objetivo de Diego
+
+**1. Que cada sección haga lo que promete**
+- "Por tus géneros favoritos" deja de ser "lo que sobró del balde de arriba" y pasa a filtrar de verdad: de todos los candidatos puntuados, se queda con los que comparten género con tus títulos mejor calificados (usando `genre_ids` + el mapa de traducción), ordenados por puntaje dentro de ese subconjunto. El texto de géneros que ya se muestra deja de ser decorativo.
+- "Más recomendadas para vos" y "Más opciones" no cambian de criterio (siguen siendo por corroboración/puntaje), pero si se suma vote_count/rating al puntaje (punto 2), automáticamente mejoran también.
+
+**2. Sumar criterios propios de Archivo, no solo TMDB**
+- **Piso de calidad:** descartar candidatos con `vote_count` por debajo de un umbral antes de puntuar. Con la distribución real de arriba, propongo **50** como default razonable (excluye poco, saca el peor ruido) — es un número de gusto de producto, no algo que pueda decidir por vos. Lo dejo como parámetro a confirmar.
+- **Rating como señal adicional:** sumar una fracción de `vote_average` normalizado al puntaje existente (que hoy solo usa tu calificación de la fuente), para que un candidato bien valorado en general pese un poco más que uno mal valorado, a igual corroboración.
+- **Década:** no como filtro (ver más abajo, diversidad), sino como dato mostrado — ej. sumar la década al "por qué" de la recomendación cuando coincide con tus décadas favoritas de ADN, para que se sienta parte del criterio sin excluir nada.
+- **Diversidad:** este es el criterio menos concreto de los cinco que nombraste, y no quiero adivinarlo — ¿te referís a que "Más recomendadas" no quede dominado por un solo género/década aunque tu historial esté cargado ahí (ej. tope de cuántos títulos del mismo género entran a un mismo balde), o a otra cosa? Antes de diseñar esta parte puntual necesito que me digas qué es "perder diversidad" en concreto para vos.
+
+**3. Por qué 20 vs. 12, y si simplificar**
+No encontré ninguna razón documentada para el corte en 12 — parece haber sido un límite arbitrario (probablemente pensado como resguardo de llamados en paralelo) que quedó desalineado del texto de la UI, que ya dice "basado en tus N mejor calificadas" usando el número real de hasta 20. Con el costo medido (13%, no lineal), propongo **usar los 20 de verdad** en vez de calcular 20 y usar 12 — no es "simplificar restando", es "dejar de calcular algo que se tira". El copy de la sección queda automáticamente correcto sin tocarlo.
+
+### Confirmado por Diego (15-ago-2026)
+
+- **`vote_count` mínimo: 50, fijo, no configurable.** "Prefiero una buena decisión por defecto antes que sumar opciones."
+- **Diversidad, definida por Diego:** no es cuota artificial por género — "si mi historial está muy cargado hacia un género, está bien que eso se refleje". El objetivo es evitar que una lista se sienta "la misma película repetida diez veces": diversidad *dentro* del perfil (décadas, estilos, países, directores, niveles de popularidad), sin perder coherencia.
+- **Director y país quedan fuera de este bloque:** no vienen en la respuesta de `/recommendations` que ya se usa — requerirían una consulta extra por candidato (mismo problema de costo que la disponibilidad por plataformas, documentado en DISCOVERY_AUDIT.md). Implementé la diversificación con lo que **no cuesta nada nuevo**: género principal, década, y nivel de popularidad (por `vote_count`). Si más adelante Diego quiere sumar director/país, es una extensión concreta y acotada de la misma función, no un rediseño — queda anotado como follow-up, no implementado.
+
+### Implementado
+
+- **`TMDB_GENRE_ID_ES`**: mapa de traducción por ID numérico (no por nombre, porque `/recommendations` trae `genre_ids`), verificado en vivo contra `/genre/movie|tv/list` — mismos nombres finales que `GENRE_CANON_EN_ES` de Bloque P, misma confirmación de que hasta el endpoint oficial de géneros de TMDB devuelve en inglés las categorías combinadas de serie.
+- **20 fuentes reales, no 12**: `topItems.slice(0,12)` → `topItems` (ya limitado a 20 más arriba). El texto "Basado en tus N mejor calificadas" queda automáticamente correcto.
+- **Piso de calidad (`DISC_MIN_VOTES = 50`)**: aplicado una sola vez, a nivel de todo el pool de candidatos, antes de puntuar — mismo criterio para las tres secciones.
+- **Empujón chico por calidad general**: `vote_average` de TMDB multiplica el puntaje hasta +15% (candidato con nota perfecta) sin pisar la corroboración de tus propias calificaciones, que sigue siendo la señal dominante.
+- **"Por tus géneros favoritos" genuinamente filtra por género**: candidatos cuyo `genre_ids` (traducido) se cruza con tus géneros mejor calificados — validado con datos reales: **100% de los candidatos mostrados coinciden con el género real**, no "lo que sobró" del balde de arriba.
+- **`diversifyPicks(pool, n)`**: selección greedy que evita que género principal, década o nivel de popularidad dominen más del ~40% de una misma lista — sin cuota fija, sin dejar huecos (si no hay suficientes candidatos variados, se completa con lo que mejor puntúa).
+
+### Validado con datos reales
+
+- Piso de calidad: mínimo real observado entre los candidatos, 53 votos — nada por debajo de 50 pasa.
+- Género: 100% de los candidatos de "Por tus géneros favoritos" comparten género real con el perfil (antes: 0% de garantía, eran sobras del otro balde).
+- Diversidad, con pool grande (157 candidatos, 10 elegidos): ningún género ni década superó el tope de 4 (el 40% de 10) — spread real logrado: géneros 1/2/2/3/2, décadas 1940s/1970s/2000s(4)/2010s/2020s.
+- Diversidad, con pool chico (6 candidatos elegibles para 12 lugares): se completó con los 6 igual, sin forzar huecos vacíos por diversidad — el diseño se comporta como se documentó ("la coherencia nunca pierde").
+- Costo de 20 fuentes vs. 12: confirmado antes de implementar, ~13% más tiempo, no lineal (medido en la etapa de investigación de este mismo bloque).
+
+### Visión a futuro del motor (documentado, no implementado en este bloque)
+
+Diego fijó el rumbo de largo plazo para esta pieza del producto: el objetivo final no es solo usar mejor el endpoint de TMDB, sino que **Archivo construya un criterio propio sobre el historial real del usuario** — que las recomendaciones dependan cada vez menos de "similar a X" (el algoritmo de caja negra de TMDB) y cada vez más de patrones reales de consumo, calificaciones y cómo evolucionan los gustos con el tiempo. Este bloque es un paso concreto en esa dirección (piso de calidad propio, diversidad propia, sección de género que filtra de verdad) pero **sigue apoyado en el algoritmo de "similares" de TMDB como fuente primaria de candidatos** — el salto a un modelo verdaderamente propio (por ejemplo, aprender de la evolución de tus calificaciones en el tiempo, no solo de tu top actual) es un bloque futuro distinto, más grande, sin diseñar todavía. Se anota acá para que cualquier trabajo futuro sobre Descubrí parta de este rumbo ya confirmado, no lo redescubra.
+
+### Estado
+
+Implementado y validado con datos reales (15-ago-2026). Pendiente commit → push → deploy → verificación en producción (workflow estándar).
+
+---
+
 ## Historial de cambios de este plan
 
 - **2026-07-30:** creación del plan a partir de MASTER_AUDIT.md. Todos los bloques en estado Pendiente.
