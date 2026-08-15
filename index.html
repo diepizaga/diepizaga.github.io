@@ -1047,6 +1047,7 @@ let discType     = 'movies';
 let searchType   = 'multi';
 let editingItem  = null;
 let pendingItem  = null;
+let lastSearchQuery = null, lastSearchType = null;
 let importRows   = [];
 let discCache    = { movies: null, series: null, books: null };
 let searchTimeout = null, bibSearchTimeout = null, toastTimeout = null;
@@ -1149,7 +1150,7 @@ async function tmdbSearch(query, type) {
     const r = await fetch(`https://api.themoviedb.org/3/${ep}?query=${encodeURIComponent(query)}&language=${lang}&page=1`, { headers:{Authorization:`Bearer ${TMDB_TOKEN}`} });
     if (!r.ok) continue;
     const d = await r.json();
-    const res = (d.results||[]).filter(x=>x.media_type!=='person');
+    const res = (d.results||[]).filter(x=>x.media_type!=='person').sort((a,b)=>(b.popularity||0)-(a.popularity||0));
     if (res.length) return res.slice(0,10);
   }
   return [];
@@ -1167,8 +1168,11 @@ async function tmdbDetail(id, type) {
   const titleEN = (resEN.title||resEN.name||'').trim();
   // es-AR solo si es traducción latinoamericana genuina (difiere de EN y de España)
   const isLatam = titleAR && titleAR.toLowerCase()!==titleEN.toLowerCase() && titleAR.toLowerCase()!==titleES.toLowerCase();
-  const bestTitle = isLatam ? titleAR : titleEN;
-  return { ...resEN, ...resAR, title:bestTitle, name:bestTitle, original_title:resEN.original_title||resEN.original_name||titleEN, overview:resAR.overview||resEN.overview };
+  // cascada AR -> ES -> EN: si no hay traducción latam genuina, preferir español de España antes que caer directo a inglés
+  const hasES = titleES && titleES.toLowerCase()!==titleEN.toLowerCase();
+  const bestTitle = isLatam ? titleAR : (hasES ? titleES : titleEN);
+  const genres = (resAR.genres?.length ? resAR.genres : resES.genres?.length ? resES.genres : resEN.genres) || [];
+  return { ...resEN, ...resAR, title:bestTitle, name:bestTitle, genres, original_title:resEN.original_title||resEN.original_name||titleEN, overview:resAR.overview||resES.overview||resEN.overview };
 }
 
 async function tmdbRecs(tmdbId, type) {
@@ -2243,6 +2247,7 @@ async function openRecDetail(e, tmdbId, type) {
     const d = await tmdbDetail(tmdbId, type);
     const omdb = await omdbGetRatings(d.original_title||d.title||d.name, (d.release_date||d.first_air_date||'').slice(0,4), d.external_ids?.imdb_id);
     pendingItem = buildTmdbItem(d, omdb, tmdbId, type);
+    pendingItem.status = 'watchlist'; // alta nueva: default "ver después", no "visto"
     openDetailModal(pendingItem, false);
   } catch { showToast('No se pudo cargar el detalle. Probá de nuevo.', 'error'); }
 }
@@ -2253,6 +2258,7 @@ async function qAddBookRec(e, bookId) {
   try {
     const b = await booksDetail(bookId);
     pendingItem = buildBookItem(b);
+    pendingItem.status = 'watchlist'; // alta nueva: default "ver después", no "visto"
     openDetailModal(pendingItem, false);
   } catch { showToast('No se pudo cargar el libro. Probá de nuevo.', 'error'); }
 }
@@ -2274,6 +2280,19 @@ function switchTab(tab) {
 // ============================================================
 // BÚSQUEDA (modal único)
 // ============================================================
+// Cancelar desde la ficha de un item nuevo (no edición): vuelve a los resultados
+// de la búsqueda que lo trajo hasta acá, en vez de cerrar todo el flujo.
+function cancelAddFlow() {
+  closeModal('modal-detail');
+  if (!lastSearchQuery) return;
+  openModal('modal-search');
+  setTimeout(()=>$id('ms-input').focus(), 80);
+  searchType = lastSearchType || 'multi';
+  document.querySelectorAll('.ms-type-btns .pill').forEach(b=>b.classList.toggle('active', b.dataset.type===searchType));
+  $id('ms-input').value = lastSearchQuery;
+  doSearch(lastSearchQuery);
+}
+
 function openSearchModal() {
   openModal('modal-search');
   setTimeout(()=>$id('ms-input').focus(), 80);
@@ -2368,6 +2387,8 @@ async function doSearch(q) {
 }
 
 async function selectBookResult(bookId) {
+  lastSearchQuery = $id('ms-input').value.trim();
+  lastSearchType = searchType;
   closeModal('modal-search');
   const existing = items.find(i=>i.google_books_id===bookId);
   if (existing) { openDetail(existing.id); return; }
@@ -2375,11 +2396,14 @@ async function selectBookResult(bookId) {
   try {
     const b = await booksDetail(bookId);
     pendingItem = buildBookItem(b);
+    pendingItem.status = 'watchlist'; // alta nueva: default "ver después", no "visto"
     openDetailModal(pendingItem, false);
   } catch { showToast('No se pudo cargar el libro. Probá de nuevo.', 'error'); }
 }
 
 async function selectResult(tmdbId, type) {
+  lastSearchQuery = $id('ms-input').value.trim();
+  lastSearchType = searchType;
   closeModal('modal-search');
   const existing = items.find(i=>i.tmdb_id===tmdbId&&i.type===type);
   if (existing) { openDetail(existing.id); return; }
@@ -2388,6 +2412,7 @@ async function selectResult(tmdbId, type) {
     const d = await tmdbDetail(tmdbId, type);
     const omdb = await omdbGetRatings(d.original_title||d.title||d.name, (d.release_date||d.first_air_date||'').slice(0,4), d.external_ids?.imdb_id);
     pendingItem = buildTmdbItem(d, omdb, tmdbId, type);
+    pendingItem.status = 'watchlist'; // alta nueva: default "ver después", no "visto"
     openDetailModal(pendingItem, false);
   } catch { showToast('No se pudo cargar el detalle. Probá de nuevo.', 'error'); }
 }
@@ -2483,7 +2508,7 @@ function openDetailModal(item, isEdit) {
       <div class="det-actions">
         ${isEdit?`<button class="btn btn-ghost-danger" onclick="confirmDelete('${item.id}')">Eliminar</button>`:''}
         ${isEdit?`<button class="btn btn-secondary" onclick="replaceItem('${item.id}','${escAttr(item.title).replace(/'/g,"\\'")}')">No es esta</button>`:''}
-        <button class="btn btn-secondary" onclick="closeModal('modal-detail')">Cancelar</button>
+        <button class="btn btn-secondary" onclick="${isEdit?"closeModal('modal-detail')":'cancelAddFlow()'}">Cancelar</button>
         <button class="btn btn-primary" onclick="saveDetail(${isEdit})">${isEdit?'Guardar':'Agregar al archivo'}</button>
       </div>
     </div>`;

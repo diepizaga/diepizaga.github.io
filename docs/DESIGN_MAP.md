@@ -403,6 +403,71 @@ Confirmado con evidencia fresca que las dos limitaciones seguían vigentes antes
 
 ---
 
+## Etapa 2 — UX y producto
+
+**Inicio:** 15-ago-2026. Cierra la etapa de estabilización técnica (Bloque M). A partir de acá el criterio de prioridad no es severidad técnica sino impacto en los flujos de uso diario, y el mandato incluye cuestionar el producto en el camino (simplificar/eliminar lo que no aporte valor, evaluar funcionalidad nueva solo si mejora la experiencia real) — no solo corregir. Nace de [UX_AUDIT.md](UX_AUDIT.md). Orden de trabajo definido por Diego: (1) flujo de buscar y agregar, (2) sensación de movimiento de la interfaz, (3) filtro de género, (4) navegación de Biblioteca a escala, (5) teclado/layouts/detalles de mobile.
+
+**Principio activo durante toda la etapa (confirmado por Diego, 15-ago-2026):** cuestionar permanentemente si cada pantalla, animación, transición, modal o interacción aporta valor real — no mantener algo solo porque "siempre estuvo ahí". Si algo genera fricción o movimiento innecesario, se simplifica aunque no esté escrito en un documento. Toda propuesta de cambio (o de no cambiar algo) se mide con una pregunta única: **¿hace que usar Archivo todos los días sea más rápido o más agradable? Si la respuesta es no, no es prioridad ahora.** Esto aplica a oportunidades que aparezcan durante la implementación, no solo a lo ya listado en UX_AUDIT.md.
+
+---
+
+## Bloque N — Flujo de buscar y agregar contenido
+
+- **Objetivo:** reducir la fricción del flujo que más se usa a diario — buscar algo y guardarlo en el archivo.
+- **Problema que resuelve:** UX_AUDIT.md hallazgos #3b (ruido en resultados), #4 (sin vuelta atrás), #6-parcial (idioma inconsistente en la ficha), #7 (estado por defecto).
+- **Valor:** Alto — es la Prioridad 1 explícita de la nueva etapa.
+- **Riesgo:** Bajo — cambios de UI/flujo y de un criterio de selección de datos ya presentes en la respuesta de TMDB; no tocan `watchlist` ni requieren backend.
+- **Esfuerzo:** Bajo-Medio, variable por sub-problema (ver abajo).
+- **Dependencias:** ninguna.
+- **Documentos que lo respaldan:** UX_AUDIT.md.
+- **Estado:** Implementado y validado (15-ago-2026), pendiente de deploy manual. Alcance confirmado: **no incluye** buscar por actor/director/autor (ver más abajo).
+
+### Implementado
+
+- **Sub-problema 1 (ranking):** `tmdbSearch()` ahora ordena por `popularity` descendente antes de devolver los primeros 10. Validado con datos reales: "Inception" pasó de un orden sin criterio (Origen, Bikini Inception, Inception: The Cobol Job...) a estrictamente descendente por popularidad (57.09, 5.09, 1.67, 1.35...).
+- **Sub-problema 2 (sin vuelta atrás):** nueva función `cancelAddFlow()` — "Cancelar" en la ficha de un ítem **nuevo** (no en edición) vuelve al modal de búsqueda con la misma query y el mismo filtro de tipo, y re-ejecuta la búsqueda. En edición, "Cancelar" sigue cerrando todo como antes (no aplica "volver a resultados" porque no hay a dónde volver). Validado con datos reales: buscar "Poor Things" → seleccionar resultado → Cancelar → vuelve al modal con "Poor Things" y los 7 resultados de nuevo.
+- **Sub-problema 3 (estado por defecto):** los 4 puntos donde se arma un ítem nuevo para agregar (búsqueda de películas/series, búsqueda de libros, quick-add de Descubrí para ambos) fuerzan `status:'watchlist'` después de construir el ítem. **No se tocó** el default de `buildTmdbItem`/`buildBookItem` en sí — esas funciones las usa también el import de CSV, donde "watched" sigue siendo el default correcto (películas ya vistas del historial). Validado con datos reales: ítem nuevo no existente en biblioteca abre con Estado="Ver después"; ítem ya existente (ej. Interstellar) sigue abriendo con su estado real guardado ("Visto"), sin cambios.
+- **Sub-problema 4 (idioma):** causa raíz confirmada y corregida — `tmdbDetail()` ahora prueba título AR → ES → EN en cascada (antes saltaba directo de AR a EN, ignorando España) y arma `genres`/`overview` con la misma cascada explícita en vez de depender del orden de un spread de objetos. Validado con datos reales: "Dune: La profecía" (id TMDB 90228) ahora abre la ficha con ese mismo título en vez de saltar a "Dune: Prophecy" en inglés. **Límite real, no corregible desde acá:** el género y la sinopsis siguen en inglés para este título puntual porque TMDB directamente no tiene traducción al español cargada para ese dato (confirmado pidiendo `es-AR`/`es-ES` por separado: ambos devuelven los géneros en inglés) — la cascada ya elige lo mejor disponible, pero no puede inventar una traducción que TMDB no tiene.
+
+### Pendiente
+
+- Deploy manual (Diego sube `index.html` a `diepizaga.github.io` como siempre).
+- Validación en producción real después del deploy.
+
+### Sub-problema 1 — Ruido en resultados de búsqueda (#3b)
+
+`tmdbSearch()` (index.html:1146) pide `search/multi`/`search/movie`/`search/tv` y devuelve los primeros 10 resultados tal cual los entrega TMDB, sin reordenar. TMDB ya incluye un campo `popularity` en cada resultado — no está siendo usado.
+- **Opción A (recomendada):** ordenar los resultados por `popularity` descendente antes de mostrarlos. No requiere ningún llamado nuevo a la API, el dato ya viene en la respuesta.
+- **Opción B:** filtrar directamente resultados por debajo de un umbral de popularidad. Más agresivo, riesgo de esconder un título real pero poco popular (ej. algo indie que sí tenés).
+- Con A alcanza para resolver el caso observado (Inception arriba, "Bikini Inception" abajo en vez de mezclado) sin arriesgar ocultar nada.
+
+### Sub-problema 2 — Sin vuelta atrás desde la ficha de confirmación (#4)
+
+Hoy "Cancelar" en la ficha de confirmación cierra todo el flujo (`closeModal`) en vez de volver a la lista de resultados.
+- **Opción A (recomendada):** que "Cancelar" desde la ficha vuelva a los resultados de búsqueda (conservando la query y el scroll), no cierre todo. Es más intuitivo — "cancelar" debería cancelar el paso actual, no el flujo entero.
+- **Opción B:** agregar un botón separado "← Volver" además de "Cancelar" (que sí cerraría todo). Más explícito pero suma un botón más a una ficha que ya tiene varios.
+- Recomiendo A por ser más simple y no agregar superficie nueva.
+
+### Sub-problema 3 — Estado por defecto siempre "Visto" (#7)
+
+`buildTmdbItem()` (index.html:1193) fija `status:'watched'` de forma incondicional para cualquier alta nueva.
+- **Opción A (recomendada):** default a `'watchlist'` ("Ver después") — probablemente el caso más común al agregar algo recién descubierto.
+- **Opción B:** sin default, forzar elección explícita en cada alta.
+- Recomiendo A: menos clics en el caso común, sin agregar un paso obligatorio nuevo.
+
+### Sub-problema 4 — Idioma inconsistente entre resultados y ficha (#6, parcial)
+
+Causa identificada en `tmdbDetail()` (index.html:1158-1171): la función pide el detalle en `es-AR`, `es-ES` y `en-US` en paralelo, pero el título final solo elige entre **AR o EN** (`bestTitle = isLatam ? titleAR : titleEN`) — nunca contempla `titleES` (España) como intermedio. Si un título no tiene traducción específica de AR pero sí tiene una de ES, el código la ignora y cae directo a inglés. Los géneros tienen un riesgo similar: se arman con `{...resEN, ...resAR}`, así que si el pedido a `es-AR` no devuelve `genres` por algún motivo, quedan los de `resEN` (inglés) sin que se note. Esto último es una hipótesis fundada en cómo está escrito el código, no confirmada todavía con una prueba puntual — la confirmo antes de tocar nada si avanzamos con este sub-problema.
+- **Opción A (recomendada):** agregar `titleES` como paso intermedio en la cascada (`AR → ES → EN`) para título y, explícitamente (no por spread implícito), para género también.
+- Alcance acotado a la ficha de agregar/editar. El buscador interno de Biblioteca (que también sufre este problema, hallazgo #6) es Prioridad 4 — no se toca en este bloque.
+
+### Pregunta de producto a resolver acá: ¿buscar por actor/director/autor?
+
+Hallazgo técnico relevante: `tmdbSearch()` ya recibe resultados de tipo persona desde `search/multi` (TMDB los devuelve mezclados con películas/series) y el código los descarta explícitamente (`x.media_type!=='person'`, index.html:1152). Es decir, la búsqueda por actor/director en TMDB **ya está a un filtro de distancia**, no es una integración nueva — el costo real no es "conectar con una API nueva" sino diseñar qué pasa cuando el resultado elegido es una persona (ej. mostrar su filmografía vía `/person/{id}/combined_credits` y dejar elegir un título desde ahí). Para libros, Open Library/Google Books ya traen `author_name` en los resultados de búsqueda (index.html:1204), así que ahí el dato también está disponible, falta decidir si se expone como filtro.
+**Respuesta de Diego (15-ago-2026):** tiene mucho valor real, no es un "nice to have" — pero no entra en el Bloque N. Primero el flujo de buscar y agregar tiene que quedar sólido; después se arma un bloque específico de exploración (actor/director/autor, filmografías). Queda anotado como **próximo bloque de la Etapa 2 una vez cerrado N** (sin nombre de letra asignado todavía, sin diseño — el hallazgo técnico de arriba, `media_type!=='person'` descartado en `tmdbSearch()`, es el punto de partida cuando llegue el turno).
+
+---
+
 ## Bloques diferidos — sin diseño formal por ahora
 
 Estos hallazgos están registrados y no se pierden, pero no tienen suficiente definición o urgencia para ser un bloque activo de diseño ahora mismo.
@@ -427,3 +492,5 @@ Estos hallazgos están registrados y no se pierden, pero no tienen suficiente de
 - **2026-07-30:** Diseño de Bloque C aprobado, con un cambio de dirección respecto de la propuesta inicial: se descarta el mecanismo de "claim" server-side (no hay forma de demostrar propiedad de una fila huérfana) a favor de prevenir su creación de raíz + constraint `NOT NULL`. Confirmado sin filas huérfanas existentes en producción. Con B y C diseñados, sigue el housekeeping de Bloque A, y después implementación por etapas.
 - **2026-07-30:** Checklist de pre-implementación corrido sobre B y C antes de ejecutar Bloque A. Encontrados y corregidos dos huecos: dependencia de B desactualizada (ya resuelta, seguía marcada pendiente) y ausencia total de criterio de éxito/rollback en C (agregados). A partir de acá, el ciclo de ejecución es Implementación → Validación → Commit, por bloque, sin mezclar etapas.
 - **2026-07-30:** Bloque A ejecutado y finalizado, con alcance acotado explícitamente: tracking + `.gitignore` + borrado de `.bak` + versionado de `docs/`. Destino de `cinelog.git` diferido sin bloquear el proyecto. **Hallazgo nuevo durante la ejecución (ver MASTER_AUDIT § 2, EP-7): `import_movies.py` contiene la `service_role` key de Supabase** (no la `anon key`) — severidad crítica, distinta e independiente de todo lo demás, pendiente de que Diego la regenere. No bloquea el inicio de la implementación de Bloque B.
+- **15-ago-2026:** cerrada la etapa de estabilización técnica (Bloque M, desplegado). Arranca la Etapa 2 — UX y producto, con [UX_AUDIT.md](UX_AUDIT.md) como insumo. Diego fija el orden de trabajo (buscar/agregar → movimiento de interfaz → filtro de género → navegación de Biblioteca → mobile) y el mandato explícito de cuestionar el producto en el camino, no solo corregir. Arranca el diseño de Bloque N (flujo de buscar y agregar).
+- **15-ago-2026:** diseño de Bloque N aprobado sin cambios de alcance. Buscar por actor/director/autor confirmado como valioso por Diego pero explícitamente fuera de este bloque — queda como próximo bloque de la etapa, sin diseñar todavía. Diego agrega un principio activo para toda la Etapa 2: cuestionar permanentemente el valor de cada pantalla/animación/modal, litmus test único = "¿más rápido o más agradable de usar todos los días?" (ver [[feedback-archivo-ux-stage-litmus-test]] en memoria). Bloque N implementado (los 4 sub-problemas) y validado con datos reales sobre el archivo local — pendiente el deploy manual de Diego.
