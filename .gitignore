@@ -5,3 +5,4 @@ migrate_titles.py
 migrate_books_rating.py
 import_movies.py
 .DS_Store
+capturas/

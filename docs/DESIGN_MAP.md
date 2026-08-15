@@ -850,12 +850,29 @@ En vez de agregar una sección nueva por cada patrón, `computeADNInsights()` ca
 
 Diego cerró la sesión de Bloque S con una lectura de conjunto del roadmap: primero la base técnica (Bloque M), después la UX de uso diario (Bloques N-Q), y ahora el arranque de la inteligencia propia de Archivo (Bloques R-S). Definió la secuencia de las próximas cuatro apuestas, en este orden — **ninguna diseñada todavía**, esto es la hoja de ruta, no un bloque en curso:
 
-1. **ADN 2.0 — el próximo gran bloque.** No más estadísticas, **insights**. La diferencia real: ADN ya no depende solo de calificaciones, ahora también recibe señal cualitativa (reacciones de Bloque S) — eso habilita un tipo de análisis distinto. Ejemplos que dio Diego de lo que busca (no como especificación literal, como el tipo de cosa): *"Tus películas que más te sorprendieron son, en promedio, de ciencia ficción"*; *"Solés puntuar por encima de la crítica cuando una obra te hace pensar"*; *"Aunque calificás muy bien el drama, tus reacciones positivas aparecen mucho más en thrillers"*. Su frase textual: **"Eso es ADN. No un dashboard. Un espejo."** Directamente alineado con la visión de producto (PRODUCT_VISION.md): que Archivo entienda cada vez mejor a su único usuario.
-2. **Buscar por actor/director/autor.** Mejora de navegación real y valiosa ("la voy a usar"), pero no cambia la identidad del producto como sí lo hace ADN 2.0 — por eso va después, no antes.
+1. ✅ **ADN 2.0** — Bloque T, finalizado y en producción (15-ago-2026).
+2. **Buscar por actor/director/autor.** Mejora de navegación real y valiosa ("la voy a usar"), pero no cambia la identidad del producto como sí lo hace ADN 2.0 — por eso va después, no antes. **En curso.**
 3. **Descubrí usando el conocimiento de ADN** — recién cuando haya suficientes reacciones acumuladas (la integración que Bloque R y Bloque S dejaron explícitamente diferida).
 4. **Memoria — un tercer frente nuevo, anotado, no abierto.** Distinto de recomendaciones y de estadísticas: reconstruir tu propia historia cultural en el tiempo. Ejemplos de Diego: *"Hace exactamente dos años viste..."*; *"La última vez que un libro te emocionó fue..."*; *"Hace ocho meses que no ves ciencia ficción"*; *"Hace mucho que no calificás algo con un 10"*. Depende de `watch_date` real, que hoy está en 0/2181 (PRODUCT_VISION.md) — no tiene datos suficientes todavía, se anota para cuando los tenga.
 
 Lectura de conjunto de Diego, para no perderla: **primero que Archivo te conozca (ADN 2.0), después que use ese conocimiento para ayudarte a descubrir cosas nuevas (Descubrí con ADN), y finalmente para reconstruir tu propia historia (Memoria)** — una progresión consistente con la visión de producto ya definida, no una lista de features sueltas.
+
+### Dos líneas de contexto adicionales (16-ago-2026), sin abrir — para no tomar decisiones aisladas
+
+Diego las trajo explícitamente como contexto de producto, no como bloques a diseñar ahora. Se documentan con detalle para que, cuando corresponda, no haya que reconstruir el razonamiento desde cero.
+
+**A. Auditoría de UX móvil/PWA — "que se sienta sólido, no solo que funcione".**
+Diego usa Archivo activamente desde Safari en iPhone y compartió 4 capturas reales de uso (16-ago-2026). Revisadas una por una, confirman con evidencia (no solo su descripción) varios puntos:
+- **Elementos superpuestos sobre contenido:** la barra de estado de Safari (hora/batería) se superpone visualmente al botón "Abrir ficha" en el hero de Inicio.
+- **Poco espacio útil real:** el header fijo de Archivo + la bottom nav fija de Archivo + la barra de direcciones flotante de Safari (con el pill "diepizaga.github.io") conviven, y esta última se superpone al contenido de la app, no solo lo empuja.
+- **Zoom de interfaz posible — el hallazgo más claro de las 4 capturas:** una de las capturas muestra la página entera pinch-zoomeada, con texto cortado y scroll horizontal roto ("...NTES" en vez de "ENTRADAS RECIENTES") — confirma que hoy nada impide hacer zoom sobre la interfaz, rompiendo el layout premium por completo.
+- **Puntitos de estado poco claros visualmente:** el punto pálido en la esquina de cada póster (estado watched/watching/pendiente) es difícil de leer a simple vista — se ve, pero no comunica.
+- **Biblioteca en mobile:** en la grilla revisada no se vio un problema tan claro como los anteriores — Diego lo describe como "sensación de que algunos elementos no están perfectamente contenidos" más que un caso puntual reproducible; queda para revisar con más casos cuando se audite.
+Diego pidió explícitamente: cuando llegue el momento, una auditoría específica de cómo se *siente* Archivo (no solo que funcione) en iPhone Safari, PWA instalada, desktop, distintos viewports, teclado abierto, scroll, modales y navegación — no arreglar síntomas sueltos sin entender la causa raíz (ej. el zoom y la superposición de barras de Safari son plausiblemente la misma causa: falta de un `viewport meta` que fije `user-scalable=no`/`maximum-scale=1`, pero esto es una hipótesis a confirmar en la auditoría, no un diagnóstico cerrado).
+
+**B. Grupos como inteligencia colectiva de gustos — dirección de producto, no diseño.**
+Hoy Grupo es "biblioteca compartida" (confirmado sin uso real, Bloque 0). La idea que Diego quiere explorar es distinta y más ambiciosa: no compartir una lista, sino que Archivo compare gustos entre personas. Ejemplos que dio: ¿qué tenemos en común?, ¿en qué somos diferentes?, ¿qué películas tienen alta probabilidad de gustarnos a todos?, ¿qué vería el grupo esta noche?, ¿qué título funciona como puente entre dos personas de gustos distintos?, ¿qué miembros tienen gustos más parecidos? Contextos que nombró: pareja, amigos, familia, varios usuarios comparando gustos.
+Diego mismo definió los tres frentes de auditoría que haría falta antes de diseñar nada: qué existe hoy realmente en código/base (el modelo de Grupo actual — `group_id`/`user_id`, sin roles reales, ver Bloque L/EP-11 — probablemente no alcanza para esto), qué datos se pueden usar (¿cruzar `my_rating`/géneros/reacciones entre usuarios del mismo grupo, dentro de las políticas RLS actuales?), y cómo manejar privacidad/permisos (¿alguien puede ver el detalle de las calificaciones de otro miembro, o solo agregados/comparaciones?). No se audita ni se diseña ahora.
 
 ---
 
