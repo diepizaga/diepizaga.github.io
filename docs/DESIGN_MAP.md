@@ -819,7 +819,7 @@ Es decir: se pregunta cuando ya hay, por los propios datos, evidencia de que pas
 
 - **Objetivo:** primer bloque de la hoja de ruta post-Bloque S. Diego pidió explícitamente NO retomar el ritmo de "documentar para después" — seguir construyendo sin pausas entre bloques salvo cambio estructural importante.
 - **Documentos que lo respaldan:** DESIGN_MAP.md § Hoja de ruta, PRODUCT_VISION.md.
-- **Estado:** Finalizado e implementado (15-ago-2026), validado con datos reales en desktop y mobile — 4 insights genuinos aparecen hoy (brecha película/serie/libro, duración de película, género polarizante, alineación con fuente de crítica). El insight de reacciones (Bloque S) queda consolidado en el mismo sistema, inactivo hasta acumular datos, como se esperaba. Pendiente commit → push → deploy → verificación.
+- **Estado:** Finalizado (15-ago-2026), commit `5e4427e`, pusheado y verificado en vivo en producción. 4 insights genuinos aparecen hoy (brecha película/serie/libro, duración de película, género polarizante, alineación con fuente de crítica). El insight de reacciones (Bloque S) queda consolidado en el mismo sistema, inactivo hasta acumular datos, como se esperaba.
 
 ### Auditoría: qué insights son reales hoy (no supuestos)
 
