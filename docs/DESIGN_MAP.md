@@ -813,6 +813,19 @@ Es decir: se pregunta cuando ya hay, por los propios datos, evidencia de que pas
 
 ---
 
+## Hoja de ruta confirmada después de Bloque S (15-ago-2026, sin bloques abiertos todavía)
+
+Diego cerró la sesión de Bloque S con una lectura de conjunto del roadmap: primero la base técnica (Bloque M), después la UX de uso diario (Bloques N-Q), y ahora el arranque de la inteligencia propia de Archivo (Bloques R-S). Definió la secuencia de las próximas cuatro apuestas, en este orden — **ninguna diseñada todavía**, esto es la hoja de ruta, no un bloque en curso:
+
+1. **ADN 2.0 — el próximo gran bloque.** No más estadísticas, **insights**. La diferencia real: ADN ya no depende solo de calificaciones, ahora también recibe señal cualitativa (reacciones de Bloque S) — eso habilita un tipo de análisis distinto. Ejemplos que dio Diego de lo que busca (no como especificación literal, como el tipo de cosa): *"Tus películas que más te sorprendieron son, en promedio, de ciencia ficción"*; *"Solés puntuar por encima de la crítica cuando una obra te hace pensar"*; *"Aunque calificás muy bien el drama, tus reacciones positivas aparecen mucho más en thrillers"*. Su frase textual: **"Eso es ADN. No un dashboard. Un espejo."** Directamente alineado con la visión de producto (PRODUCT_VISION.md): que Archivo entienda cada vez mejor a su único usuario.
+2. **Buscar por actor/director/autor.** Mejora de navegación real y valiosa ("la voy a usar"), pero no cambia la identidad del producto como sí lo hace ADN 2.0 — por eso va después, no antes.
+3. **Descubrí usando el conocimiento de ADN** — recién cuando haya suficientes reacciones acumuladas (la integración que Bloque R y Bloque S dejaron explícitamente diferida).
+4. **Memoria — un tercer frente nuevo, anotado, no abierto.** Distinto de recomendaciones y de estadísticas: reconstruir tu propia historia cultural en el tiempo. Ejemplos de Diego: *"Hace exactamente dos años viste..."*; *"La última vez que un libro te emocionó fue..."*; *"Hace ocho meses que no ves ciencia ficción"*; *"Hace mucho que no calificás algo con un 10"*. Depende de `watch_date` real, que hoy está en 0/2181 (PRODUCT_VISION.md) — no tiene datos suficientes todavía, se anota para cuando los tenga.
+
+Lectura de conjunto de Diego, para no perderla: **primero que Archivo te conozca (ADN 2.0), después que use ese conocimiento para ayudarte a descubrir cosas nuevas (Descubrí con ADN), y finalmente para reconstruir tu propia historia (Memoria)** — una progresión consistente con la visión de producto ya definida, no una lista de features sueltas.
+
+---
+
 ## Historial de cambios de este plan
 
 - **2026-07-30:** creación del plan a partir de MASTER_AUDIT.md. Todos los bloques en estado Pendiente.
