@@ -693,6 +693,26 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
 #toast.success { border-left-color: var(--ok); }
 #toast.error { border-left-color: var(--acc); color: #E9A398; }
 
+/* prompt de reacción (Bloque S) -- misma familia visual que el toast, pero más
+   ancho (para los chips) y con vida más larga porque es interactivo, no un aviso. */
+#reaction-prompt {
+  position: fixed; bottom: 22px; right: 22px; z-index: 600; max-width: 320px;
+  background: var(--ink2); border: 1px solid var(--hair2); border-left: 3px solid var(--gold);
+  padding: 15px 16px; box-shadow: 0 14px 50px rgba(0,0,0,.8);
+  transform: translateY(130px); opacity: 0; transition: transform .26s var(--ease), opacity .2s;
+  pointer-events: none;
+}
+#reaction-prompt.show { transform: translateY(0); opacity: 1; pointer-events: auto; }
+.rp-q { font-family: var(--serif); font-style: italic; font-size: 14.5px; color: var(--paper); margin-bottom: 10px; }
+.rp-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.rp-chip {
+  padding: 6px 12px; border-radius: 20px; border: 1px solid var(--hair2); background: transparent;
+  font-size: 11.5px; color: var(--paper2); cursor: pointer; transition: all .15s;
+}
+.rp-chip:hover { border-color: var(--gold); color: var(--paper); }
+.rp-chip.active { background: var(--gold); border-color: var(--gold); color: #16100B; font-weight: 600; }
+.rp-close { position: absolute; top: 10px; right: 12px; color: var(--paper4); cursor: pointer; font-size: 13px; line-height: 1; }
+
 /* ── RESPONSIVE ─────────────────────────────────────────── */
 @media (max-width: 840px) {
   .mh-inner { padding: 0 18px; }
@@ -739,6 +759,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
   .form-row { flex-direction: column; gap: 16px; }
   .det-actions .btn { flex: 1; text-align: center; }
   #toast { bottom: calc(var(--bottomnav-h) + env(safe-area-inset-bottom, 0px) + 12px); right: 12px; left: 12px; max-width: none; text-align: center; }
+  #reaction-prompt { bottom: calc(var(--bottomnav-h) + env(safe-area-inset-bottom, 0px) + 12px); right: 12px; left: 12px; max-width: none; }
 }
 @media (max-width: 380px) {
   .grid-cards { grid-template-columns: repeat(2, 1fr); }
@@ -1046,6 +1067,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
 </div>
 
 <div id="toast"></div>
+<div id="reaction-prompt"></div>
 
 <script>
 // ============================================================
@@ -1861,6 +1883,30 @@ function renderADN() {
   const topDecades = Object.entries(dc).sort((a,b)=>b[1]-a[1]);
   const topDecade  = topDecades[0]?.[0] || null;
 
+  // Bloque S: por qué te gustan las cosas, a partir de las reacciones registradas.
+  // Gateado como el resto de ADN (necesita volumen mínimo antes de decir algo real) --
+  // con reacciones recién empezando a acumularse, esta sección va a tardar en aparecer.
+  const reacted = watched.filter(i=>i.reactions && i.reactions.length);
+  let reactionInsight = '';
+  if (reacted.length >= 5) {
+    const chipCounts = {};
+    reacted.forEach(i=>i.reactions.forEach(c=>chipCounts[c]=(chipCounts[c]||0)+1));
+    const topChips = Object.entries(chipCounts).sort((a,b)=>b[1]-a[1]);
+    const [topChip] = topChips[0];
+    const withTopChip = reacted.filter(i=>i.reactions.includes(topChip));
+    const chipGc = {};
+    withTopChip.forEach(i=>(i.genres||[]).forEach(g=>chipGc[g]=(chipGc[g]||0)+1));
+    const chipTopGenre = Object.entries(chipGc).sort((a,b)=>b[1]-a[1])[0];
+    const chipGenreShare = chipTopGenre ? chipTopGenre[1]/withTopChip.length : 0;
+    reactionInsight = `<div class="adn-section">
+      <div class="adn-section-header">Por qué te gustan las cosas</div>
+      <div class="criterio-card">
+        ${topChips.slice(0,5).map(([c,n])=>`<div class="criterio-row"><span class="criterio-lbl">${esc(c)}</span><span class="criterio-val" style="color:var(--gold)">${n}</span></div>`).join('')}
+        ${chipGenreShare >= 0.5 ? `<p class="criterio-narrative">Cuando algo te genera "${esc(topChip.toLowerCase())}", ${Math.round(chipGenreShare*100)}% de las veces es ${esc(chipTopGenre[0].toLowerCase())}.</p>` : ''}
+      </div>
+    </div>`;
+  }
+
   const totalMins = movies.filter(i=>i.runtime).reduce((s,i)=>s+(parseInt(i.runtime)||0),0);
   const totalHours = Math.round(totalMins/60);
 
@@ -2041,6 +2087,8 @@ function renderADN() {
       ${coincTmdb!=null ? `<div class="coincidencia-row"><span class="coinc-src">TMDB</span><div class="bar-track"><div class="bar-fill fill-tmdb" style="width:${coincTmdb}%"></div></div><span class="coinc-pct">${coincTmdb}%</span></div>` : ''}
       ${coincRt!=null   ? `<div class="coincidencia-row"><span class="coinc-src">Rotten</span><div class="bar-track"><div class="bar-fill fill-rt" style="width:${coincRt}%"></div></div><span class="coinc-pct">${coincRt}%</span></div>` : ''}
     </div>` : ''}
+
+    ${reactionInsight}
 
     ${top10diffs.length >= 4 ? `
     <div class="adn-section">
@@ -2679,6 +2727,84 @@ function setRating(val) {
   const sv = $id('star-val'); if (sv) sv.textContent = val ? `${val}/10` : 'Sin calificar';
 }
 
+// ============================================================
+// REACCIONES + SEÑAL INFERIDA (Bloque S)
+// ============================================================
+// Universal para película/serie/libro -- solo el último chip adapta el texto
+// según el tipo de contenido, no el criterio de selección ni la cantidad
+// (pedido explícito de Diego: nada de listas que se desalineen con el tiempo).
+function reactionChips(type) {
+  const revisit = type === 'book' ? 'Volvería a leerlo' : 'Volvería a verla';
+  return ['Me sorprendió', 'Me emocionó', 'Me hizo pensar', 'No pude soltarla', revisit];
+}
+
+// Rango "normal" de tu propia distribución de notas (por tipo), vía outliers
+// de rango intercuartílico (Q1-1.5·IQR / Q3+1.5·IQR) -- un umbral fijo de
+// percentil sobre el VALOR de la nota no sirve acá: validado con datos reales,
+// las notas de Diego se concentran tan fuerte en 6-7 (72% de 1646 películas)
+// que un simple "percentil 20/80 por valor" marcaba el 100% como extremo, no
+// el ~4-8% esperado. IQR es el método estándar para esto y da un resultado
+// sensato con la misma data real (70/1646 = 4.3%).
+function personalRatingBounds(type) {
+  const rated = items.filter(i=>i.type===type&&i.my_rating).map(i=>parseFloat(i.my_rating)).sort((a,b)=>a-b);
+  if (rated.length < 10) return null; // hace falta más base para que un IQR tenga sentido
+  const at = p => rated[Math.floor(rated.length*p)];
+  const q1 = at(0.25), q3 = at(0.75), iqr = q3 - q1;
+  if (iqr === 0) return null; // distribución sin variación real -- no hay "extremo" que detectar
+  return { lower: q1 - 1.5*iqr, upper: q3 + 1.5*iqr };
+}
+
+// "¿Vale la pena preguntar?" -- solo cuando la propia calificación ya es, por
+// los datos, una reacción fuera de lo habitual (extremo de tu propia
+// distribución, o lejos de la crítica). No hay además un límite de frecuencia
+// aparte: si no hay nada distinto que contar, no se pregunta -- eso alcanza
+// para que sea infrecuente por construcción, sin una regla artificial extra.
+function isNotableReaction(item) {
+  if (!item.my_rating) return false;
+  const r = parseFloat(item.my_rating);
+  const bounds = personalRatingBounds(item.type);
+  const personalExtreme = bounds && (r < bounds.lower || r > bounds.upper);
+  const critDelta = (item.type !== 'book' && item.imdb_rating) ? Math.abs(r - parseFloat(item.imdb_rating)) : 0;
+  return personalExtreme || critDelta >= 3;
+}
+
+let reactionPromptTimeout = null;
+
+function maybeShowReactionPrompt(item) {
+  if (!item || (item.reactions && item.reactions.length)) return; // ya respondió una vez -- no se repregunta
+  if (!isNotableReaction(item)) return;
+  const el = $id('reaction-prompt'); if (!el) return;
+  const qLabel = item.type === 'book' ? '¿Qué te generó este libro?' : '¿Qué te generó esta película o serie?';
+  el.innerHTML = `<span class="rp-close" onclick="closeReactionPrompt()">✕</span>
+    <div class="rp-q">${esc(qLabel)}</div>
+    <div class="rp-chips">${reactionChips(item.type).map(c=>`<button class="rp-chip" onclick="toggleReaction('${item.id}',${JSON.stringify(c)},this)">${esc(c)}</button>`).join('')}</div>`;
+  el.classList.add('show');
+  clearTimeout(reactionPromptTimeout);
+  reactionPromptTimeout = setTimeout(closeReactionPrompt, 9000);
+}
+
+function closeReactionPrompt() {
+  $id('reaction-prompt')?.classList.remove('show');
+  clearTimeout(reactionPromptTimeout);
+}
+
+async function toggleReaction(itemId, chip, btnEl) {
+  const item = items.find(i=>i.id===itemId); if (!item) return;
+  const current = new Set(item.reactions || []);
+  current.has(chip) ? current.delete(chip) : current.add(chip);
+  btnEl.classList.toggle('active');
+  clearTimeout(reactionPromptTimeout);
+  reactionPromptTimeout = setTimeout(closeReactionPrompt, 9000); // interactuar renueva el tiempo antes de desaparecer
+  try { await saveItem({ id: itemId, reactions: [...current] }); }
+  catch { /* gesto opcional -- no vale la pena una alarma de error por esto */ }
+}
+
+function findSavedItem(data) {
+  if (data.id) return items.find(i=>i.id===data.id);
+  if (data.type === 'book') return items.find(i=>i.type==='book' && i.google_books_id===data.google_books_id);
+  return items.find(i=>i.type===data.type && i.tmdb_id===data.tmdb_id);
+}
+
 async function saveDetail(isEdit) {
   const base = isEdit ? editingItem : pendingItem;
   if (!base) return;
@@ -2686,12 +2812,14 @@ async function saveDetail(isEdit) {
   const notes = $id('det-notes').value.trim();
   const watchDate = $id('det-date').value;
   // currentRating: null = no tocó las estrellas (queda lo que había); 0 = limpió
+  const ratingTouched = currentRating !== null;
   const rating = currentRating !== null ? (currentRating || null) : (base.my_rating ?? null);
   const data = { ...base, status, notes: notes||null, watch_date: watchDate||null, my_rating: rating };
   try {
     await saveItem(data);
     closeModal('modal-detail');
     showToast(isEdit?'Actualizado':'Agregado a tu archivo','success');
+    if (ratingTouched && rating) maybeShowReactionPrompt(findSavedItem(data));
     currentRating=null; editingItem=null; pendingItem=null;
   } catch(e) { showToast('Error al guardar. Probá de nuevo.','error'); }
 }

@@ -761,7 +761,7 @@ Finalizado (15-ago-2026), commit `f05de6e`, pusheado y verificado en vivo en pro
 - **Esfuerzo:** Medio.
 - **Dependencias:** ninguna abierta.
 - **Documentos que lo respaldan:** PRODUCT_VISION.md, EXPRESSION_DESIGN.md.
-- **Estado:** En diseño.
+- **Estado:** Implementado y validado con datos reales (15-ago-2026). Pendiente que Diego corra el `ALTER TABLE` en Supabase, después commit → push → deploy → verificación.
 
 ### Parte B — Capa de señal inferida (permanente, sin UI)
 
@@ -795,9 +795,21 @@ Es decir: se pregunta cuando ya hay, por los propios datos, evidencia de que pas
 - **ADN:** nueva sección, gateada por volumen mínimo de datos (mismo patrón que ya usa ADN: "calificá al menos 5 para ver tu perfil") — con reactions y señal inferida acumulándose desde cero, va a tardar en tener algo real que decir. Se construye la infraestructura ahora; el "por qué" narrado en ADN crece con el uso, no aparece completo el día uno.
 - **Descubrí:** las reacciones y la señal inferida se suman como un eje más de `diversifyPicks()`/puntaje (Bloque R) — un candidato que comparte género con ítems que marcaste "me emocionó" en el extremo alto de tu distribución pesa más que uno que solo comparte género en general. No se implementa en este bloque hasta que haya datos reales acumulados — implementarlo antes sería optimizar sobre una tabla vacía.
 
-### Antes de implementar
+### Decisiones finales de Diego (15-ago-2026)
 
-Confirmame: (a) la lista final de 5 chips y si el copy se adapta por tipo, (b) el criterio de "cuándo preguntar" (percentil 20 + delta ≥3), (c) que la integración con Descubrí queda para cuando haya datos reales, no en este bloque.
+- **Chips:** universales de verdad, sin listas distintas por tipo — solo el último chip adapta el texto. Lista final: *Me sorprendió · Me emocionó · Me hizo pensar · No pude soltarla · Volvería a verla/leerla* (reemplaza "Gran actuación", que no traducía bien a libros).
+- **Cuándo preguntar:** confirmado el criterio basado en señales reales, con una regla extra — si el ítem ya tiene reacciones registradas, no se vuelve a preguntar (salvo que en el futuro exista el concepto de revisitar una obra — hoy no existe, `UNIQUE(tmdb_id, type)` lo impide estructuralmente, ver arriba).
+- **Descubrí:** confirmado que queda para después. Primero ADN construye conocimiento real.
+- **Principio de diseño nuevo, explícito:** *"cada chip debería sentirse como una conversación, no como una encuesta — si en algún momento aparece la sensación de estar completando un formulario, el diseño perdió el objetivo."* Aplicado a la implementación: pregunta con tono conversacional ("¿Qué te generó...?", no una etiqueta tipo "Reacción:"), sin botón de "enviar" — cada chip se guarda al toque, sin un paso de confirmación aparte, y desaparece solo si no se toca.
+
+### Implementado
+
+- **Corrección de diseño encontrada validando con datos reales (transparencia, no un detalle menor):** la primera versión de "cuándo preguntar" usaba percentil 20/80 **sobre el valor** de la nota. Validado con tus 1646 películas calificadas, esto marcaba el **100% como "reacción notable"** — no el ~5-10% esperado. Causa: tus notas se concentran fortísimo en 6-7 (72% de tus 1646 películas), así que el percentil 20 y el percentil 80 *por valor* caen exactamente sobre esos dos números dominantes, y casi cualquier nota los toca. Corregido a un método estadístico estándar para esto (outliers por rango intercuartílico, Q1−1.5·IQR / Q3+1.5·IQR) — validado con los mismos datos reales: **70 de 1646 (4.3%)**, más cerca de lo esperado y de lo que "infrecuente por construcción" pedía.
+- Columna nueva `reactions text[]` en `watchlist` (aditiva, mismo patrón que `genres`) — **pendiente que Diego la ejecute en Supabase** antes de que el guardado de reacciones funcione en producción (el resto de la app no se rompe si no está: el guardado falla en silencio, es un gesto opcional).
+- `saveDetail()` dispara el prompt solo cuando se tocó la calificación en ese guardado (no en cualquier edición).
+- Nueva sección en ADN, "Por qué te gustan las cosas" — gateada a ≥5 ítems con reacciones registradas (mismo patrón de gate que el resto de ADN). Con reacciones empezando de cero, va a tardar en aparecer — es esperado, no un bug.
+- Validado en vivo: prompt se muestra/oculta correctamente, chips seleccionables, sin salto de layout, sin superposición con la barra de navegación mobile (medido con `getBoundingClientRect()`, no a simple vista — una primera lectura visual sugería superposición y resultó ser un artefacto de timing entre capturas, no un bug real).
+- **Pendiente:** que corras el SQL de la columna nueva, y recién ahí commit → push → deploy → verificación en producción.
 
 ---
 
