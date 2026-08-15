@@ -330,20 +330,42 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
 .list-rating { font-family: var(--mono); font-size: 16px; color: var(--acc); flex-shrink: 0; width: 36px; text-align: right; }
 
 /* ── BIBLIOTECA controles ───────────────────────────────── */
-.bib-pills { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; }
-.bib-controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 24px; }
-.bib-controls select { padding-top: 8px; padding-bottom: 8px; font-size: 12px; background-color: var(--ink2); }
-.searchbox {
-  display: flex; align-items: center; gap: 9px; flex: 1; min-width: 150px; max-width: 280px;
-  background: var(--ink2); border: 1px solid var(--hair2); border-radius: 3px;
-  padding: 8px 12px; transition: border-color .15s;
+/* buscador: protagonista de la navegación, no un filtro más -- primera fila,
+   más grande, tratamiento visual propio. */
+.bib-search-hero {
+  display: flex; align-items: center; gap: 12px;
+  background: var(--ink2); border: 1px solid var(--hair2); border-radius: 4px;
+  padding: 15px 18px; margin-bottom: 16px; transition: border-color .15s;
 }
-.searchbox:focus-within { border-color: rgba(232,68,46,.5); }
-.searchbox svg { color: var(--paper3); flex-shrink: 0; }
-.searchbox input { background: none; border: none; padding: 0; font-size: 13px; width: 100%; }
+.bib-search-hero:focus-within { border-color: var(--acc); }
+.bib-search-hero svg { color: var(--paper3); flex-shrink: 0; }
+.bib-search-hero input { background: none; border: none; padding: 0; font: 500 16px var(--sans); width: 100%; color: var(--paper); }
+.bib-search-hero input::placeholder { color: var(--paper4); font-family: var(--serif); font-style: italic; font-weight: 400; }
+
+.bib-pills { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 18px; }
 .viewtoggle { display: flex; gap: 2px; background: var(--ink2); border: 1px solid var(--hair2); border-radius: 3px; padding: 2px; margin-left: auto; }
 .viewtoggle button { width: 32px; height: 30px; border-radius: 2px; display: flex; align-items: center; justify-content: center; color: var(--paper3); transition: background .12s, color .12s; }
 .viewtoggle button.active { background: var(--ink4); color: var(--paper); }
+
+/* "Filtros": oculto en desktop -- ahí el panel de abajo siempre está visible
+   porque el espacio horizontal alcanza y evita un clic extra para explorar.
+   Solo se activa como toggle en el breakpoint mobile, más abajo. */
+.bib-filters-toggle {
+  display: none; align-items: center; gap: 7px;
+  padding: 8px 15px; border-radius: 2px; border: 1px solid var(--hair2); background: transparent;
+  font: 600 10.5px var(--sans); text-transform: uppercase; letter-spacing: .14em;
+  color: var(--paper3); cursor: pointer; transition: border-color .15s, color .15s;
+}
+.bib-filters-toggle.has-active { color: var(--acc); border-color: var(--acc); }
+.bib-filters-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 15px; height: 15px; padding: 0 4px; border-radius: 8px;
+  background: var(--acc); color: #fff; font: 700 9px var(--mono); line-height: 1;
+}
+.bib-filters-badge:empty { display: none; }
+
+.bib-filters-panel { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 24px; }
+.bib-filters-panel select { padding-top: 8px; padding-bottom: 8px; font-size: 12px; background-color: var(--ink2); }
 
 /* estadísticas (insights) */
 .ins-strip { border: 1px solid var(--hair); background: var(--ink2); margin-bottom: 26px; }
@@ -688,8 +710,16 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
   .hero-body { padding: 22px 18px 22px; }
   .ins-panels { grid-template-columns: 1fr 1fr; }
   .compat-bars { grid-template-columns: 1fr; }
-  .bib-controls select { flex: 1 1 calc(33% - 8px); min-width: 0; }
-  .searchbox { max-width: none; flex: 1 1 100%; order: 5; }
+  /* en mobile el espacio vertical es escaso (medido: ~380px de "chrome" antes
+     del contenido) -- Estado/Género/Década/Orden se esconden detrás de "Filtros"
+     en vez de estar siempre visibles; en desktop siguen siempre a la vista. */
+  .bib-filters-toggle { display: inline-flex; }
+  .bib-filters-panel {
+    flex-basis: 100%; max-height: 0; overflow: hidden; margin-bottom: 0;
+    transition: max-height .25s var(--ease), margin-bottom .25s var(--ease);
+  }
+  .bib-filters-panel.open { max-height: 400px; margin-bottom: 20px; }
+  .bib-filters-panel select { flex: 1 1 calc(50% - 4px); min-width: 0; }
   .viewtoggle { display: none; }
   .adn-profile-block { padding-left: 18px; }
   .rec-featured { flex-direction: column; }
@@ -789,14 +819,29 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
       <h1 class="ed-title">Biblioteca</h1>
       <div class="ed-sub" id="bib-count">—</div>
     </div>
+    <div class="bib-search-hero">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" id="bib-search" placeholder="Buscar título, autor…" oninput="rerenderBib()" />
+    </div>
     <div class="bib-pills">
       <button class="pill active" data-type="all" onclick="setBibType('all',this)">Todo</button>
       <button class="pill" data-type="movie" onclick="setBibType('movie',this)">Películas</button>
       <button class="pill" data-type="tv" onclick="setBibType('tv',this)">Series</button>
       <button class="pill" data-type="book" onclick="setBibType('book',this)">Libros</button>
+      <button class="bib-filters-toggle" id="bib-filters-toggle" onclick="toggleBibFilters()" aria-expanded="false">
+        Filtros<span class="bib-filters-badge" id="bib-filters-badge"></span>
+      </button>
+      <div class="viewtoggle">
+        <button id="view-grid-btn" class="active" onclick="setView('grid')" title="Grilla" aria-label="Vista grilla">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        </button>
+        <button id="view-list-btn" onclick="setView('list')" title="Lista" aria-label="Vista lista">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+        </button>
+      </div>
     </div>
     <div id="bib-insights"></div>
-    <div class="bib-controls">
+    <div class="bib-filters-panel" id="bib-filters-panel">
       <select id="filter-status" onchange="rerenderBib()">
         <option value="">Estado</option>
         <option value="watched">Visto / leído</option>
@@ -821,18 +866,6 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
         <option value="year_asc">Más antiguos</option>
         <option value="title">A–Z</option>
       </select>
-      <div class="searchbox">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input type="text" id="bib-search" placeholder="Buscar en tu archivo…" oninput="rerenderBib()" />
-      </div>
-      <div class="viewtoggle">
-        <button id="view-grid-btn" class="active" onclick="setView('grid')" title="Grilla" aria-label="Vista grilla">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-        </button>
-        <button id="view-list-btn" onclick="setView('list')" title="Lista" aria-label="Vista lista">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-        </button>
-      </div>
     </div>
     <div id="bib-grid" class="grid-cards"></div>
     <div id="bib-list" class="list-rows" style="display:none"></div>
@@ -1507,6 +1540,7 @@ function renderBiblio() {
   const filtered = list.length !== total;
   const cnt = $id('bib-count');
   if (cnt) cnt.textContent = `${total} entrada${total!==1?'s':''} en el catálogo${filtered ? ` · ${list.length} con estos filtros` : ''}`;
+  updateBibFiltersBadge();
 
   renderBibInsights();
 
@@ -1546,6 +1580,26 @@ function setView(v) {
   $id('view-grid-btn')?.classList.toggle('active', v==='grid');
   $id('view-list-btn')?.classList.toggle('active', v==='list');
   renderBiblio();
+}
+
+// El panel de filtros secundarios (Estado/Género/Década/Orden) solo se abre/cierra
+// como acordeón en mobile -- en desktop el CSS lo mantiene siempre visible sin
+// depender de esta clase, así que alternarla ahí no tiene ningún efecto visual.
+function toggleBibFilters() {
+  const panel = $id('bib-filters-panel'); if (!panel) return;
+  const open = panel.classList.toggle('open');
+  $id('bib-filters-toggle')?.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+
+// Cuenta solo Estado/Género/Década (lo que oculta resultados). El orden no cuenta:
+// reordena, no filtra. Así el usuario nunca pierde de vista que "faltan" ítems
+// aunque tenga el panel de filtros cerrado.
+function updateBibFiltersBadge() {
+  const btn = $id('bib-filters-toggle'), badge = $id('bib-filters-badge');
+  if (!btn || !badge) return;
+  const active = [$id('filter-status')?.value, $id('filter-genre')?.value, $id('filter-decade')?.value].filter(Boolean).length;
+  badge.textContent = active ? String(active) : '';
+  btn.classList.toggle('has-active', active > 0);
 }
 
 function updateGenreFilter() {

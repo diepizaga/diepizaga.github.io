@@ -524,7 +524,7 @@ Las 39 transiciones CSS del archivo son de foco/hover (disparadas por el usuario
 - **Esfuerzo:** Bajo-Medio.
 - **Dependencias:** ninguna.
 - **Documentos que lo respaldan:** UX_AUDIT.md.
-- **Estado:** Finalizado (15-ago-2026), pendiente commit y deploy manual. Ver corrección de diseño durante la implementación más abajo — el enfoque final no fue el primero que probé.
+- **Estado:** Finalizado (15-ago-2026), commit `882f9bd`. Pendiente deploy manual. Ver corrección de diseño durante la implementación más abajo — el enfoque final no fue el primero que probé.
 
 ### Investigación antes de proponer
 
@@ -550,6 +550,83 @@ Corregido rediseñando `cleanBookGenre()` de lista negra a **lista blanca**: `BO
 
 ---
 
+## Bloque Q — Navegación de Biblioteca a escala
+
+*Dimensión de calidad que ataca: que encontrar un título concreto en una biblioteca de ~2000+ ítems sea rápido y obvio, no una tarea.*
+
+- **Objetivo:** Prioridad 4 de la Etapa 2 — validar y mejorar cómo se navega Biblioteca cuando la colección es grande.
+- **Problema que resuelve:** UX_AUDIT.md hallazgos #5 (parpadeo de carga), #6 (buscador interno y el idioma), #8 (mucho "chrome" antes del contenido en mobile).
+- **Estado:** Finalizado (15-ago-2026), pendiente commit y deploy manual. Investigación cerrada, virtualización descartada por ahora (deuda técnica documentada), rediseño de la navegación implementado y validado con datos reales — ver detalle más abajo.
+
+### Metodología de esta investigación
+
+Se midió con datos reales (sesión de Diego, 2180 ítems) en vez de asumir: tiempo/clics para llegar a un título, render performance real (`performance.now()`), cuántas cards entran en una pantalla sin scrollear, altura real del "chrome" antes del contenido en mobile, y si buscador+filtros combinan bien. No se implementó nada — es la misma disciplina que auditoría/diseño previos.
+
+### Hallazgos, priorizados por impacto
+
+**1. (Alto) El buscador interno es, de lejos, el camino más rápido a un título concreto — pero pesa menos visualmente que un select más.**
+Con 2180 ítems y 14 cards visibles por pantalla en desktop (7 columnas × 2 filas), llegar a un título por scroll puro requeriría del orden de ~150 pantallas de scroll — inviable a esta escala. El buscador interno, en cambio, ya es rápido y correcto: debounce de 120ms, filtra bien combinado con tipo/género/década (validado: película + "the" → 567 resultados, el 100% del tipo correcto). El problema no es el mecanismo, es que **no se distingue del resto de los filtros** — mismo tamaño, mismo peso, última posición de la barra. En mobile esto es más grave: el buscador queda a 383px de scroll en un viewport de 812px, es decir, a mitad de pantalla, por debajo de los 4 chips de tipo y los 4 selects/dropdowns. La herramienta más importante a esta escala es hoy la menos jerarquizada.
+
+**2. (Medio, atacar ahora que es barato) El render de Biblioteca reconstruye todo el DOM en cada interacción, sin virtualización.**
+Medido: renderizar la grilla completa (2180 cards) tarda ~81ms y genera ~19.400 nodos DOM; la vista lista, ~51ms. Cada cambio de filtro, orden, tipo o búsqueda dispara un rebuild completo (`innerHTML` desde cero), no hay virtualización ni paginación. Estos números son en hardware de desarrollo — un celular real probablemente sea 2-4x más lento en este tipo de trabajo. Hoy no es un problema grave (por debajo del umbral de lag perceptible en la mayoría de los casos), pero la visión de producto ya definida en el Bloque 0 espera "algunos miles" de ítems — a ese volumen el costo escala linealmente y sí se va a notar. No es optimización prematura: es evidencia real de una tendencia, atacarla ahora que el fix es barato es más barato que esperar a que se sienta lento.
+
+**3. (Bajo hoy, no requiere acción) El filtro "Estado" tiene poco valor discriminante todavía.**
+Confirmado con datos reales (visto durante Bloque O): "Pendientes" = 0 en toda la biblioteca hoy. Es historia, no un bug — casi todo el historial de 2180 ítems es anterior al cambio de default a "watchlist" del Bloque N. Coincide con una pista que ya estaba anotada desde la auditoría original ("el estado de cada card es ruido, ~99% Visto"). No propongo tocar nada acá: el filtro va a ganar valor solo, a medida que se agreguen ítems nuevos con el default corregido. Lo dejo documentado para no reabrirlo por error más adelante pensando que es un hallazgo nuevo.
+
+**4. (Confirmado sin problema) Búsqueda y filtros combinan bien; Género/Década/Orden no generan ruido.**
+Validado con datos reales, sin hallazgos: la búsqueda interna y los filtros de tipo/género/década se combinan con lógica AND correcta. Década tiene una distribución desigual (2010s domina) pero es información real, no ruido. Género ya se resolvió en Bloque P. Orden ("Recientes", "A–Z", etc.) son todas opciones con uso real posible para una colección de este tamaño.
+
+**5. (Conecta con #1) Mobile necesita un recorrido distinto, no una versión angosta del de desktop.**
+En mobile la grilla usa 3 columnas (vs. 7 en desktop) — menos ítems por pantalla todavía, y el "chrome" antes del contenido pesa proporcionalmente más del viewport. La solución de #1 (subir la jerarquía del buscador) importa más en mobile que en desktop porque ahí el costo de no encontrarlo rápido es mayor.
+
+### Decisión de Diego (15-ago-2026) sobre la propuesta original
+
+**Virtualización (punto #2 de la propuesta original): fuera de alcance por ahora, queda como deuda técnica documentada.** 81ms con ~2200 ítems no justifica hoy sumar complejidad de arquitectura de render — se monitorea, no se implementa hasta que el rendimiento real lo exija. Ver tabla de "Bloques diferidos" más abajo.
+**Prioridad confirmada: atacar #1 a fondo.** No un cambio cosmético (mover el buscador de lugar) — repensar toda la jerarquía de navegación de Biblioteca asumiendo una escala de miles de ítems, no cientos. Diego pidió cuestionar explícitamente: ubicación y tamaño del buscador, jerarquía visual, filtros, cantidad de controles visibles por defecto, qué queda siempre accesible vs. qué puede esconderse, y si desktop/mobile deberían resolverse distinto.
+
+### Rediseño de la navegación de Biblioteca (propuesta, pendiente de tu confirmación antes de implementar)
+
+**Punto de partida (medido, no supuesto):** hoy, antes de llegar al contenido en mobile, se muestran 9 controles en secuencia — 4 chips de tipo, 4 selects (Estado/Género/Década/Orden) y recién al final el buscador, a 383px de scroll (mitad del viewport). El buscador es la herramienta más rápida y correcta que existe (validado en la investigación), pero es la última en aparecer.
+
+**Respuestas a cada pregunta, pensando en 5000 ítems:**
+
+- **Ubicación:** el buscador pasa a ser el primer control después del título de la sección, antes que cualquier chip o filtro. Es lo primero que se toca al entrar a Biblioteca.
+- **Tamaño y jerarquía visual:** deja de tener el mismo peso que un `<select>`. Pasa a ocupar su propia fila completa, más alto, con tipografía más grande y un ícono de lupa — visualmente "la forma de entrar a tu archivo", no un filtro más.
+- **Qué queda siempre accesible:** buscador + los 4 chips de tipo (Todo/Películas/Series/Libros). Son las dos formas de uso más frecuentes: "sé lo que busco" (buscador) y "quiero ver todas mis películas/series/libros" (tipo). Ambos son baratos en espacio y de alto valor.
+- **Qué puede esconderse:** Estado, Género, Década y Orden se agrupan detrás de un único control "Filtros" (con contador de filtros activos si hay alguno puesto) que despliega un panel — dejan de ocupar espacio permanente. Son refinamientos para sesiones de exploración ("qué me pinta ver"), no para el caso de uso principal a esta escala (encontrar algo puntual).
+- **Cantidad de controles visibles por defecto:** baja de 9 a 6 (buscador + 4 chips + botón Filtros), y el más importante pasa de la posición 9 a la posición 1.
+- **Desktop vs. mobile — se resuelven distinto, con justificación:** en desktop el espacio horizontal ya alcanza para mostrar los 4 selects en una sola fila compacta sin costo real de scroll (hoy el problema en desktop es solo de jerarquía visual del buscador, no de espacio) — ahí NO escondo los filtros detrás de "Filtros", simplemente agrando y adelanto el buscador. En mobile sí se esconden, porque ahí el costo es real y medido (383px de scroll). No aplico el mismo patrón en los dos porque el problema que resuelven es distinto en cada uno: en desktop es jerarquía, en mobile es espacio vertical.
+- **Vista grilla/lista:** sin cambios — es un control barato (dos íconos) que no contribuye al problema medido, no hay evidencia de que haya que tocarlo.
+
+**Esto es un cambio de UX real, no cosmético — por eso lo presento para tu confirmación antes de tocar código, como pediste.**
+
+### Confirmado por Diego (15-ago-2026), con dos principios adicionales para la implementación
+
+1. El buscador tiene que ser **el protagonista**, no solo cambiar de lugar — tiene que quedar visualmente evidente que buscar es la forma principal de navegar Biblioteca.
+2. **Ocultar complejidad, no funcionalidad.** Mobile esconde Estado/Género/Década/Orden detrás de "Filtros"; desktop los mantiene siempre visibles (el costo de espacio ahí es despreciable y evita un clic extra para explorar) — confirmó explícitamente no forzar la misma solución en los dos.
+
+Más 3 criterios de implementación: sin saltos de layout al abrir/cerrar "Filtros"; estado abierto/cerrado predecible al rotar o redimensionar; filtros activos visibles aunque el panel esté cerrado (para que nadie piense "faltan películas").
+
+### Implementado
+
+- **Buscador rediseñado como pieza propia (`.bib-search-hero`):** primera fila de la sección, antes que cualquier chip o filtro. Más grande (16px vs. los ~12-13px de antes), ícono de lupa más grande, fondo y borde propios que lo distinguen de los `<select>`, placeholder en serif itálica (mismo lenguaje tipográfico que los títulos editoriales de la app) para reforzar que es "la forma de entrar a tu archivo", no un campo de formulario más.
+- **Panel de filtros secundarios (`#bib-filters-panel`: Estado/Género/Década/Orden) separado del buscador**, con visibilidad resuelta por CSS según breakpoint, no por JS: en desktop el panel es `display:flex` incondicional (sin botón "Filtros", ni siquiera existe la posibilidad de ocultarlo); en mobile (`@media max-width:840px`, el breakpoint que ya usaba el resto de la app) el mismo panel colapsa detrás de un botón "Filtros" vía una clase `.open` que anima `max-height` (transición suave, sin salto — se abre/cierra igual que cualquier otro acordeón de la app).
+- **Estado predecible entre breakpoints, sin lógica JS de reseteo:** como la visibilidad depende de CSS/media query y no de un estado que el JS reinicie al redimensionar, rotar el teléfono o cambiar de tamaño la ventana nunca puede dejar el panel en un estado inconsistente — validado: se abrió el panel en mobile, se cambió a ancho desktop (el panel se ve, viene del CSS de desktop, no de la clase `.open`), se volvió a mobile (panel sigue abierto, tal como se dejó).
+- **Indicador de filtros activos en el botón "Filtros":** cuenta Estado/Género/Década (no Orden, porque reordena, no oculta nada) y muestra un badge numérico + resalta el botón en rojo — validado con datos reales: 2 filtros activos (Estado=Visto, Género=Terror) → badge "2", botón resaltado, **y el badge se mantiene visible con el panel cerrado**, cumpliendo el criterio explícito de que nunca se pierda de vista que se está filtrando. El contador "N con estos filtros" bajo el título también sigue funcionando como respaldo redundante.
+- **No se tocó:** vista grilla/lista, virtualización, lógica de filtrado (`getBibFiltered()`) — todo eso queda igual, tal como pidió Diego.
+
+### Validado con datos reales
+
+- Desktop: buscador grande y en primera posición; los 4 selects siempre visibles debajo, sin botón "Filtros" (correctamente ausente).
+- Mobile: buscador visible sin scrollear (antes a 383px de scroll, ahora a 218px — 43% más cerca); primera fila de contenido ya visible en el viewport inicial sin scrollear nada (antes hacía falta scrollear para ver cualquier ítem).
+- Toggle de filtros: abre/cierra con transición suave (sin salto), badge correcto, estado sobrevive un cambio de viewport mobile→desktop→mobile sin romperse.
+
+### Estado
+
+Finalizado (15-ago-2026), pendiente commit y deploy manual.
+
+---
+
 ## Bloques diferidos — sin diseño formal por ahora
 
 Estos hallazgos están registrados y no se pierden, pero no tienen suficiente definición o urgencia para ser un bloque activo de diseño ahora mismo.
@@ -561,6 +638,7 @@ Estos hallazgos están registrados y no se pierden, pero no tienen suficiente de
 | Sin paginación en `loadItems()` (PROD-9) | Resuelto por Bloque 0: escala esperada (algunos miles) no lo amerita todavía. |
 | `discCache` se invalida por completo en cada escritura (PROD-10) | Optimización interna menor, sin apuro ni dependencia externa. |
 | Alias de CSS legacy (PROD-12) | Cosmético interno, sin valor de usuario directo. |
+| Virtualización/paginación del render de Biblioteca (Bloque Q) | Medido: 81ms / ~19.400 nodos DOM con 2180 ítems, todavía por debajo del umbral de lag perceptible. Diego decidió (15-ago-2026) no sumar complejidad de arquitectura de render hasta que el rendimiento real lo exija — se retoma si el tamaño de la colección lo justifica, no antes. |
 | Scripts `.py` con credenciales (PROD-13 / EP-2) | Depende de tu decisión simple (ignorar vs. sanear) ya registrada en MASTER_AUDIT § 5 — si es "ignorar", no genera bloque. |
 
 ---
