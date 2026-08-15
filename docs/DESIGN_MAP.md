@@ -746,7 +746,58 @@ Este bloque (R) es un primer paso concreto en esa dirección, pero el ranking si
 
 ### Estado
 
-Implementado y validado con datos reales (15-ago-2026). Pendiente commit → push → deploy → verificación en producción (workflow estándar).
+Finalizado (15-ago-2026), commit `f05de6e`, pusheado y verificado en vivo en producción (`diepizaga.github.io`).
+
+---
+
+## Bloque S — Capa de conocimiento propio: señal inferida + reacciones universales
+
+*Dimensión de calidad que ataca: que Archivo empiece a describir por qué te gustan las cosas, no solo cuáles — la continuación directa del hallazgo central de PRODUCT_VISION.md.*
+
+- **Objetivo:** dos piezas complementarias, decididas por Diego a partir de [EXPRESSION_DESIGN.md](EXPRESSION_DESIGN.md): (1) una capa permanente de señal inferida de datos que ya existen, sin pedir nada nuevo; (2) reacciones universales opcionales, mostradas solo cuando el sistema decide que vale la pena preguntar. Ambas alimentan tanto el motor de recomendaciones (Bloque R) como ADN.
+- **Problema que resuelve:** PRODUCT_VISION.md — 1 nota de 2181 ítems, Archivo sabe cuánto te gustó algo y casi nada de por qué.
+- **Valor:** Alto — es la apuesta que Diego priorizó primero de las tres del documento de visión.
+- **Riesgo:** Bajo — B no toca UI ni pide nada nuevo; A es un dato nuevo aditivo (columna), sin tocar flujos existentes.
+- **Esfuerzo:** Medio.
+- **Dependencias:** ninguna abierta.
+- **Documentos que lo respaldan:** PRODUCT_VISION.md, EXPRESSION_DESIGN.md.
+- **Estado:** En diseño.
+
+### Parte B — Capa de señal inferida (permanente, sin UI)
+
+Diego fue explícito: esto no es una feature, es una capa del sistema. Señales concretas a computar, todas de datos que ya existen hoy:
+
+- **Delta vs. crítica:** `my_rating` menos el promedio de `tmdb_rating`/`imdb_rating` — ya se calcula puntualmente en ADN ("tu criterio vs. IMDb"), pasa a calcularse y guardarse como señal reutilizable por ítem, no solo como agregado global.
+- **Delta vs. tu propio promedio por género:** tu nota a este ítem vs. tu promedio histórico en ese género — más fuerte que el delta vs. crítica para detectar "esto te gustó de una forma distinta a lo habitual", porque se compara contra vos mismo, no contra un tercero.
+- **Secuencia:** ¿agregaste esto justo después de otro ítem del mismo director/autor? Señal de interés sostenido, no un dato puntual aislado.
+- **Timing:** calificaste apenas lo agregaste vs. días/semanas después — con `watch_date` en 0/2181 hoy, esta señal por ahora solo puede usar `created_at`, con la misma limitación ya anotada en PRODUCT_VISION.md (no es un dato de "cuándo lo viste", es de "cuándo lo cargaste").
+
+**Dónde vive:** una función que corre sobre `items` en memoria (no requiere columna nueva ni cambio de esquema — todo se puede derivar de lo que ya está en la fila) y expone estas señales a quien las necesite: ADN (para narrar patrones) y Descubrí (para pesar candidatos). No se persiste en la base porque es 100% derivable de datos que ya están ahí — persistirlo sería una segunda fuente de verdad para algo que ya se puede calcular al vuelo.
+
+### Parte A — Reacciones universales opcionales
+
+Diego corrigió mi primera propuesta explícitamente: nada de chips que cambian según la nota. Chips universales, centrados en la experiencia, muy pocos. Propuesta de lista final (5, siguiendo los ejemplos que diste):
+
+**Me sorprendió · Me emocionó · Me hizo pensar · Gran actuación/interpretación · Volvería a verla/leerla**
+
+Matiz que quiero confirmar: "gran actuación" no traduce bien a libros — propongo que el copy se adapte por tipo (`interpretación` para película/serie, algo como `muy bien escrita` para libro) manteniendo la misma cantidad y el mismo criterio de selección — esto no es "chips distintos por nota" (lo que rechazaste), es el mismo concepto expresado con la palabra correcta según el medio. Confirmame si te sirve o preferís una sola redacción para los tres tipos.
+
+**Cuándo vale la pena preguntar** (la parte que delegaste al sistema): propongo que se muestren solo cuando el ítem es una **reacción notable**, no una rutinaria — definido con las señales de la Parte B, no arbitrario:
+- Tu calificación está entre el 20% más alto o más bajo de tu propia distribución para ese tipo, **o**
+- El delta vs. la crítica es grande (`|my_rating − promedio_crítica| ≥ 3`).
+
+Es decir: se pregunta cuando ya hay, por los propios datos, evidencia de que pasó algo distinto de lo habitual — no en cada guardado. Con esto no hace falta además un límite artificial de frecuencia: como estas condiciones no se cumplen en la mayoría de los guardados, el prompt ya va a ser infrecuente por construcción. Si en el uso real resulta que aparece más seguido de lo que gustaría, se ajusta el umbral — no agregaría un límite de sesión por separado desde el arranque, sería resolver con una regla algo que ya resuelve el propio criterio.
+
+**Dónde vive:** columna nueva `reactions` (array de texto) en `watchlist` — aditiva, mismo patrón que `genres`. El prompt aparece como un paso opcional, no bloqueante, después de guardar (toast/chip picker chico, no un modal nuevo) — desaparece solo si no se toca.
+
+### Cómo alimenta a ADN y a Descubrí
+
+- **ADN:** nueva sección, gateada por volumen mínimo de datos (mismo patrón que ya usa ADN: "calificá al menos 5 para ver tu perfil") — con reactions y señal inferida acumulándose desde cero, va a tardar en tener algo real que decir. Se construye la infraestructura ahora; el "por qué" narrado en ADN crece con el uso, no aparece completo el día uno.
+- **Descubrí:** las reacciones y la señal inferida se suman como un eje más de `diversifyPicks()`/puntaje (Bloque R) — un candidato que comparte género con ítems que marcaste "me emocionó" en el extremo alto de tu distribución pesa más que uno que solo comparte género en general. No se implementa en este bloque hasta que haya datos reales acumulados — implementarlo antes sería optimizar sobre una tabla vacía.
+
+### Antes de implementar
+
+Confirmame: (a) la lista final de 5 chips y si el copy se adapta por tipo, (b) el criterio de "cuándo preguntar" (percentil 20 + delta ≥3), (c) que la integración con Descubrí queda para cuando haya datos reales, no en este bloque.
 
 ---
 
