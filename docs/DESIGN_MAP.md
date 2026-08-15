@@ -813,6 +813,39 @@ Es decir: se pregunta cuando ya hay, por los propios datos, evidencia de que pas
 
 ---
 
+## Bloque T — ADN 2.0: insights, no estadísticas
+
+*Dimensión de calidad que ataca: que ADN deje de ser un resumen y empiece a ser un espejo — patrones que Diego no sabía sobre sus propios gustos.*
+
+- **Objetivo:** primer bloque de la hoja de ruta post-Bloque S. Diego pidió explícitamente NO retomar el ritmo de "documentar para después" — seguir construyendo sin pausas entre bloques salvo cambio estructural importante.
+- **Documentos que lo respaldan:** DESIGN_MAP.md § Hoja de ruta, PRODUCT_VISION.md.
+- **Estado:** Finalizado e implementado (15-ago-2026), validado con datos reales en desktop y mobile — 4 insights genuinos aparecen hoy (brecha película/serie/libro, duración de película, género polarizante, alineación con fuente de crítica). El insight de reacciones (Bloque S) queda consolidado en el mismo sistema, inactivo hasta acumular datos, como se esperaba. Pendiente commit → push → deploy → verificación.
+
+### Auditoría: qué insights son reales hoy (no supuestos)
+
+Antes de proponer nada, calculé varias correlaciones candidatas contra tus 2181 ítems reales. Algunas confirmaron lo esperado, dos me sorprendieron a mí también:
+
+| Candidato | Resultado real | ¿Sirve hoy? |
+|---|---|---|
+| Película vs. serie vs. libro | Películas 6.36 (n=1646), series 7.35 (n=291), libros 7.46 (n=28) — **casi un punto completo de diferencia** | **Sí, fuerte** |
+| Duración de película vs. nota | <90min: 6.02 · 90-110: 6.13 · 110-130: 6.56 · 130min+: 7.05 — patrón monótono y claro | **Sí, fuerte** |
+| Género polarizante (promedio vs. presencia en tus 9-10) | Comedia: promedio 6.33 (uno de los más bajos), pero es el género del 40% (20/50) de tus calificaciones de 9+ | **Sí, matiz real** |
+| Alineación con fuentes de crítica | vs. IMDb ≈ 0 · vs. Rotten Tomatoes +0.73 · vs. Metacritic +0.99 (n=852-853) — mucho más cerca de IMDb que de la crítica especializada | **Sí, fuerte** |
+| Década vs. nota | 6.43 a 6.75 en todas las décadas con n≥15 — prácticamente plano | **No — se probó y no hay señal real, no se fuerza un insight sin sustento** |
+| Delta vs. crítica por género | Rango real: -0.35 (Action & Adventure) a +0.03 (Romance) — existe pero es chico | **Señal secundaria, no un insight por sí solo** |
+| Reacciones × género (tus propios ejemplos: "sorprendió → sci-fi") | 0 reacciones registradas todavía | **No todavía — infraestructura lista, se activa sola con uso** |
+| Patrones temporales/Memoria | `watch_date` en 0/2181 | **No — ya registrado como Bloque futuro aparte** |
+
+### Diseño: un sistema de insights rankeados, no secciones fijas
+
+En vez de agregar una sección nueva por cada patrón, `computeADNInsights()` calcula **todos** los candidatos con datos suficientes, les asigna una fuerza (tamaño del efecto × log del tamaño de muestra) y muestra los más fuertes primero — el mecanismo generaliza: a medida que las reacciones acumulen datos, esos insights van a competir y aparecer solos, sin tocar código de nuevo.
+
+- **Se consolida el hallazgo de Bloque S** ("Por qué te gustan las cosas") como un candidato más de este mismo sistema, no una tarjeta aparte — evita que ADN tenga dos mecanismos de insight en paralelo.
+- **Se mantienen las secciones existentes** (géneros con conteo, décadas, criterio vs. IMDb, coincidencia con la crítica, mayores diferencias) como detalle de apoyo debajo de los insights — no hay evidencia de que sean redundantes o sin uso (a diferencia de "Directores favoritos" en Bloque E, que sí estaba confirmado muerto); se revisan si en el uso real se sienten de más, no se sacan por anticipado.
+- **Gate propio, más exigente que el resto de ADN:** 15 calificados mínimo (no 5) — un insight sobre un patrón necesita más base que un resumen simple para no decir algo sin sustento.
+
+---
+
 ## Hoja de ruta confirmada después de Bloque S (15-ago-2026, sin bloques abiertos todavía)
 
 Diego cerró la sesión de Bloque S con una lectura de conjunto del roadmap: primero la base técnica (Bloque M), después la UX de uso diario (Bloques N-Q), y ahora el arranque de la inteligencia propia de Archivo (Bloques R-S). Definió la secuencia de las próximas cuatro apuestas, en este orden — **ninguna diseñada todavía**, esto es la hoja de ruta, no un bloque en curso:

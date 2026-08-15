@@ -448,6 +448,14 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
 .criterio-lbl { font-size: 13px; color: var(--paper2); }
 .criterio-val { font-family: var(--mono); font-size: 17px; }
 .criterio-narrative { margin-top: 12px; font-size: 13px; color: var(--paper3); line-height: 1.7; border-top: 1px solid var(--hair); padding-top: 14px; }
+
+/* ADN 2.0 (Bloque T): insights, no estadísticas -- misma voz editorial que
+   adn-profile-desc, cada uno con su índice, sin gráficos de por medio. */
+.adn-insights { margin-bottom: 40px; }
+.adn-insight-row { display: flex; gap: 16px; padding: 16px 0; border-bottom: 1px solid var(--hair); }
+.adn-insight-row:last-child { border-bottom: none; }
+.adn-insight-idx { font-family: var(--mono); font-size: 12px; color: var(--gold); flex-shrink: 0; width: 20px; padding-top: 2px; }
+.adn-insight-text { font-family: var(--serif); font-style: italic; font-size: 15px; color: var(--paper); line-height: 1.7; }
 .coincidencia-row { display: flex; align-items: center; gap: 14px; padding: 10px 0; }
 .coinc-src { font-family: var(--mono); font-size: 11px; color: var(--paper2); width: 60px; flex-shrink: 0; }
 .coinc-pct { font-family: var(--mono); font-size: 12px; width: 44px; text-align: right; flex-shrink: 0; }
@@ -1855,6 +1863,114 @@ function genreChipsHTML(genreEntries) {
   }).join('');
 }
 
+// ============================================================
+// ADN 2.0 (Bloque T) -- INSIGHTS, NO ESTADÍSTICAS
+// ============================================================
+// Cada candidato se computa siempre; solo aparece si hay evidencia real
+// detrás (tamaño de muestra mínimo + efecto no trivial) -- así el sistema
+// se activa solo a medida que se acumulan más datos (reacciones, sobre
+// todo), sin tocar código de nuevo. "strength" = tamaño del efecto ×
+// log(muestra), para mostrar primero lo más fuerte, no lo más reciente.
+function computeADNInsights(watched, rated) {
+  const insights = [];
+  if (rated.length < 15) return insights; // gate propio, más exigente que el resto de ADN
+
+  // 1. Brecha entre tipos de contenido (validado con datos reales: hasta ~1
+  // punto de diferencia entre películas y series/libros -- no es ruido).
+  const byType = {};
+  rated.forEach(i=>{ if(!byType[i.type]) byType[i.type]={sum:0,n:0}; byType[i.type].sum+=parseFloat(i.my_rating); byType[i.type].n++; });
+  const movieAvg = byType.movie && byType.movie.n>=20 ? byType.movie.sum/byType.movie.n : null;
+  if (movieAvg!=null) {
+    const others = ['tv','book'].filter(t=>byType[t]&&byType[t].n>=10)
+      .map(t=>({t, avg: byType[t].sum/byType[t].n, n: byType[t].n}));
+    if (others.length) {
+      const best = others.sort((a,b)=>Math.abs(b.avg-movieAvg)-Math.abs(a.avg-movieAvg))[0];
+      const gap = best.avg - movieAvg;
+      if (Math.abs(gap) >= 0.5) {
+        const label = best.t==='tv' ? 'las series' : 'los libros';
+        insights.push({ strength: Math.abs(gap)*Math.log(best.n), text: gap>0
+          ? `Calificás ${label} en promedio ${gap.toFixed(1)} puntos más alto que las películas (${best.avg.toFixed(1)} vs. ${movieAvg.toFixed(1)}) — no es la misma vara para todo.`
+          : `Calificás las películas ${Math.abs(gap).toFixed(1)} puntos más alto que ${label} (${movieAvg.toFixed(1)} vs. ${best.avg.toFixed(1)}).` });
+      }
+    }
+  }
+
+  // 2. Duración de película vs. nota (validado: patrón monótono y claro,
+  // hasta 1 punto de diferencia entre cortas y largas).
+  const movies = watched.filter(i=>i.type==='movie'&&i.my_rating&&i.runtime);
+  const short = movies.filter(i=>i.runtime<100), long = movies.filter(i=>i.runtime>=130);
+  if (short.length>=15 && long.length>=15) {
+    const shortAvg = short.reduce((s,i)=>s+parseFloat(i.my_rating),0)/short.length;
+    const longAvg  = long.reduce((s,i)=>s+parseFloat(i.my_rating),0)/long.length;
+    const gap = longAvg - shortAvg;
+    if (Math.abs(gap) >= 0.4) insights.push({ strength: Math.abs(gap)*Math.log(short.length+long.length), text: gap>0
+      ? `Las películas de más de 2 horas te gustan en promedio ${gap.toFixed(1)} puntos más que las de menos de 100 minutos (${longAvg.toFixed(1)} vs. ${shortAvg.toFixed(1)}).`
+      : `Preferís las películas cortas: rendís ${Math.abs(gap).toFixed(1)} puntos más alto a las de menos de 100 minutos que a las de más de 2 horas.` });
+  }
+
+  // 3. Género polarizante: promedio no destacado, pero domina tus 9-10
+  // (validado: Comedia promedia 6.33 -- uno de los más bajos -- pero es el
+  // género del 40% de tus calificaciones de 9+. Contradice el ranking simple
+  // por promedio, que es exactamente el tipo de patrón que un dashboard de
+  // estadísticas no muestra).
+  const nonBook = rated.filter(i=>i.type!=='book');
+  const topRated = nonBook.filter(i=>parseFloat(i.my_rating)>=9);
+  if (topRated.length >= 20) {
+    const gAvg = {}, gTop = {};
+    nonBook.forEach(i=>(i.genres||[]).forEach(g=>{ if(!gAvg[g])gAvg[g]={sum:0,n:0}; gAvg[g].sum+=parseFloat(i.my_rating); gAvg[g].n++; }));
+    topRated.forEach(i=>(i.genres||[]).forEach(g=>gTop[g]=(gTop[g]||0)+1));
+    const overallAvg = nonBook.reduce((s,i)=>s+parseFloat(i.my_rating),0)/nonBook.length;
+    const [polGenre, polCount] = Object.entries(gTop).sort((a,b)=>b[1]-a[1])[0] || [];
+    if (polGenre && gAvg[polGenre]?.n>=30) {
+      const gAvgVal = gAvg[polGenre].sum/gAvg[polGenre].n;
+      const share = polCount/topRated.length;
+      if (gAvgVal <= overallAvg+0.15 && share >= 0.25) {
+        insights.push({ strength: share*Math.log(gAvg[polGenre].n), text:
+          `${esc(polGenre)} es tu género más polarizante: tu promedio ahí (${gAvgVal.toFixed(1)}) no se destaca del resto, pero es el género de ${Math.round(share*100)}% de tus calificaciones de 9 o más. Cuando te convence, te convence a fondo.` });
+      }
+    }
+  }
+
+  // 4. Con qué fuente de crítica coincidís más (validado: mucho más cerca de
+  // IMDb que de Rotten Tomatoes o Metacritic -- +0.7/+1.0 de diferencia).
+  const deltaVs = (field, div) => {
+    const withF = nonBook.filter(i=>i[field]);
+    if (withF.length < 30) return null;
+    return { delta: withF.reduce((s,i)=>s+(parseFloat(i.my_rating)-i[field]/div),0)/withF.length, n: withF.length };
+  };
+  const bySource = { 'IMDb': deltaVs('imdb_rating',1), 'Rotten Tomatoes': deltaVs('rt_score',10), 'Metacritic': deltaVs('metacritic_score',10) };
+  const validSources = Object.entries(bySource).filter(([,v])=>v);
+  if (validSources.length >= 2) {
+    const closest  = validSources.slice().sort((a,b)=>Math.abs(a[1].delta)-Math.abs(b[1].delta))[0];
+    const farthest = validSources.slice().sort((a,b)=>Math.abs(b[1].delta)-Math.abs(a[1].delta))[0];
+    if (farthest[0]!==closest[0] && Math.abs(farthest[1].delta)>=0.5) {
+      insights.push({ strength: Math.abs(farthest[1].delta)*Math.log(farthest[1].n), text:
+        `Tu criterio está más cerca de ${closest[0]} que de cualquier otra fuente. Sos ${farthest[1].delta>0?'más generoso':'más exigente'} que ${farthest[0]} por ${Math.abs(farthest[1].delta).toFixed(1)} puntos en promedio.` });
+    }
+  }
+
+  // 5. Patrones de reacciones (Bloque S) -- consolidado acá en vez de una
+  // tarjeta aparte, para no tener dos mecanismos de insight en paralelo. Con
+  // 0 reacciones hoy no devuelve nada; se activa solo con el uso.
+  const reacted = watched.filter(i=>i.reactions && i.reactions.length);
+  if (reacted.length >= 8) {
+    const chipCounts = {};
+    reacted.forEach(i=>i.reactions.forEach(c=>chipCounts[c]=(chipCounts[c]||0)+1));
+    const [topChip, topChipN] = Object.entries(chipCounts).sort((a,b)=>b[1]-a[1])[0];
+    const withTopChip = reacted.filter(i=>i.reactions.includes(topChip));
+    if (withTopChip.length >= 5) {
+      const chipGc = {};
+      withTopChip.forEach(i=>(i.genres||[]).forEach(g=>chipGc[g]=(chipGc[g]||0)+1));
+      const [chipTopGenre, chipTopGenreN] = Object.entries(chipGc).sort((a,b)=>b[1]-a[1])[0] || [];
+      const share = chipTopGenre ? chipTopGenreN/withTopChip.length : 0;
+      if (share >= 0.5) insights.push({ strength: share*Math.log(withTopChip.length), text:
+        `Cuando algo te genera "${esc(topChip.toLowerCase())}", ${Math.round(share*100)}% de las veces es ${esc(chipTopGenre.toLowerCase())}.` });
+    }
+  }
+
+  return insights.sort((a,b)=>b.strength-a.strength);
+}
+
 function renderADN() {
   const el = $id('adn-content'); if (!el) return;
   const watched = items.filter(i=>i.status!=='watchlist');
@@ -1883,29 +1999,10 @@ function renderADN() {
   const topDecades = Object.entries(dc).sort((a,b)=>b[1]-a[1]);
   const topDecade  = topDecades[0]?.[0] || null;
 
-  // Bloque S: por qué te gustan las cosas, a partir de las reacciones registradas.
-  // Gateado como el resto de ADN (necesita volumen mínimo antes de decir algo real) --
-  // con reacciones recién empezando a acumularse, esta sección va a tardar en aparecer.
-  const reacted = watched.filter(i=>i.reactions && i.reactions.length);
-  let reactionInsight = '';
-  if (reacted.length >= 5) {
-    const chipCounts = {};
-    reacted.forEach(i=>i.reactions.forEach(c=>chipCounts[c]=(chipCounts[c]||0)+1));
-    const topChips = Object.entries(chipCounts).sort((a,b)=>b[1]-a[1]);
-    const [topChip] = topChips[0];
-    const withTopChip = reacted.filter(i=>i.reactions.includes(topChip));
-    const chipGc = {};
-    withTopChip.forEach(i=>(i.genres||[]).forEach(g=>chipGc[g]=(chipGc[g]||0)+1));
-    const chipTopGenre = Object.entries(chipGc).sort((a,b)=>b[1]-a[1])[0];
-    const chipGenreShare = chipTopGenre ? chipTopGenre[1]/withTopChip.length : 0;
-    reactionInsight = `<div class="adn-section">
-      <div class="adn-section-header">Por qué te gustan las cosas</div>
-      <div class="criterio-card">
-        ${topChips.slice(0,5).map(([c,n])=>`<div class="criterio-row"><span class="criterio-lbl">${esc(c)}</span><span class="criterio-val" style="color:var(--gold)">${n}</span></div>`).join('')}
-        ${chipGenreShare >= 0.5 ? `<p class="criterio-narrative">Cuando algo te genera "${esc(topChip.toLowerCase())}", ${Math.round(chipGenreShare*100)}% de las veces es ${esc(chipTopGenre[0].toLowerCase())}.</p>` : ''}
-      </div>
-    </div>`;
-  }
+  // ADN 2.0 (Bloque T): insights rankeados, no estadísticas sueltas -- ver
+  // computeADNInsights() para el detalle de cada candidato y la evidencia real
+  // que respalda cada uno (DESIGN_MAP.md § Bloque T).
+  const insights = computeADNInsights(watched, rated);
 
   const totalMins = movies.filter(i=>i.runtime).reduce((s,i)=>s+(parseInt(i.runtime)||0),0);
   const totalHours = Math.round(totalMins/60);
@@ -2047,6 +2144,14 @@ function renderADN() {
       ${statsLine ? `<div class="adn-stats-line">${statsLine}</div>` : ''}
     </div>
 
+    ${insights.length ? `
+    <div class="adn-section">
+      <div class="adn-section-header">Lo que dicen tus datos</div>
+      <div class="adn-insights">
+        ${insights.slice(0,4).map((ins,i)=>`<div class="adn-insight-row"><div class="adn-insight-idx">${String(i+1).padStart(2,'0')}</div><div class="adn-insight-text">${ins.text}</div></div>`).join('')}
+      </div>
+    </div>` : ''}
+
     ${topGenres.length > 2 ? `
     <div class="adn-section">
       <div class="adn-section-header">Géneros</div>
@@ -2087,8 +2192,6 @@ function renderADN() {
       ${coincTmdb!=null ? `<div class="coincidencia-row"><span class="coinc-src">TMDB</span><div class="bar-track"><div class="bar-fill fill-tmdb" style="width:${coincTmdb}%"></div></div><span class="coinc-pct">${coincTmdb}%</span></div>` : ''}
       ${coincRt!=null   ? `<div class="coincidencia-row"><span class="coinc-src">Rotten</span><div class="bar-track"><div class="bar-fill fill-rt" style="width:${coincRt}%"></div></div><span class="coinc-pct">${coincRt}%</span></div>` : ''}
     </div>` : ''}
-
-    ${reactionInsight}
 
     ${top10diffs.length >= 4 ? `
     <div class="adn-section">
