@@ -1485,7 +1485,7 @@ function getBibFiltered() {
   const q       = ($id('bib-search')?.value || '').trim().toLowerCase();
   if (fStatus) list = list.filter(i=>i.status===fStatus);
   if (q) list = list.filter(i=>i.title.toLowerCase().includes(q)||(i.original_title||'').toLowerCase().includes(q)||(i.author||'').toLowerCase().includes(q));
-  if (fGenre) list = list.filter(i=>(i.genres||[]).includes(fGenre));
+  if (fGenre) list = list.filter(i=>(i.genres||[]).some(g=>canonGenre(i.type,g)===fGenre));
   if (fDecade) {
     if (fDecade==='old') list = list.filter(i=>(i.release_year||0)<1980 && i.release_year);
     else { const d=parseInt(fDecade); list = list.filter(i=>(i.release_year||0)>=d&&(i.release_year||0)<d+10); }
@@ -1551,7 +1551,9 @@ function setView(v) {
 function updateGenreFilter() {
   const sel = $id('filter-genre'); if (!sel) return;
   const cur = sel.value;
-  const allGenres = [...new Set(items.flatMap(i=>i.genres||[]))].sort((a,b)=>a.localeCompare(b));
+  const canon = new Set();
+  items.forEach(i => (i.genres||[]).forEach(g => { const c = canonGenre(i.type, g); if (c) canon.add(c); }));
+  const allGenres = [...canon].sort((a,b)=>a.localeCompare(b));
   sel.innerHTML = '<option value="">Género</option>' + allGenres.map(g=>`<option value="${escAttr(g)}"${g===cur?' selected':''}>${esc(g)}</option>`).join('');
 }
 
@@ -1616,29 +1618,61 @@ function renderBibInsights() {
 // ============================================================
 // ADN CULTURAL
 // ============================================================
-const BOOK_TAG_BLOCKLIST = [
-  /^series:/i,
-  /(people|wives|husbands|mothers|fathers|sons|daughters)$/i,
-  /crimes against/i,
-  /[^\x00-\x7F]{4,}/,
-  /^\d{4}$/,
-  /^(Autor|autor)$/,
-];
-const BISAC_DISPLAY = {
-  'FICTION / Mystery & Detective / General': 'Misterio',
-  'FICTION / Fantasy / General':             'Fantasía',
-  'FICTION / Literary':                      'Ficción Literaria',
-  'FICTION / Classics':                      'Clásicos',
-  'Fiction':                                 'Ficción',
-  'Juvenile Fiction':                        'Ficción Juvenil',
-  'Biography & Autobiography':               'Biografía',
-  'History':                                 'Historia',
-  'Science Fiction':                         'Ciencia Ficción',
-  'Horror Fiction':                          'Terror',
+// Open Library/Google Books traen "subject" como texto libre, no una taxonomía --
+// una lista negra nunca alcanza (siempre aparece un tag nuevo que no bloquea). Lista
+// blanca en cambio: solo se muestra como género lo que reconocemos explícitamente:
+// todo lo demás (temas/tramas sueltos tipo "dementors", "orphans", nombres propios,
+// idiomas) se descarta en vez de ensuciar el filtro.
+const BOOK_GENRE_MAP = {
+  'fiction':'Ficción', 'ficción':'Ficción', 'literature':'Ficción', 'literatura':'Ficción', 'romans':'Ficción',
+  'fiction / mystery & detective / general':'Misterio',
+  'fiction / fantasy / general':'Fantasía',
+  'fiction / literary':'Ficción literaria',
+  'fiction / classics':'Clásicos',
+  'fiction, romance, contemporary':'Romance', 'fiction / romance / contemporary':'Romance',
+  'fiction / contemporary women':'Ficción', 'fiction, women':'Ficción',
+  'spiritual fiction':'Ficción', 'love—fiction':'Romance',
+  'terminally ill—fiction':'Ficción', 'cancer—fiction':'Ficción',
+  'fantasy':'Fantasía', 'fantasía':'Fantasía', 'fantasy fiction':'Fantasía',
+  'science fiction':'Ciencia ficción', 'ciencia ficción':'Ciencia ficción',
+  'mystery':'Misterio', 'misterio':'Misterio',
+  'suspense':'Suspense', 'suspense & thriller':'Suspense', 'suspense fiction':'Suspense', 'thrillers':'Suspense', 'thriller':'Suspense',
+  'romance':'Romance', 'romance literature':'Romance',
+  'horror':'Terror', 'horror fiction':'Terror', 'terror':'Terror',
+  'drama':'Drama',
+  'crime':'Crimen', 'crimen':'Crimen',
+  'history':'Historia', 'historia':'Historia',
+  'biography':'Biografía', 'biography & autobiography':'Biografía', 'biografía':'Biografía',
+  'family':'Familia', 'families':'Familia', 'familia':'Familia',
+  "children's books":'Infantil', "children's books/ages 9-12 fiction":'Infantil',
+  'juvenile fiction':'Infantil', 'juvenile audience':'Infantil', 'juvenile drama':'Infantil',
+  'juvenile literature':'Infantil', 'juvenile works':'Infantil', 'young adult fiction':'Infantil',
+  'adventure':'Aventura', 'aventura':'Aventura',
+  'comedy':'Comedia', 'comedia':'Comedia', 'satire':'Comedia',
 };
 function cleanBookGenre(tag) {
-  if (!tag || BOOK_TAG_BLOCKLIST.some(r => r.test(tag))) return null;
-  return BISAC_DISPLAY[tag] ?? tag;
+  if (!tag) return null;
+  return BOOK_GENRE_MAP[tag.trim().toLowerCase()] || null;
+}
+
+// Lista de géneros de TMDB (película + serie) es corta y estable -- mapa fijo en vez
+// de depender de que TMDB siempre devuelva la traducción (no siempre lo hace, ver
+// tmdbDetail()). Las categorías combinadas de serie sin equivalente exacto en
+// película (Action & Adventure, Sci-Fi & Fantasy, War & Politics) quedan como su
+// propia etiqueta compuesta, no se fuerzan dentro de una sola categoría de película.
+const GENRE_CANON_EN_ES = {
+  'Action': 'Acción', 'Action & Adventure': 'Acción y aventura', 'Adventure': 'Aventura',
+  'Animation': 'Animación', 'Comedy': 'Comedia', 'Crime': 'Crimen', 'Documentary': 'Documental',
+  'Drama': 'Drama', 'Family': 'Familia', 'Fantasy': 'Fantasía', 'History': 'Historia',
+  'Horror': 'Terror', 'Kids': 'Infantil', 'Music': 'Música', 'Mystery': 'Misterio',
+  'News': 'Noticias', 'Reality': 'Reality', 'Romance': 'Romance',
+  'Sci-Fi & Fantasy': 'Ciencia ficción y fantasía', 'Science Fiction': 'Ciencia ficción',
+  'Soap': 'Telenovela', 'Talk': 'Talk Show', 'Thriller': 'Suspense', 'TV Movie': 'Película de TV',
+  'War': 'Bélica', 'War & Politics': 'Guerra y política', 'Western': 'Western',
+};
+function canonGenre(type, g) {
+  if (!g) return null;
+  return type === 'book' ? cleanBookGenre(g) : (GENRE_CANON_EN_ES[g] || g);
 }
 
 const GENRE_COLORS = {

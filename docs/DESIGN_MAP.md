@@ -409,6 +409,8 @@ Confirmado con evidencia fresca que las dos limitaciones seguían vigentes antes
 
 **Principio activo durante toda la etapa (confirmado por Diego, 15-ago-2026):** cuestionar permanentemente si cada pantalla, animación, transición, modal o interacción aporta valor real — no mantener algo solo porque "siempre estuvo ahí". Si algo genera fricción o movimiento innecesario, se simplifica aunque no esté escrito en un documento. Toda propuesta de cambio (o de no cambiar algo) se mide con una pregunta única: **¿hace que usar Archivo todos los días sea más rápido o más agradable? Si la respuesta es no, no es prioridad ahora.** Esto aplica a oportunidades que aparezcan durante la implementación, no solo a lo ya listado en UX_AUDIT.md.
 
+**Cambio metodológico confirmado por Diego (15-ago-2026, tras validar el Bloque O): los bloques de esta etapa se enmarcan por dimensión de calidad percibida, no solo por área funcional.** Hasta Bloque N el criterio de agrupación era "qué parte de la app" (buscar/agregar, biblioteca, grupo). Desde Bloque O, el criterio pasa a ser también "qué sensación se está construyendo o eliminando" — ejemplos que dio Diego: Bloque O = eliminar sensación de movimiento; un futuro bloque de cantidad de clics; uno de velocidad para agregar contenido; uno de consistencia visual; uno de pulido desktop; uno de pulido mobile. La idea explícita: "ya no estás arreglando funciones, estás construyendo una sensación" — el objetivo no es que cada pantalla funcione, sino que la app pase de "está buena" a "qué bien hecha está esta aplicación". **Cómo se aplica:** cada bloque nuevo de esta etapa debe poder nombrarse por la sensación que ataca (no solo por la función que toca), aunque el criterio de PRIORIDAD sigue siendo el orden ya fijado por Diego (buscar/agregar → movimiento → género → biblioteca → mobile) — esto no reemplaza ese orden, es una forma de enmarcar y nombrar cada bloque a medida que se abre.
+
 ---
 
 ## Bloque N — Flujo de buscar y agregar contenido
@@ -477,7 +479,7 @@ Hallazgo técnico relevante: `tmdbSearch()` ya recibe resultados de tipo persona
 - **Esfuerzo:** Bajo-Medio.
 - **Dependencias:** ninguna.
 - **Documentos que lo respaldan:** UX_AUDIT.md.
-- **Estado:** Implementado y validado (15-ago-2026), pendiente deploy manual.
+- **Estado:** Finalizado (15-ago-2026), commit `bfb3bc2`. Confirmado por Diego: "no se limitó al ticker y atacó varias causas reales de la sensación de inestabilidad... es el enfoque correcto para esta etapa". Pendiente deploy manual. Única validación que queda abierta (no bloquea el cierre del bloque): confirmar en el celular real de Diego el comportamiento con el teclado — si aparece algún caso raro, se ajusta sobre este mismo bloque, no como uno nuevo.
 
 **Regla de producto fijada por Diego para toda la Etapa 2 (no solo este bloque):** cualquier movimiento permanente que no aporte información imprescindible se elimina — no se reemplaza una animación por otra solución cosmética. Ampliación de alcance explícita: no limitarse al hallazgo ya escrito, identificar y eliminar cualquier causa de sensación de inestabilidad (reflows, cambios de altura, scrolls inesperados, modales que empujan contenido, overlays que mueven el fondo, layouts que cambian con el teclado, loaders que mueven la posición de la pantalla). **Nota de alcance:** "layouts que cambian con el teclado" se solapa con el hallazgo #2 de UX_AUDIT.md, que la prioridad original (Prioridad 5) dejaba para el final — por indicación directa de Diego en este bloque, se adelantó y resolvió acá; cuando llegue el turno de Prioridad 5 puede que quede menos pendiente de lo previsto.
 
@@ -508,6 +510,43 @@ Mi lectura con el litmus test que fijaste ("¿hace que usar Archivo todos los d�
 ### Investigado y descartado (sin evidencia de problema real)
 
 Las 39 transiciones CSS del archivo son de foco/hover (disparadas por el usuario, no ambientales) — no se tocaron. Biblioteca (grilla/lista) y ADN renderizan de forma síncrona desde datos ya en memoria, sin el patrón "loader chico → contenido grande" que sí tenía Descubrí — no aplica el mismo fix ahí. El parpadeo de pósters de Biblioteca (hallazgo #5) es carga de imágenes, no reflow de layout — sigue siendo Prioridad 4, no se tocó acá.
+
+---
+
+## Bloque P — Confiabilidad del filtro de género
+
+*Dimensión de calidad que ataca: que un filtro que existe y se ve prolijo realmente funcione — no "está buena la lista de géneros" sino "el filtro hace lo que promete".*
+
+- **Objetivo:** que el filtro "Género" de Biblioteca sea usable — Prioridad 3 de la Etapa 2.
+- **Problema que resuelve:** UX_AUDIT.md hallazgo #1 (~110 opciones sin curar, español/inglés duplicado, tags de libros que no son géneros).
+- **Valor:** Alto — Prioridad 3 explícita, es el filtro más visible de la sección más usada.
+- **Riesgo:** Bajo — es normalización de datos ya presentes, no un cambio de esquema ni de origen de datos.
+- **Esfuerzo:** Bajo-Medio.
+- **Dependencias:** ninguna.
+- **Documentos que lo respaldan:** UX_AUDIT.md.
+- **Estado:** Finalizado (15-ago-2026), pendiente commit y deploy manual. Ver corrección de diseño durante la implementación más abajo — el enfoque final no fue el primero que probé.
+
+### Investigación antes de proponer
+
+- **Los libros ya tienen una función de limpieza (`cleanBookGenre()`, index.html:1639) que hoy no se usa donde hace falta.** Filtra tags con blocklist (`series:`, relaciones familiares como tag suelto, "crimes against", strings no-ASCII de 4+ caracteres — captura alemán/francés/etc., años sueltos, "Autor") y traduce algunos BISAC conocidos vía `BISAC_DISPLAY`. Se usa hoy en `renderBibInsights()` y en una sección de ADN — **pero no en `updateGenreFilter()`**, que es exactamente la función que puebla el combo roto. Ahí está la causa raíz concreta: no falta crear nada, falta invocar lo que ya existe en el lugar correcto.
+- **Para películas/series el problema es distinto: no hay ninguna función de canonicalización EN→ES.** Confirmé con una llamada real a TMDB (durante el diseño de Bloque N) que el propio `/tv/{id}` a veces devuelve géneros en inglés aunque se pida en español — no es then algo que podamos arreglar pidiéndole mejor el dato a TMDB, hay que traducir nosotros con un mapa fijo. La lista de géneros de TMDB (película + serie) es corta y estable (~27 valores en total, documentada), así que un mapa manual es exacto y no necesita mantenimiento futuro salvo que TMDB agregue categorías nuevas (no ha pasado en años).
+- **`getBibFiltered()` hoy compara con `.includes(fGenre)` (index.html:1488), exacto contra el string crudo guardado.** Cualquier normalización tiene que aplicarse tanto al armar las opciones del filtro como al comparar, si no el filtro se ve prolijo pero deja de encontrar resultados.
+
+### Propuesta
+
+- **Opción A (recomendada):** función `canonGenre(type, g)` — para libros, delega en `cleanBookGenre()` ya existente; para película/serie, traduce vía un mapa fijo EN→ES (`Action`→`Acción`, `Science Fiction`→`Ciencia ficción`, etc.), con fallback al valor original si no está en el mapa. Se usa en dos lugares: `updateGenreFilter()` arma las opciones a partir de valores canonicalizados y deduplicados (en vez del `[...new Set(...)]` crudo actual), y `getBibFiltered()` compara `canonGenre(i.type, g) === fGenre` en vez de comparar el string crudo.
+- **Casos combinados de TV sin equivalente exacto en película** (`Action & Adventure`, `Sci-Fi & Fantasy`, `War & Politics`): en vez de forzarlos dentro de una categoría de película (perdiendo la mitad del significado — ej. una serie de solo-fantasía quedaría mal etiquetada como "Ciencia ficción"), se traducen como su propia etiqueta compuesta en español ("Acción y aventura", "Ciencia ficción y fantasía", "Guerra y política"). No se mezclan con las categorías de película que sí están separadas.
+- **Límite que no se soluciona con esto (lo dejo anotado, no es parte de este bloque):** un typo real en la fuente de datos ("College stdents" en vez de "College students") no lo agarra ningún blocklist por regex — seguiría apareciendo como su propia opción suelta. Solucionarlo de raíz requeriría una lista blanca curada de géneros válidos en vez de una lista negra de ruido, que es un cambio de enfoque más grande y no se justifica por un solo typo.
+- **Opción B (descartada):** curar a mano la lista completa de géneros existentes hoy en la base, como constante estática. Más simple de escribir, pero se desactualiza solo con la próxima película que TMDB categorice distinto o el próximo libro importado — la Opción A se mantiene sola.
+- **Estado:** Finalizado (15-ago-2026), pendiente commit y deploy manual.
+
+### Corrección durante la implementación (transparencia, no un detalle menor)
+
+La primera versión de este fix reusaba `cleanBookGenre()` tal cual estaba escrita (lista negra angosta: `series:`, palabras de parentesco sueltas, "crimes against", no-ASCII, años, "Autor"). Validado con datos reales, el combo bajó de 110 a **102** opciones — prácticamente nada, porque la lista negra nunca bloqueaba el grueso del ruido real ("adolescence", "Booksellers and bookselling", "dementors", "fiction"/"Fiction"/"FICTION" como tres entradas separadas, etc.). El lado de película/serie sí funcionó bien desde el primer intento (fusionó Action→Acción, Sci-Fi & Fantasy→Ciencia ficción y fantasía, etc.).
+Corregido rediseñando `cleanBookGenre()` de lista negra a **lista blanca**: `BOOK_GENRE_MAP` (index.html) mapea explícitamente las variantes reales observadas (fiction/ficción/FICTION, fantasy/fantasía, suspense/thriller/thrillers, family/families, biography, juvenile/children's/young adult, etc.) a un género final en español; cualquier tag que no está en el mapa se descarta directamente en vez de mostrarse. Es el mismo principio que en Bloque O: no una mejora parcial de lo que ya había, sino sacar la categoría completa del problema.
+**Resultado validado con datos reales:** 110 → **27 opciones**, todas géneros reales en español, sin duplicados de idioma, sin tags de tema/trama sueltos. Verificado también que el filtrado sigue funcionando (no solo la lista se ve limpia): "Fantasía" devuelve 290 ítems incluyendo 3 libros de Harry Potter + 287 películas/series; "Terror" devuelve 129 ítems.
+**Efecto colateral positivo, no buscado:** `cleanBookGenre()` la usan también `renderBibInsights()` y una sección de ADN — se benefician del mismo arreglo automáticamente, sin tocarlas.
+**Límite conocido, no resuelto acá:** un tag que no está en `BOOK_GENRE_MAP` simplemente no aparece como género filtrable (aunque el libro sigue teniendo ese tag guardado en `genres` para otros usos). Es la contracara esperada de pasar a lista blanca — cubre todo lo observado hoy, pero un libro futuro con un subject completamente nuevo no tendrá género hasta que se agregue al mapa. Aceptable: es preferible a que vuelva a inflarse con ruido.
 
 ---
 
