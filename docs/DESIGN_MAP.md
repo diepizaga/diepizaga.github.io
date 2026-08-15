@@ -405,7 +405,24 @@ Confirmado con evidencia fresca que las dos limitaciones seguían vigentes antes
 
 ## Etapa 2 — UX y producto
 
-**Inicio:** 15-ago-2026. Cierra la etapa de estabilización técnica (Bloque M). A partir de acá el criterio de prioridad no es severidad técnica sino impacto en los flujos de uso diario, y el mandato incluye cuestionar el producto en el camino (simplificar/eliminar lo que no aporte valor, evaluar funcionalidad nueva solo si mejora la experiencia real) — no solo corregir. Nace de [UX_AUDIT.md](UX_AUDIT.md). Orden de trabajo definido por Diego: (1) flujo de buscar y agregar, (2) sensación de movimiento de la interfaz, (3) filtro de género, (4) navegación de Biblioteca a escala, (5) teclado/layouts/detalles de mobile.
+**Inicio:** 15-ago-2026. Cierra la etapa de estabilización técnica (Bloque M). A partir de acá el criterio de prioridad no es severidad técnica sino impacto en los flujos de uso diario, y el mandato incluye cuestionar el producto en el camino (simplificar/eliminar lo que no aporte valor, evaluar funcionalidad nueva solo si mejora la experiencia real) — no solo corregir. Nace de [UX_AUDIT.md](UX_AUDIT.md).
+
+**Orden de trabajo (actualizado por Diego, 15-ago-2026, tras cerrar Bloque Q):**
+1. ✅ Flujo de buscar y agregar — Bloque N.
+2. ✅ Sensación de movimiento de la interfaz — Bloque O.
+3. ✅ Filtro de género — Bloque P.
+4. ✅ Navegación de Biblioteca a escala — Bloque Q.
+5. **Próxima capa (sin bloques asignados todavía), los flujos donde sigue habiendo fricción diaria:**
+   - Agregar película/serie/libro: velocidad y sensación premium del flujo *completo*, no solo la búsqueda (que ya se resolvió en N) — el resto del camino hasta guardar.
+   - Detalle del ítem: modal, acciones, edición, calificación, notas.
+   - Mobile/PWA fino (lo que quedaba de teclado/layout de mobile, adelantado parcialmente en el Bloque O).
+   - Recomendaciones/inteligencia real de Archivo.
+
+**Dos oportunidades grandes identificadas, registradas pero sin abrir todavía (no son parte de la Prioridad 5, son su propio frente futuro):**
+- **Buscar por actor/director/autor** — ya identificado durante el diseño de Bloque N: técnicamente cerca, TMDB ya devuelve resultados de tipo persona y hoy se descartan explícitamente (`tmdbSearch()`, index.html). Diego confirmó que le interesa en serio, no es un "nice to have".
+- **La inteligencia real de Archivo** — recomendaciones basadas en el historial propio, en línea con la visión de "archivo cultural definitivo" ya definida en el Bloque 0. Descubrí y ADN (ver sus respectivas secciones) ya son la base de esto.
+
+Diego prioriza cerrar Q con deploy manual antes de seguir, porque es la pantalla que más se usa.
 
 **Principio activo durante toda la etapa (confirmado por Diego, 15-ago-2026):** cuestionar permanentemente si cada pantalla, animación, transición, modal o interacción aporta valor real — no mantener algo solo porque "siempre estuvo ahí". Si algo genera fricción o movimiento innecesario, se simplifica aunque no esté escrito en un documento. Toda propuesta de cambio (o de no cambiar algo) se mide con una pregunta única: **¿hace que usar Archivo todos los días sea más rápido o más agradable? Si la respuesta es no, no es prioridad ahora.** Esto aplica a oportunidades que aparezcan durante la implementación, no solo a lo ya listado en UX_AUDIT.md.
 
@@ -623,7 +640,22 @@ Más 3 criterios de implementación: sin saltos de layout al abrir/cerrar "Filtr
 
 ### Estado
 
-Finalizado (15-ago-2026), pendiente commit y deploy manual.
+Finalizado (15-ago-2026), commit `ce2537e`. **Desplegado y verificado en producción** — ver "Incidente de deploy" más abajo: el workflow de deploy de Archivo se reparó en el proceso, este bloque fue el primero en salir a producción con el nuevo flujo automático (push real, no upload manual).
+
+---
+
+## Incidente de deploy (15-ago-2026) — resuelto, cambia el workflow del proyecto
+
+Después de commitear el Bloque Q, Diego notó una contradicción: se le había dicho "commiteado" varias veces durante N/O/P/Q pero él nunca hizo un deploy manual. Investigación con evidencia (no supuestos, como pidió):
+
+- **Local vs GitHub:** `git fetch` + `git branch -vv` confirmaron que `main` estaba 21 commits adelante de `root/main` (el remoto `diepizaga.github.io.git`) — todo el trabajo desde Bloque M en adelante, incluidos N/O/P/Q, había quedado solo en local.
+- **Qué había en GitHub Pages:** verificado con `curl` directo a producción + diff byte a byte: exactamente el commit `7b19e0c` ("Add files via upload", de Diego, 10-ago-2026 21:15) — su último upload manual. Confirmado que ese contenido era, a su vez, **idéntico byte a byte** a `84ba78c` (el commit local donde cerré Bloque M) — es decir, el remoto no tenía ningún cambio único, solo estaba desactualizado.
+- **Causa raíz de que el push nunca funcionara:** el remoto tenía un token (PAT) embebido en la URL, y ese token devolvía 401 (revocado) al probarlo contra la API de GitHub. Consistente con un incidente de filtración de token de sesiones anteriores de este mismo proyecto — probablemente el mismo token, nunca reemplazado porque el deploy real seguía el camino manual de Diego sin que nadie lo necesitara.
+- **Hallazgo adicional durante el diagnóstico:** el comando `git remote -v` usado para diagnosticar volvió a imprimir ese token en texto plano en el output — mismo tipo de incidente que ya había pasado antes en este proyecto. Señalado a Diego de inmediato.
+
+**Decisión de Diego:** unificar el workflow de deploy de Archivo con el de FitCoach y CFO Personal — Implementación → Validación → Commit → Push → Deploy → Verificación en producción, sin que él tenga que subir nada a mano nunca más. Si en algún momento se pierde acceso a push/deploy, frenar y avisar antes de seguir acumulando commits locales. Ver `feedback-unified-deploy-workflow` en memoria — aplica a todos sus proyectos, no solo Archivo.
+
+**Resuelto:** remoto reconfigurado para usar la credencial ya autenticada de `gh` CLI (Keychain de macOS, `gh auth setup-git`) en vez del token muerto embebido en la URL. Historial divergente reconciliado con un merge (`git merge root/main -X ours`, seguro porque se confirmó que el remoto no tenía contenido único que perder). Push probado y funcionando; Bloque Q desplegado con este flujo y verificado con `gh api .../pages/builds/latest` (`status:"built"`) + `curl` a producción con diff byte a byte contra el HEAD local — coinciden exacto.
 
 ---
 
