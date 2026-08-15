@@ -736,7 +736,13 @@ No encontré ninguna razón documentada para el corte en 12 — parece haber sid
 
 ### Visión a futuro del motor (documentado, no implementado en este bloque)
 
-Diego fijó el rumbo de largo plazo para esta pieza del producto: el objetivo final no es solo usar mejor el endpoint de TMDB, sino que **Archivo construya un criterio propio sobre el historial real del usuario** — que las recomendaciones dependan cada vez menos de "similar a X" (el algoritmo de caja negra de TMDB) y cada vez más de patrones reales de consumo, calificaciones y cómo evolucionan los gustos con el tiempo. Este bloque es un paso concreto en esa dirección (piso de calidad propio, diversidad propia, sección de género que filtra de verdad) pero **sigue apoyado en el algoritmo de "similares" de TMDB como fuente primaria de candidatos** — el salto a un modelo verdaderamente propio (por ejemplo, aprender de la evolución de tus calificaciones en el tiempo, no solo de tu top actual) es un bloque futuro distinto, más grande, sin diseñar todavía. Se anota acá para que cualquier trabajo futuro sobre Descubrí parta de este rumbo ya confirmado, no lo redescubra.
+Diego fijó el rumbo de largo plazo para esta pieza del producto, con una formulación precisa que vale la pena citar tal cual (15-ago-2026, después de cerrar Bloque R):
+
+> **TMDB deja de ser el motor de recomendación y pasa a ser principalmente una fuente de candidatos. El orden final y la relevancia comienzan a depender progresivamente del conocimiento que Archivo tiene del usuario (historial, evolución de gustos, patrones de consumo y contexto), no solo de la similitud calculada por TMDB.**
+
+La distinción clave, en términos de arquitectura: **sourcing** (de dónde salen los candidatos) sigue siendo TMDB — eso no cambia, es dato que Archivo no tiene forma de generar por sí solo. Lo que se traslada progresivamente a Archivo es el **ranking** (qué orden y qué tan relevante es cada candidato) — hoy ese ranking es prácticamente 100% el score de corroboración de TMDB con ajustes chicos encima (Bloque R: piso de calidad, empujón por rating, diversidad). El rumbo es que ese ranking dependa cada vez más de conocimiento propio de Archivo sobre el usuario, no del algoritmo de caja negra de TMDB.
+
+Este bloque (R) es un primer paso concreto en esa dirección, pero el ranking sigue apoyado en el score de "similares" de TMDB como base. El salto real —que el ranking dependa de un modelo de conocimiento propio del usuario— es un bloque futuro distinto, más grande, sin diseñar todavía. Se anota acá para que cualquier trabajo futuro sobre Descubrí parta de este rumbo ya confirmado, no lo redescubra.
 
 ### Estado
 
