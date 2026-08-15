@@ -761,7 +761,7 @@ Finalizado (15-ago-2026), commit `f05de6e`, pusheado y verificado en vivo en pro
 - **Esfuerzo:** Medio.
 - **Dependencias:** ninguna abierta.
 - **Documentos que lo respaldan:** PRODUCT_VISION.md, EXPRESSION_DESIGN.md.
-- **Estado:** Implementado y validado con datos reales (15-ago-2026). Pendiente que Diego corra el `ALTER TABLE` en Supabase, después commit → push → deploy → verificación.
+- **Estado:** Finalizado (15-ago-2026), commit `5973337`, pusheado y verificado en vivo en producción. Columna `reactions` confirmada en Supabase; ciclo completo de guardar/borrar una reacción probado extremo a extremo contra la base real (agregada y removida como prueba, sin dejar datos falsos).
 
 ### Parte B — Capa de señal inferida (permanente, sin UI)
 
