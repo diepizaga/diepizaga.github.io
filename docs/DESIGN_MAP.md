@@ -1038,6 +1038,41 @@ Encuadre explícito de Diego al confirmar el diseño, para que quede trazado por
 
 ---
 
+## Bloque Y — Hero y scrim editorial
+
+- **Objetivo:** hallazgo #1 de UX_UI_AUDIT_2.md — el texto del hero de Inicio se leía como un cartel pegado a la foto, no integrado a ella. Confirmado en mobile y desktop.
+- **Estado:** Finalizado, validado con 2 imágenes reales de dificultad distinta (una muy clara/saturada, una más oscura).
+
+### Diagnóstico correcto antes de tocar CSS
+
+La primera hipótesis del audit ("no hay degradado") era incorrecta — sí existía un `.hero-grad`, pero con una forma no monótona (se aclaraba de nuevo a mitad de imagen, en el 72%) que dejaba esa zona sin suficiente oscurecimiento. Por eso el `.hero-eyebrow` necesitaba su propia caja con fondo + blur encima — esa caja aislada, no la ausencia de degradado, era lo que se leía como cartel. El título (`.hero-title`) nunca tuvo ese problema porque usa solo `text-shadow`, sin caja — la comparación entre los dos reveló la causa real.
+
+### Cambio
+
+- `.hero-grad` pasa a un degradado monótono y más fuerte (97% abajo → 8% arriba, sin el hueco intermedio).
+- `.hero-eyebrow` pierde su fondo/blur/padding propios, pasa a `text-shadow` como el título — mismo lenguaje visual en todo el texto del hero.
+- Validado con la imagen real más difícil del archivo (alto contraste, colores saturados) además del caso normal — el texto queda legible sin caja en ambos casos.
+
+---
+
+## Bloque AA — Estados legibles (repensado, no agrandado)
+
+- **Objetivo:** hallazgo #3 de UX_UI_AUDIT_2.md. Diego pidió explícitamente no agrandar el punto, repensar el concepto: cuándo mostrar indicador, si todos los estados lo necesitan, cómo hacerlo entendible sin depender del color.
+- **Estado:** Finalizado, validado en grilla y lista, desktop.
+
+### El dato que define el diseño
+
+Medido en vivo, no supuesto: **2181 de 2181 ítems (100%) están en estado "Visto" ahora mismo** — cero en "Viendo", cero en "Pendiente", incluso semanas después de que Bloque N cambiara el default de las altas nuevas. Marcar "Visto" en cada card no distingue nada porque siempre es cierto — es la definición de ruido repetido.
+
+### Decisión de diseño
+
+- **"Visto" deja de mostrar cualquier indicador** — ni punto, ni color, ni ícono. Es el estado asumido; solo se marca la excepción.
+- **"Viendo" y "Pendiente" pasan de un punto de color de 7×7px a un ícono de forma distinta** (play para viendo, marcador/bookmark para pendiente) dentro de una placa de 22px con fondo propio — la forma lleva el significado, no el tono de gris, y el tamaño ya cumple con legibilidad mínima.
+- **Vista lista:** mismo criterio — la etiqueta de texto ("Viendo"/"Pendiente") solo se muestra para la excepción; para "Visto" se reserva el mismo espacio pero sin contenido visible (`visibility:hidden`), así la columna de rating sigue alineada fila a fila en vez de correrse según haya o no etiqueta.
+- Validado con datos reales de tu archivo simulando localmente 2 ítems en "Viendo"/"Pendiente" (sin escribir a la base) — el resto de la grilla/lista queda limpia, sin ningún punto, y el rating sigue alineado en la vista lista.
+
+---
+
 ## Hoja de ruta confirmada después de Bloque S (15-ago-2026, sin bloques abiertos todavía)
 
 Diego cerró la sesión de Bloque S con una lectura de conjunto del roadmap: primero la base técnica (Bloque M), después la UX de uso diario (Bloques N-Q), y ahora el arranque de la inteligencia propia de Archivo (Bloques R-S). Definió la secuencia de las próximas cuatro apuestas, en este orden — **ninguna diseñada todavía**, esto es la hoja de ruta, no un bloque en curso:
