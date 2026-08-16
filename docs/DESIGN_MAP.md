@@ -846,6 +846,35 @@ En vez de agregar una sección nueva por cada patrón, `computeADNInsights()` ca
 
 ---
 
+## Bloque U — Buscar por actor/director/autor
+
+- **Objetivo:** que el buscador de Biblioteca (ya dice "Buscar título, autor…" desde Bloque Q) también encuentre por director/actor — Prioridad 2 de la hoja de ruta post-Bloque S.
+- **Estado:** Auditado, en diseño — una decisión pendiente de Diego antes de terminar de implementar (ver abajo).
+
+### Auditoría: qué existe hoy
+
+- **Libros ya funcionan.** `author` es una columna real, ya se busca (`bib-search` matchea contra `title`/`original_title`/`author`) y ya alimenta "Autores favoritos" en ADN (Bloque E). No hace falta nada nuevo acá.
+- **Películas y series: cero datos de director/reparto hoy.** Ni se piden ni se guardan — confirmado revisando `buildTmdbItem()` y el bloque `adnSwitchType()` (el `else` de la sección "Directores ↔ autores" simplemente esconde la sección para película/serie, remanente de cuando existía "Directores favoritos", removida en Bloque E).
+- **El dato está disponible sin costo extra para altas nuevas.** Verificado en vivo: agregando `append_to_response=credits` a las llamadas que `tmdbDetail()` ya hace (AR/ES/EN en paralelo, sin llamados nuevos), la respuesta ya trae `credits.crew` (para sacar el director) y `credits.cast` (reparto). Para series, `credits.crew` viene vacío (director no es un concepto estable a nivel serie en TMDB) — el equivalente real es `created_by` (showrunner), que **ya viene en la respuesta que `tmdbDetail()` pide hoy**, sin ningún cambio.
+- **El problema real no es técnico, es de volumen: 2153 películas/series ya guardadas no tienen este dato.** Conseguirlo para altas nuevas es gratis; conseguirlo para lo que ya existe requiere **un llamado nuevo por ítem** — hasta ~2153 llamados a TMDB, una sola vez.
+
+### Diseño
+
+- Columna nueva `people text[]` en `watchlist` (aditiva, mismo patrón que `genres`/`reactions`) — para película: `[director, ...top 5 del reparto]`; para serie: `[...creadores, ...top 5 del reparto]`. No se toca `author` (libros), que ya funciona.
+- `getBibFiltered()`/`bib-search` suman `people` a los campos que ya matchea (`title`, `original_title`, `author`) — mismo mecanismo, sin UI nueva, sin filtro nuevo: escribís "Nolan" y aparece lo que tenga a Nolan en `people`.
+- Altas nuevas: `buildTmdbItem()` arma `people` a partir de la respuesta que `tmdbDetail()` ya trae (con `credits` agregado) — sin llamados extra.
+
+### Decisión pendiente de Diego antes de cerrar el bloque
+
+**El backfill de las 2153 películas/series existentes es la parte que sí toca algo estructural** (volumen de llamados a una API externa, no solo una columna) — prefiero confirmarlo con vos en vez de decidirlo solo:
+- **Opción A (recomendada):** backfill en lote, corrido una sola vez desde el navegador con tu sesión — client-side, sin tocar backend, en tandas para no saturar TMDB (ej. 10-20 en paralelo, con pausas). Con 2153 ítems, a un ritmo conservador, son varios minutos, no segundos — lo puedo dejar corriendo y avisarte cuando termine.
+- **Opción B:** backfill perezoso — se completa solo cuando abrís la ficha de un ítem viejo (ya se llama a `tmdbDetail`/`loadWatchProviders` al abrir cada ficha) en vez de un lote de una vez. Más lento en cubrir todo el archivo, cero riesgo de saturar la API de una sola vez.
+- **Opción C:** no hacer backfill — la búsqueda por persona solo funciona para lo que agregues de acá en adelante. Más simple, dato incompleto por mucho tiempo dado tu ritmo de altas.
+
+Mientras tanto, implemento la columna, el fetch en altas nuevas, y el buscador extendido — no depende de esta decisión.
+
+---
+
 ## Hoja de ruta confirmada después de Bloque S (15-ago-2026, sin bloques abiertos todavía)
 
 Diego cerró la sesión de Bloque S con una lectura de conjunto del roadmap: primero la base técnica (Bloque M), después la UX de uso diario (Bloques N-Q), y ahora el arranque de la inteligencia propia de Archivo (Bloques R-S). Definió la secuencia de las próximas cuatro apuestas, en este orden — **ninguna diseñada todavía**, esto es la hoja de ruta, no un bloque en curso:
