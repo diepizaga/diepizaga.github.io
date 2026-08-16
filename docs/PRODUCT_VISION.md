@@ -68,3 +68,39 @@ Archivo ya tiene la base correcta para ser mejor que sus competidores — el dif
 Mi recomendación de rumbo, en orden: **primero bajar la fricción de expresión** (es barato, y es el insumo que las otras dos apuestas necesitan) — **después profundizar ADN y acelerar el motor de recomendaciones en paralelo**, ya que ambos se alimentan de la misma data y del mismo cambio de fondo (más señal por ítem, no solo un número).
 
 No decidí un bloque todavía a propósito — es tu llamado, con esta síntesis como base en vez de inercia.
+
+---
+
+## Revisión del roadmap — 16-ago-2026, después de Bloques R-X
+
+Las tres apuestas que este documento proponía (bajar fricción de expresión, profundizar ADN, acelerar el motor de recomendaciones) **ya están implementadas y en producción**: Bloque S (reacciones + señal inferida), Bloques T/V/W (ADN 2.0 + personas, director/reparto separados), Bloque X (ranking propio de Descubrí). Diego pidió una revisión honesta del roadmap completo antes de elegir el próximo movimiento — no seguir por inercia sobre lo que ya viene encadenado.
+
+### 1. Qué sigue teniendo sentido del roadmap original
+
+- **Memoria** (recordar tu historia en el tiempo) — sigue siendo el tercer pilar correcto de la visión (aprender → ayudar a descubrir → recordar). No perdió sentido, está **estructuralmente bloqueada**: `watch_date` sigue en 0 de 2153 ítems. Empezarla hoy sería construir sobre una tabla vacía.
+- **Grupos como inteligencia colectiva de gustos** — sigue siendo una dirección real y que a Diego le interesa, no se desarmó con nada de lo construido. Sigue necesitando su propia auditoría (qué hay en código/base, qué datos se pueden cruzar, privacidad) antes de diseñar nada — no se hizo todavía.
+- **Auditoría UX móvil/PWA** — sigue en pie, con evidencia real ya recolectada (4 capturas de Diego, 15-ago) sin actuar todavía: superposición de la barra de Safari, posibilidad de pinch-zoom que rompe el layout, puntitos de estado poco legibles.
+
+### 2. Qué perdió prioridad — no por dejar de importar, sino porque ya está resuelto
+
+- **Las tres apuestas de PRODUCT_VISION.md ya no son "el próximo paso"** — están hechas. No perdieron valor, perdieron urgencia porque ya se cobraron.
+- **"¿Género o persona pesa más?"** (la pregunta abierta desde Bloque V) — dejó de ser una pregunta pendiente: Bloque X la resolvió con evidencia (afinidad por valor específico, no peso fijo por categoría). Cerrada, no diferida.
+- **Buscar por actor/director/autor** (Bloque U) — se planteó originalmente como mejora de navegación ("la voy a usar, pero no cambia la identidad del producto"). Terminó siendo mucho más que eso: es la base de datos que hizo posible Bloque V, W y X. La ambición del bloque creció con el uso que terminó teniendo, no se achicó.
+
+### 3. El próximo bloque de mayor impacto — mi recomendación, con el razonamiento
+
+**La auditoría UX móvil/PWA.** No es la continuación obvia de la secuencia ADN→Descubrí→Memoria, y lo digo a propósito: creo que seguir esa secuencia ahora sería inercia, no la decisión de mayor impacto real. Razones concretas:
+
+- **Memoria no puede arrancar todavía** — no hay con qué (`watch_date` en 0). Empezarla ahora sería repetir el error que ya evitamos una vez con reacciones: construir sobre datos que no existen.
+- **Grupos necesita una auditoría propia antes de poder ni siquiera dimensionarse** — no está listo para ser "el próximo bloque", está listo para ser "la próxima auditoría".
+- **ADN y Descubrí ya tienen su primera versión real, funcionando y validada** — profundizarlas más hoy tiene rendimientos decrecientes hasta que haya más datos (más reacciones, más uso). No es que no haya más para hacer ahí, es que no es lo más urgente.
+- **La UX móvil/PWA, en cambio, ya tiene evidencia real esperando** (no hay que auditar de cero, ya se juntaron las capturas) y **afecta cada sesión, no una sección puntual** — un layout que se rompe con pinch-zoom o una barra de Safari que tapa contenido pesa en cada uso diario, no solo cuando abrís Descubrí o ADN.
+
+Es mi recomendación, no una decisión tomada — la dejo para que la confirmes o la redirijas.
+
+### 4. Deuda técnica y de UX que sigue abierta
+
+- **Duplicación real de lógica:** `computeADNInsights()` (ADN) y `computeAffinityMaps()` (Descubrí, Bloque X) calculan el mismo tipo de cosa — efecto de un valor sobre tu calificación, ponderado por confianza — con dos implementaciones separadas. Funciona hoy, pero es la misma señal calculada dos veces; en algún momento conviene unificarlas en un solo módulo que alimente a ambos.
+- **`watch_date` en 0/2153** — ya nombrado como el bloqueo estructural de Memoria, lo dejo también acá como deuda de dato, no solo como "falta implementar una feature".
+- **Los 3 puntos concretos de la auditoría UX/PWA** (pinch-zoom, superposición de Safari, puntitos de estado) — diagnosticados, no corregidos.
+- **Grupos** — infraestructura de "biblioteca compartida" sin uso real, sin auditoría de qué serviría para "inteligencia colectiva".
