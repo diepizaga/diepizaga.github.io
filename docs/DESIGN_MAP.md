@@ -880,6 +880,35 @@ Mientras tanto, implemento la columna, el fetch en altas nuevas, y el buscador e
 
 ---
 
+## Bloque V — ADN aprende de personas
+
+- **Objetivo:** antes de pasar a Descubrí con ADN, auditar qué habilita la capa de `people` (Bloque U) para ADN — misma metodología que Bloque T, medir primero, mostrar solo lo sostenible.
+- **Estado:** Auditado con datos reales. Una decisión de arquitectura pendiente de Diego antes de cerrar (ver abajo).
+
+### Auditoría: qué sostiene la evidencia y qué no
+
+- **Promedio de nota por persona, con muestra comparable a la de género (n≥20): spread real de 1.35 puntos** (Tom Hanks 7.30 — Dwayne Johnson 5.95, 16 personas califican). **Prácticamente el mismo orden de magnitud que género (1.29 en Bloque T)** — ni género ni persona explica claramente más que el otro a igual nivel de confianza; los dos son señales reales y comparables, no hay un ganador.
+- **Bajando el umbral a n≥8 (200 personas califican) el spread crece a 2.41** (Robert Downey Jr. 7.54 — Gino Renni 5.13) — más rico, pero con menos muestra por persona que en género, así que hay que tratarlo con menos certeza, no como un hallazgo más fuerte que el de género.
+- **"Personas que aparecen repetidamente en tus favoritos" (calificación ≥9): descartado, no hay sustento.** De tus 50 títulos con 9+, solo **una persona** (Robert Downey Jr.) aparece en 3 o más — no hay un patrón real ahí, es un solo dato suelto. No se fuerza un insight con esto.
+- **Combinaciones (director + actor juntos): descartado tal como se planteó, hallazgo metodológico real.** Calculé 185 pares con muestra ≥4 — el top está dominado por elencos de Avengers (Chris Evans + Robert Downey Jr., Chris Hemsworth + Mark Ruffalo, etc.). No es una señal nueva: es la misma información que "te gustan las pelis de Avengers" contada muchas veces distintas, porque un elenco ensemble de 6 genera 15 pares de una sola película. Mostrar esto como "combinación interesante" sería inventar un insight que en realidad es redundante con el de personas individuales.
+- **Género vs. persona, con evidencia:** no hay un ganador claro a igual confianza estadística — ambos son ejes reales y de magnitud similar. Lo que sí cambia es la granularidad: género te dice "te gusta el thriller", persona te dice "te gusta cuando aparece Robert Downey Jr." — dos niveles de explicación distintos, no competidores.
+
+### Decisión de arquitectura pendiente: ¿separar director de reparto?
+
+Hoy `people` es una lista plana — director/creador y reparto mezclados sin etiqueta de rol (fue la decisión de Bloque U, para no multiplicar llamados a TMDB). Esto alcanza para un insight tipo *"cuando participa X, tendés a calificar más alto"* — cierto sea X director o actor, sin necesidad de saber cuál es. **Pero no alcanza** para separar específicamente "tus directores favoritos" de "tus actores favoritos" como pediste en los ejemplos — eso requeriría volver a tocar el esquema (columnas separadas `director`/`cast`) y, como el dato ya viene mezclado en la base, un segundo backfill sobre lo ya guardado (no gratis, mismo volumen que Bloque U). Antes de encarar eso prefiero preguntarte: ¿te alcanza con el insight sin distinguir rol, o te importa lo suficiente la distinción director/actor como para justificar un segundo backfill?
+
+### Propuesta (con la respuesta a la pregunta de arriba, sin distinguir rol)
+
+Sumar como candidatos nuevos a `computeADNInsights()` (Bloque T), mismo mecanismo de fuerza (efecto × log muestra), sin sección aparte:
+- Persona con promedio de nota más alto/bajo, gate en n≥8 (documentado como umbral menor que género porque el dato es más granular, no porque sea más confiable).
+- Sin insight de "aparece en tus favoritos" ni de "combinaciones" — no hay evidencia real detrás, según la auditoría de arriba.
+
+### Sobre navegación vs. alimentar ADN/recomendaciones
+
+Con evidencia real de un spread comparable al de género, **sí vale la pena que `people` alimente ADN** — ya no es solo una herramienta de navegación. Para Descubrí, Diego ya lo confirmó diferido hasta que haya más señal acumulada (mismo criterio que reacciones, Bloque R/S) — `people` puede sumarse ahí en el mismo momento, no antes.
+
+---
+
 ## Hoja de ruta confirmada después de Bloque S (15-ago-2026, sin bloques abiertos todavía)
 
 Diego cerró la sesión de Bloque S con una lectura de conjunto del roadmap: primero la base técnica (Bloque M), después la UX de uso diario (Bloques N-Q), y ahora el arranque de la inteligencia propia de Archivo (Bloques R-S). Definió la secuencia de las próximas cuatro apuestas, en este orden — **ninguna diseñada todavía**, esto es la hoja de ruta, no un bloque en curso:
