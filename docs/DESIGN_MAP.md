@@ -849,7 +849,7 @@ En vez de agregar una sección nueva por cada patrón, `computeADNInsights()` ca
 ## Bloque U — Buscar por actor/director/autor
 
 - **Objetivo:** que el buscador de Biblioteca (ya dice "Buscar título, autor…" desde Bloque Q) también encuentre por director/actor — Prioridad 2 de la hoja de ruta post-Bloque S.
-- **Estado:** Finalizado (16-ago-2026). Backfill completo: 2145 de 2153 películas/series (99.6%) con `people` real. Los 8 restantes confirmados uno por uno como límite real de TMDB (ej. Jujutsu Kaisen: `created_by` y `cast` vacíos en la fuente, no un bug del backfill) — no reality shows/anime, no un patrón que valga la pena perseguir más. Validado con datos reales: "tom hanks" encuentra 23 títulos, "nolan" 8.
+- **Estado:** Finalizado (16-ago-2026), commit `c41ac91`, pusheado y verificado en vivo en producción. Backfill completo: 2145 de 2153 películas/series (99.6%) con `people` real. Los 8 restantes confirmados uno por uno como límite real de TMDB (ej. Jujutsu Kaisen: `created_by` y `cast` vacíos en la fuente, no un bug del backfill) — no reality shows/anime, no un patrón que valga la pena perseguir más. Validado con datos reales: "tom hanks" encuentra 23 títulos, "nolan" 8.
 
 ### Incidente durante el backfill (transparencia, no un detalle menor)
 
