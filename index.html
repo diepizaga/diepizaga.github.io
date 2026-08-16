@@ -148,10 +148,11 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
 }
 
 /* ── MASTHEAD ───────────────────────────────────────────── */
+/* Bloque Z: sin backdrop-filter -- ver nota en .modal-overlay más abajo sobre
+   por qué se saca de todo lo que es fixed/sticky, no solo de acá. */
 #masthead {
   position: sticky; top: 0; z-index: 120;
   background: rgba(13,11,9,.92);
-  backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
   border-bottom: 1px solid var(--hair);
   padding-top: env(safe-area-inset-top, 0px); /* app instalada: no pisar la hora del iPhone */
 }
@@ -189,7 +190,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
 /* ── BOTTOM NAV (mobile) ────────────────────────────────── */
 #bottomnav {
   display: none; position: fixed; bottom: 0; left: 0; right: 0; z-index: 150;
-  background: rgba(13,11,9,.96); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  background: rgba(13,11,9,.96);
   border-top: 1px solid var(--hair);
   height: calc(var(--bottomnav-h) + env(safe-area-inset-bottom, 0px));
   padding-bottom: env(safe-area-inset-bottom, 0px);
@@ -523,12 +524,23 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
 .rec-row:hover .rr-add { color: var(--acc); }
 
 /* ── MODALES ────────────────────────────────────────────── */
+/* Bloque Z: se saca backdrop-filter de los 3 elementos fixed/sticky con blur
+   (masthead, bottomnav, acá) -- no es un ajuste cosmético, es la causa más
+   probable del glitch de pinch-zoom que reportó Diego. Es un patrón conocido
+   de WebKit: un elemento fixed/sticky con backdrop-filter puede desprenderse
+   o renderizar mal durante un gesto de pinch-zoom activo -- no encontré overflow
+   horizontal real en el layout (medido en 320px, 0 en las 4 pantallas + 3
+   modales), así que el CSS de layout en sí ya es robusto; esto ataca la causa
+   de renderizado más probable en vez de parchear el caso puntual. El fondo ya
+   está al 78% de opacidad -- por encima del 40-60% que recomienda la guía de
+   scrim, alcanza sin el blur. `.card-status-badge` no se toca: es absolute
+   dentro de una card que scrollea normal, no fixed/sticky -- no aplica el
+   mismo patrón de riesgo. */
 .modal-overlay {
   position: fixed; inset: 0; background: rgba(8,6,5,.78);
   z-index: 300; display: flex; align-items: flex-start; justify-content: center;
   padding: 30px 20px; overflow-y: auto;
   opacity: 0; pointer-events: none; transition: opacity .18s;
-  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
 }
 .modal-overlay.open { opacity: 1; pointer-events: all; }
 .modal {

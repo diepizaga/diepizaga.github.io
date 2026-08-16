@@ -1073,6 +1073,47 @@ Medido en vivo, no supuesto: **2181 de 2181 ítems (100%) están en estado "Vist
 
 ---
 
+## Bloque Z — Estabilidad bajo zoom (auditoría de patrón, no parche puntual)
+
+- **Objetivo:** hallazgo #2 de UX_UI_AUDIT_2.md — la captura de Diego mostraba scroll horizontal y texto cortado al hacer pinch-zoom. Mandato explícito: no bloquear zoom (viola accesibilidad — WCAG exige poder ampliar hasta 200%), no hackear para que la captura quede bien, auditar la robustez sistémica del layout completo, y si el problema es transversal, corregir el patrón en vez de casos sueltos.
+- **Estado:** Finalizado. Diagnóstico completo con evidencia; fix aplicado al patrón sistémico identificado; validación honesta con una limitación reconocida (ver más abajo).
+
+### Auditoría: se descartó la hipótesis más obvia primero
+
+La hipótesis inicial ("hay contenedores con ancho rígido que no reflowan") se probó directamente, no se asumió. Medí `document.documentElement.scrollWidth` vs `window.innerWidth` a 320px de ancho (equivalente a la reducción de ancho efectivo que produce el zoom) en las 4 pantallas principales (Inicio, Biblioteca —incluso con el panel de filtros abierto—, Descubrí, ADN) y en los 3 estados de modal (búsqueda, detalle, confirmación). **Resultado: 0px de overflow horizontal en los 7 casos.** No hay un bug de layout/CSS escondido — esto en sí mismo es un hallazgo, no un no-resultado.
+
+Segundo paso: grep de todas las declaraciones `width: [0-9]{3,}px` (ancho fijo, no `max-width`) del archivo. Encontré 4 casos, revisados uno por uno:
+- `.prog-card` — dentro de una fila con `overflow-x:auto` intencional (carrusel), correcto por diseño.
+- `.adn-stats-row > div` — protegido por `flex-wrap:wrap`, reacomoda sin overflow.
+- `.rcf-poster` — protegido por media query que cambia `.rec-featured` a `flex-direction:column` en mobile.
+- `.det-poster` — demasiado chico para producir overflow real.
+Ningún ancho fijo real sin protección.
+
+### El patrón real: `backdrop-filter` sobre elementos `fixed`/`sticky`
+
+`grep -n "backdrop-filter"` mostró 4 usos en total. Tres de ellos combinan `position:fixed` o `sticky` con `backdrop-filter`/`blur()`: `#masthead` (header), `#bottomnav` (nav inferior), `.modal-overlay` (scrim de modales). Esta combinación es una causa documentada de glitches de composición GPU en WebKit/Safari específicamente durante el gesto activo de pinch-zoom — no un problema de CSS de layout, sino de cómo Safari recompone una capa `fixed` con blur mientras la página está siendo escalada en tiempo real. Encaja con lo que mostraba la captura de Diego (corte de texto y desalineación puntual, no un overflow persistente medible en reposo) y es coherente con no haber encontrado overflow real: el layout en sí no está roto, lo que se rompe es la composición visual de esas 3 capas durante el gesto.
+
+El 4to uso de `backdrop-filter` (`.card-status-badge`, Bloque AA) se dejó **sin tocar** a propósito: es `position:absolute` dentro de una card que scrollea normalmente, no `fixed`/`sticky` — no coincide con el patrón de riesgo.
+
+### Fix aplicado (al patrón, no a un caso)
+
+Se removió `backdrop-filter`/`-webkit-backdrop-filter` de los 3 elementos de riesgo, manteniendo su fondo sólido ya existente (que no cambia):
+- `#masthead`: `background: rgba(13,11,9,.92)`
+- `#bottomnav`: `background: rgba(13,11,9,.96)`
+- `.modal-overlay`: `background: rgba(8,6,5,.78)` — de paso, esta opacidad ya supera el rango 40-60% que recomienda `pro-rules.md` para scrims, así que no hizo falta compensar nada al perder el blur.
+
+El viewport meta (`width=device-width, initial-scale=1, viewport-fit=cover`) queda exactamente como estaba — nunca se tocó, tal como pediste.
+
+### Validación
+
+- 320px de ancho, post-fix: 0px de overflow en Biblioteca (control — el fix no toca anchos, resultado esperado).
+- Mobile (375×812): Inicio con header y bottom nav visibles — ambos leen sólidos y nítidos sin el efecto vidrio esmerilado, sin regresión visual.
+- Mobile: modal de búsqueda abierto — el scrim se ve sólido y oscuro, el contenido de fondo se distingue atenuado pero claramente secundario, la hoja modal se lee con nitidez.
+- Desktop (1280×800): mismos 3 elementos (header, modal) — incluida la barra de navegación superior completa (Inicio/Biblioteca/Descubrí/ADN + Grupo/Importar/Agregar) — se ven correctos, sin artefactos.
+- **Limitación honesta:** esta validación confirma que el fix no rompió nada y que el diagnóstico está fundado en evidencia real (auditoría de overflow + patrón de código), pero no reproduce el gesto de pinch-zoom real en un dispositivo físico — las herramientas de este entorno no simulan ese gesto. Como con la validación de teclado del Bloque O, la confirmación final en tu iPhone real queda pendiente de tu parte.
+
+---
+
 ## Hoja de ruta confirmada después de Bloque S (15-ago-2026, sin bloques abiertos todavía)
 
 Diego cerró la sesión de Bloque S con una lectura de conjunto del roadmap: primero la base técnica (Bloque M), después la UX de uso diario (Bloques N-Q), y ahora el arranque de la inteligencia propia de Archivo (Bloques R-S). Definió la secuencia de las próximas cuatro apuestas, en este orden — **ninguna diseñada todavía**, esto es la hoja de ruta, no un bloque en curso:
