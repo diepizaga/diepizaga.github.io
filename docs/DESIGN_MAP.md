@@ -883,7 +883,7 @@ Mientras tanto, implemento la columna, el fetch en altas nuevas, y el buscador e
 ## Bloque V — ADN aprende de personas
 
 - **Objetivo:** antes de pasar a Descubrí con ADN, auditar qué habilita la capa de `people` (Bloque U) para ADN — misma metodología que Bloque T, medir primero, mostrar solo lo sostenible.
-- **Estado:** Auditado con datos reales. Una decisión de arquitectura pendiente de Diego antes de cerrar (ver abajo).
+- **Estado:** Implementado y validado en vivo — nuevo candidato de persona sumado a `computeADNInsights()` (sin distinguir rol, ver decisión pendiente abajo), sección de ADN ahora muestra hasta 6 insights (antes 4). Con datos reales aparecen 5 hoy, incluido el de persona ("Gino Renni, 1.4 puntos más bajo que tu general"). Pendiente: tu respuesta sobre separar director/reparto (no bloquea el cierre de este bloque, es una decisión para un bloque futuro si la querés).
 
 ### Auditoría: qué sostiene la evidencia y qué no
 

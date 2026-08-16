@@ -2020,6 +2020,31 @@ function computeADNInsights(watched, rated) {
     }
   }
 
+  // 6. Persona (director/reparto, sin distinguir rol -- Bloque V) con
+  // promedio de nota más alejado del tuyo general. Validado con datos reales:
+  // a muestra comparable a género (n≥20) el spread es del mismo orden de
+  // magnitud (1.35 vs. 1.29) -- ninguno de los dos ejes domina claramente,
+  // así que esto es un candidato más, no una señal "superior" a género.
+  // Gate más bajo que género (n≥8, no 20) porque el dato es más granular por
+  // naturaleza -- documentado así, no porque sea más confiable a igual n.
+  const peopleRated = watched.filter(i=>i.my_rating && i.people && i.people.length);
+  if (peopleRated.length >= 30) {
+    const overallP = peopleRated.reduce((s,i)=>s+parseFloat(i.my_rating),0)/peopleRated.length;
+    const personStats = {};
+    peopleRated.forEach(i=>i.people.forEach(p=>{
+      if(!personStats[p]) personStats[p]={sum:0,n:0};
+      personStats[p].sum+=parseFloat(i.my_rating); personStats[p].n++;
+    }));
+    const withN = Object.entries(personStats).filter(([p,s])=>s.n>=8)
+      .map(([p,s])=>({p, avg: s.sum/s.n, n: s.n}));
+    if (withN.length) {
+      const extreme = withN.sort((a,b)=>Math.abs(b.avg-overallP)-Math.abs(a.avg-overallP))[0];
+      const diff = extreme.avg - overallP;
+      if (Math.abs(diff) >= 0.6) insights.push({ strength: Math.abs(diff)*Math.log(extreme.n), text:
+        `En los títulos donde participa ${esc(extreme.p)} (${extreme.n} en tu archivo), calificás en promedio ${Math.abs(diff).toFixed(1)} puntos ${diff>0?'más alto':'más bajo'} que tu general (${extreme.avg.toFixed(1)} vs. ${overallP.toFixed(1)}).` });
+    }
+  }
+
   return insights.sort((a,b)=>b.strength-a.strength);
 }
 
@@ -2200,7 +2225,7 @@ function renderADN() {
     <div class="adn-section">
       <div class="adn-section-header">Lo que dicen tus datos</div>
       <div class="adn-insights">
-        ${insights.slice(0,4).map((ins,i)=>`<div class="adn-insight-row"><div class="adn-insight-idx">${String(i+1).padStart(2,'0')}</div><div class="adn-insight-text">${ins.text}</div></div>`).join('')}
+        ${insights.slice(0,6).map((ins,i)=>`<div class="adn-insight-row"><div class="adn-insight-idx">${String(i+1).padStart(2,'0')}</div><div class="adn-insight-text">${ins.text}</div></div>`).join('')}
       </div>
     </div>` : ''}
 
