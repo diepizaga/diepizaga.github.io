@@ -850,7 +850,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
     </div>
     <div class="bib-search-hero">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-      <input type="text" id="bib-search" placeholder="Buscar título, autor…" oninput="rerenderBib()" />
+      <input type="text" id="bib-search" placeholder="Buscar título, actor, director, autor…" oninput="rerenderBib()" />
     </div>
     <div class="bib-pills">
       <button class="pill active" data-type="all" onclick="setBibType('all',this)">Todo</button>
@@ -1149,7 +1149,7 @@ async function refreshSession() {
 
 async function sbFetch(path, opts = {}, _retried = false) {
   const token = currentSession?.access_token || SUPABASE_ANON;
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+  const res = await fetchTimeout(`${SUPABASE_URL}/rest/v1/${path}`, {
     ...opts,
     headers: { 'apikey': SUPABASE_ANON, 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json', 'Prefer': opts.prefer || 'return=representation', ...(opts.headers||{}) }
   });
@@ -1207,12 +1207,22 @@ async function tmdbSearch(query, type) {
   return [];
 }
 
+// Un fetch colgado (sin esta guarda) bloquea para siempre cualquier Promise.all
+// que lo espere -- se descubrió corriendo el backfill de Bloque U: una sola
+// request sin resolver congeló el lote entero en silencio, sin error visible.
+function fetchTimeout(url, opts, ms=10000) {
+  const ctrl = new AbortController();
+  const t = setTimeout(()=>ctrl.abort(), ms);
+  return fetch(url, {...opts, signal: ctrl.signal}).finally(()=>clearTimeout(t));
+}
+
 async function tmdbDetail(id, type) {
   // es-AR + es-ES + en-US en paralelo para elegir el título correcto
   const [resAR, resES, resEN] = await Promise.all([
-    fetch(`https://api.themoviedb.org/3/${type}/${id}?language=es-AR&append_to_response=external_ids`, { headers:{Authorization:`Bearer ${TMDB_TOKEN}`} }).then(r=>r.json()),
-    fetch(`https://api.themoviedb.org/3/${type}/${id}?language=es-ES`, { headers:{Authorization:`Bearer ${TMDB_TOKEN}`} }).then(r=>r.json()),
-    fetch(`https://api.themoviedb.org/3/${type}/${id}?language=en-US`, { headers:{Authorization:`Bearer ${TMDB_TOKEN}`} }).then(r=>r.json()),
+    fetchTimeout(`https://api.themoviedb.org/3/${type}/${id}?language=es-AR&append_to_response=external_ids`, { headers:{Authorization:`Bearer ${TMDB_TOKEN}`} }).then(r=>r.json()),
+    fetchTimeout(`https://api.themoviedb.org/3/${type}/${id}?language=es-ES`, { headers:{Authorization:`Bearer ${TMDB_TOKEN}`} }).then(r=>r.json()),
+    // credits solo acá -- nombres de persona no se traducen, no hace falta pedirlo 3 veces
+    fetchTimeout(`https://api.themoviedb.org/3/${type}/${id}?language=en-US&append_to_response=credits`, { headers:{Authorization:`Bearer ${TMDB_TOKEN}`} }).then(r=>r.json()),
   ]);
   const titleAR = (resAR.title||resAR.name||'').trim();
   const titleES = (resES.title||resES.name||'').trim();
@@ -1292,6 +1302,47 @@ async function tmdbRecs(tmdbId, type) {
 }
 
 // Item de watchlist a partir de un detalle TMDB + ratings OMDB
+// Director/creador + reparto principal, para buscar por persona (Bloque U).
+// Película: credits.crew no tiene director estable en serie (viene vacío) --
+// para serie el equivalente real es created_by (showrunner), que tmdbDetail()
+// ya trae sin llamados extra. Reparto: top 5 de credits.cast en ambos casos.
+function extractPeople(d, type) {
+  const director = type === 'tv'
+    ? (d.created_by||[]).map(c=>c.name)
+    : (d.credits?.crew||[]).filter(c=>c.job==='Director').map(c=>c.name);
+  const cast = (d.credits?.cast||[]).slice(0,5).map(c=>c.name);
+  const people = [...new Set([...director, ...cast])];
+  return people.length ? people : null;
+}
+
+// Backfill de `people` para lo ya guardado (Bloque U) -- operación única, se
+// corre a mano desde la consola/JS del navegador, no es un botón de la UI:
+// es un script de migración, versionado igual que el resto del código, pero
+// no una feature permanente. Idempotente (salta lo que ya tiene people), así
+// que se puede volver a correr sin duplicar trabajo si se corta a mitad.
+async function backfillPeople(batchSize=12, pauseMs=800) {
+  const targets = items.filter(i => i.type !== 'book' && i.tmdb_id && !(i.people && i.people.length));
+  console.log(`Backfill people: ${targets.length} ítems sin datos.`);
+  let done = 0, failed = 0;
+  for (let i = 0; i < targets.length; i += batchSize) {
+    const batch = targets.slice(i, i + batchSize);
+    await Promise.all(batch.map(async item => {
+      try {
+        const d = await tmdbDetail(item.tmdb_id, item.type);
+        const people = extractPeople(d, item.type);
+        if (people) {
+          await sbFetch(`watchlist?id=eq.${item.id}`, { method:'PATCH', body: JSON.stringify({people}), prefer:'return=minimal' });
+          item.people = people;
+        }
+        done++;
+      } catch(e) { failed++; console.warn('Backfill falló:', item.title, e); }
+    }));
+    console.log(`Backfill: ${Math.min(i+batchSize,targets.length)}/${targets.length} (ok:${done} fail:${failed})`);
+    await new Promise(r=>setTimeout(r, pauseMs));
+  }
+  console.log(`Backfill people terminado. OK: ${done}, fallidos: ${failed}.`);
+}
+
 function buildTmdbItem(d, omdb, tmdbId, type) {
   const title = d.title||d.name, year = (d.release_date||d.first_air_date||'').slice(0,4);
   return {
@@ -1304,6 +1355,7 @@ function buildTmdbItem(d, omdb, tmdbId, type) {
     tmdb_rating: d.vote_average?parseFloat(d.vote_average.toFixed(1)):null,
     imdb_rating: omdb.imdb_rating||null, rt_score: omdb.rt_score||null,
     metacritic_score: omdb.metacritic_score||null,
+    people: extractPeople(d, type),
     status: 'watched', my_rating: null
   };
 }
@@ -1606,7 +1658,7 @@ function getBibFiltered() {
   const fSort   = $id('filter-sort')?.value || 'recent';
   const q       = ($id('bib-search')?.value || '').trim().toLowerCase();
   if (fStatus) list = list.filter(i=>i.status===fStatus);
-  if (q) list = list.filter(i=>i.title.toLowerCase().includes(q)||(i.original_title||'').toLowerCase().includes(q)||(i.author||'').toLowerCase().includes(q));
+  if (q) list = list.filter(i=>i.title.toLowerCase().includes(q)||(i.original_title||'').toLowerCase().includes(q)||(i.author||'').toLowerCase().includes(q)||(i.people||[]).some(p=>p.toLowerCase().includes(q)));
   if (fGenre) list = list.filter(i=>(i.genres||[]).some(g=>canonGenre(i.type,g)===fGenre));
   if (fDecade) {
     if (fDecade==='old') list = list.filter(i=>(i.release_year||0)<1980 && i.release_year);
