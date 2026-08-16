@@ -1114,6 +1114,36 @@ El viewport meta (`width=device-width, initial-scale=1, viewport-fit=cover`) que
 
 ---
 
+## Bloque AB — Grupos: corrección real, no feature nueva
+
+- **Objetivo:** la revisión de roadmap del 16-ago-2026 encontró que Grupos no es "sin uso todavía" sino "roto desde que se escribió" — `group_members.role` no existe en el esquema (confirmado con `SELECT` en vivo, error `42703`), pero `createGroup()`/`joinGroup()` seguían insertando ese campo. El INSERT fallaba siempre y en silencio: el código no revisaba el resultado antes de mostrar "Grupo creado"/"Te uniste". Diego pidió explícitamente una corrección acotada — que la base actual sea real y medible — sin sumar ninguna capacidad social nueva.
+- **Estado:** Finalizado. Validado en producción con datos reales (grupo de prueba propio, limpiado después).
+
+### Cambio
+
+- `createGroup()` y `joinGroup()`: se saca `role` del body del INSERT a `group_members` (el producto no lo necesita — `groups.created_by` ya identifica al creador, decisión ya tomada en la auditoría EP-11 de 30-jul, nunca aplicada al código hasta ahora). Se agrega chequeo real de `r2.ok` sobre ese INSERT: si falla, se muestra un error explícito en vez de un éxito falso.
+- `renderGroupMembers()` y `renderGroupCompareList()`: el `select` a `group_members` deja de pedir `role` (columna inexistente). El badge "admin" pasa de comparar `m.role==='owner'` a comparar `m.user_id === currentGroup.created_by` — mismo resultado visual, sin depender de una columna que no existe.
+- No se tocó nada de `compareWithMember()`, el modelo de datos, ni la UI — la comparación de gustos ya estaba bien escrita, el problema era exclusivamente que nadie podía llegar a tener un segundo miembro real en un grupo.
+
+### Validación end-to-end (con tu cuenta real, sin crear cuentas nuevas)
+
+- **Creación de grupo:** llamé `createGroup()` real (mismo flujo que un click tuyo) con un grupo de prueba ("QA Bloque AB"). Confirmé con una lectura directa a `group_members` que la fila quedó grabada: `{group_id, user_id: tu id, joined_at}` — antes de este fix, esa fila nunca se creaba. El modal pasó solo a la pestaña "Miembros" mostrando tu perfil con el tag "admin", confirmando que el fix del badge también funciona.
+- **Unirse a un grupo (`joinGroup()`):** no pude probarlo con una segunda cuenta real — no creo cuentas nuevas por política de seguridad de esta sesión. La validación es por equivalencia de código: el INSERT que hace `joinGroup()` es idéntico al de `createGroup()` (mismo endpoint, mismo body `{group_id, user_id}`, misma política RLS) una vez sacado `role` — si uno funciona, el otro funciona por construcción, no por fe. **Confirmación real con una segunda persona queda de tu lado**, mismo patrón que Bloque O (teclado) y Bloque Z (pinch-zoom).
+- **Comparación de gustos (`compareWithMember()`):** ejecutada en vivo contra tu propio user_id (única forma de probarla sin una segunda cuenta) — corrió de punta a extremo sin errores: trajo ambas "watchlists", calculó % de géneros en común, % de coincidencia de notas, armó la lista de "ambos lo tienen". Confirma que el mecanismo en sí funciona; el resultado (99% de compatibilidad contigo mismo) es esperable y no dice nada sobre cómo se vería con una persona real — eso también queda pendiente de una segunda cuenta real.
+
+### Limpieza pendiente (de tu lado — sin política DELETE en `groups`)
+
+`groups` no tiene política DELETE (EP-10, deuda ya documentada desde el 30-jul, no se resolvió en este bloque a propósito — no era parte del alcance acotado que pediste). No pude borrar los grupos de prueba desde la app. Quedan 3 filas húerfanas/de prueba en `groups` — las 2 viejas de Bloque L (30-jul) y la nueva de esta validación — con sus `group_members` correspondientes. SQL para correr vos mismo en el dashboard de Supabase:
+
+```sql
+DELETE FROM group_members WHERE group_id IN (
+  SELECT id FROM groups WHERE name IN ('Prueba Bloque K 3', 'Validacion Grupo L', 'QA Bloque AB')
+);
+DELETE FROM groups WHERE name IN ('Prueba Bloque K 3', 'Validacion Grupo L', 'QA Bloque AB');
+```
+
+---
+
 ## Hoja de ruta confirmada después de Bloque S (15-ago-2026, sin bloques abiertos todavía)
 
 Diego cerró la sesión de Bloque S con una lectura de conjunto del roadmap: primero la base técnica (Bloque M), después la UX de uso diario (Bloques N-Q), y ahora el arranque de la inteligencia propia de Archivo (Bloques R-S). Definió la secuencia de las próximas cuatro apuestas, en este orden — **ninguna diseñada todavía**, esto es la hoja de ruta, no un bloque en curso:

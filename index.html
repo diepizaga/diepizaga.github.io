@@ -3611,7 +3611,7 @@ async function renderGroupMembers() {
     return;
   }
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/group_members?group_id=eq.${currentGroup.id}&select=user_id,role,profiles(username)`, { headers: getAuthHeaders() });
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/group_members?group_id=eq.${currentGroup.id}&select=user_id,profiles(username)`, { headers: getAuthHeaders() });
     const members = await r.json();
     const code = currentGroup.invite_code || '—';
     el.innerHTML = `
@@ -3627,7 +3627,7 @@ async function renderGroupMembers() {
             <div class="avatar">${esc(name.charAt(0).toUpperCase())}</div>
             <div class="member-name">${esc(name)}</div>
             ${isMe ? '<span class="member-you">vos</span>' : `<button class="member-compare-btn" onclick="compareWithMember('${m.user_id}','${escAttr(name).replace(/'/g,"\\'")}')">Comparar →</button>`}
-            ${m.role === 'owner' ? '<span style="font-size:10px;color:var(--t-3)">admin</span>' : ''}
+            ${m.user_id === currentGroup.created_by ? '<span style="font-size:10px;color:var(--t-3)">admin</span>' : ''}
           </div>`;
         }).join('')}
       </div>`;
@@ -3639,7 +3639,7 @@ async function renderGroupCompareList() {
   if (!currentGroup) { el.innerHTML = `<div class="loading-block">Necesitás estar en un grupo.</div>`; return; }
   el.innerHTML = `<div class="loading-block">Cargando miembros…</div>`;
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/group_members?group_id=eq.${currentGroup.id}&select=user_id,role,profiles(username)`, { headers: getAuthHeaders() });
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/group_members?group_id=eq.${currentGroup.id}&select=user_id,profiles(username)`, { headers: getAuthHeaders() });
     const members = await r.json();
     const others = members.filter(m => m.user_id !== currentUser.id);
     if (!others.length) { el.innerHTML = `<div class="loading-block">Todavía no hay otros miembros. ¡Compartí el código!</div>`; return; }
@@ -3785,7 +3785,8 @@ async function joinGroup() {
     const gs = await r.json();
     if (!r.ok || !gs.length) { showToast('Código inválido', 'error'); return; }
     const g = gs[0];
-    await fetch(`${SUPABASE_URL}/rest/v1/group_members`, { method:'POST', headers:{...getAuthHeaders(),'Prefer':'resolution=ignore-duplicates,return=minimal'}, body: JSON.stringify({ group_id: g.id, user_id: currentUser.id, role:'member' }) });
+    const r2 = await fetch(`${SUPABASE_URL}/rest/v1/group_members`, { method:'POST', headers:{...getAuthHeaders(),'Prefer':'resolution=ignore-duplicates,return=minimal'}, body: JSON.stringify({ group_id: g.id, user_id: currentUser.id }) });
+    if (!r2.ok) { showToast('No se pudo unir al grupo', 'error'); return; }
     currentGroup = g;
     showToast(`Te uniste a "${g.name}"`, 'success');
     const tabs = document.querySelectorAll('#group-tabs-row .group-tab');
@@ -3805,7 +3806,8 @@ async function createGroup() {
     const gs = await r.json();
     const g = Array.isArray(gs) ? gs[0] : gs;
     if (!g?.id) { showToast('Error al crear', 'error'); return; }
-    await fetch(`${SUPABASE_URL}/rest/v1/group_members`, { method:'POST', headers:{...getAuthHeaders(),'Prefer':'return=minimal'}, body: JSON.stringify({ group_id: g.id, user_id: currentUser.id, role:'owner' }) });
+    const r2 = await fetch(`${SUPABASE_URL}/rest/v1/group_members`, { method:'POST', headers:{...getAuthHeaders(),'Prefer':'return=minimal'}, body: JSON.stringify({ group_id: g.id, user_id: currentUser.id }) });
+    if (!r2.ok) { showToast('Grupo creado, pero falló agregarte como miembro — reintentá', 'error'); return; }
     currentGroup = g;
     showToast(`Grupo "${name}" creado · Código: ${code}`, 'success');
     const tabs = document.querySelectorAll('#group-tabs-row .group-tab');
