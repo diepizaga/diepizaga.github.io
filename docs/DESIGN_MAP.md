@@ -909,6 +909,23 @@ Con evidencia real de un spread comparable al de género, **sí vale la pena que
 
 ---
 
+## Bloque W — Separar director de reparto (calidad de dato, no feature visual)
+
+- **Objetivo:** Diego confirmó la separación de rol planteada en Bloque V — no es una mejora visual, es preparar la estructura para que ADN, Descubrí y grupos puedan pesar distinto "quién define una obra" (director) de "quién participa" (reparto), más adelante.
+- **Alcance explícito de Diego:** sin complejidad visual nueva; sin forzar insights nuevos hasta que haya muestra suficiente; dejar la estructura lista para uso futuro.
+- **Estado:** En diseño → implementando.
+
+### Diseño
+
+- Columnas nuevas `director text[]` y `cast_names text[]` (no `cast`, palabra reservada) en `watchlist` — mismo patrón aditivo que `people`/`reactions`.
+- `extractPeople()` se separa en `extractDirector()` y `extractCast()` — mismos datos ya disponibles hoy (`credits`/`created_by`, sin llamados nuevos a TMDB), solo dejan de mezclarse en un único array.
+- **Una sola fuente de verdad, no dos:** `getBibFiltered()`/`bib-search` y el candidato de persona en `computeADNInsights()` pasan a leer `director`+`cast_names` combinados en el momento (no se sigue escribiendo en `people`) — mismo comportamiento visible hoy (el buscador sigue encontrando por cualquier persona, el insight de ADN sigue sin distinguir rol todavía), pero la estructura queda preparada para el día que sí haga falta distinguir.
+- **No se agrega insight de "tus directores favoritos" ni "tus actores favoritos" separados todavía** — exactamente lo que pidió Diego: no forzar hasta medir si hay muestra suficiente una vez separado. Queda como paso siguiente, auditado con datos reales antes de mostrarse.
+- **Backfill, de nuevo:** los 2145 ítems ya tienen `people`, pero no con el rol separado — hace falta un segundo backfill, mismo volumen que Bloque U, reusando el mecanismo ya calibrado (`fetchTimeout`, batch 10-12, idempotente).
+- **`people` queda en desuso después de esto** — no se le sigue escribiendo. Se propone dropear la columna una vez confirmado que el backfill nuevo cerró bien, para no dejar dos fuentes de verdad del mismo concepto en el esquema — se pide confirmación aparte antes de correr un `DROP COLUMN` (operación destructiva).
+
+---
+
 ## Hoja de ruta confirmada después de Bloque S (15-ago-2026, sin bloques abiertos todavía)
 
 Diego cerró la sesión de Bloque S con una lectura de conjunto del roadmap: primero la base técnica (Bloque M), después la UX de uso diario (Bloques N-Q), y ahora el arranque de la inteligencia propia de Archivo (Bloques R-S). Definió la secuencia de las próximas cuatro apuestas, en este orden — **ninguna diseñada todavía**, esto es la hoja de ruta, no un bloque en curso:
