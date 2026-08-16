@@ -931,7 +931,35 @@ Con evidencia real de un spread comparable al de género, **sí vale la pena que
 *Dimensión de calidad que ataca: que Descubrí sea la primera parte de Archivo donde se note de verdad que te conoce — no "mejores recomendaciones", un ranking que es tuyo.*
 
 - **Objetivo:** separar fuente de candidatos (TMDB, no se toca) de ranking (hoy es ~100% el score de corroboración de TMDB con ajustes chicos; pasa a ser un ranking propio de Archivo sobre esos candidatos).
-- **Estado:** En diseño — presentado para tu confirmación antes de tocar código, como pediste.
+- **Estado:** Implementado y validado con datos reales — pendiente commit → push → deploy → verificación.
+
+### Ajustes de Diego antes de implementar (confirmados en el código)
+
+1. **Motor y explicación separados.** `buildWhyExplanation()` arma una frase en lenguaje humano a partir de los factores que realmente contribuyeron (no hay porcentajes ni desglose técnico en la UI). Ejemplo real generado: *"Por tu afinidad con Saving Private Ryan — solés puntuar alto el género bélica y te funcionan las películas de Clint Eastwood."*
+2. **Capa reemplazable, no atada a TMDB.** `sourceCandidates` (tmdbRecs, sin tocar) y el ranking (`computeAffinityMaps`/`rankCandidates` dentro de `renderDisc`) quedan separados en funciones propias — el día que haya otra fuente de candidatos o un motor de ranking distinto, no hace falta reescribir todo junto.
+3. **"Match" vs. "apuesta", diferenciación interna.** Un candidato se marca `_tier:'apuesta'` cuando la corroboración de TMDB sola no lo hubiera destacado, pero la afinidad propia de Archivo (género/director/reparto/duración) sí lo empuja. Sin cambio de UI todavía (el label "Una apuesta para vos" está listo en el featured card, pero hoy es una diferenciación mayormente interna) — validado en vivo: encontré 1 caso real hoy ("Finch", por afinidad con Tom Hanks + género drama, algo que TMDB no hubiera destacado solo).
+
+### Validación con datos reales (pedida explícitamente antes de cerrar)
+
+**Comparación directa OLD (solo corroboración TMDB) vs. NEW (con ranking propio), mismo top-12 de películas:**
+
+| Género | OLD (top 12) | NEW (top 12) |
+|---|---|---|
+| Acción | 10 | 6 |
+| Ciencia ficción | 9 | 5 |
+| Aventura | 7 | 6 |
+| Bélica | 2 | **5** |
+| Drama | 4 | 7 |
+| Historia | 0 | **2** |
+| Comedia | 1 | 2 |
+
+**Respuesta directa a "¿estamos amplificando géneros ya dominantes?": no, lo contrario.** Acción y Ciencia ficción (tus dos géneros más grandes por volumen — 593 y 357 películas respectivamente) **bajan** en el nuevo ranking. Bélica e Historia (chicos por volumen — 29 y 37 películas — pero tus promedios más altos, Bloque T) **suben**. Es exactamente lo esperado por diseño: la afinidad se calcula por calidad de tu calificación, no por cuántas tenés de cada género.
+
+**Títulos concretos que suben/bajan:** "Cartas desde Iwo Jima" pasa del puesto 3 al 1 (Bélica + Clint Eastwood). "La Liga de la Justicia" (paradoja y trono) y ambos "Stargate" **salen** del top-12; entran "Banderas de nuestros padres", "El sargento de hierro", "Los violentos de Kelly" (mismo patrón Bélica/Eastwood) y "Todo el dinero del mundo"/"Finch" (afinidad de reparto).
+
+**Rendimiento:** medido en vivo, 466-878ms el render completo (antes ~400ms) — el costo nuevo real (créditos+detalle sobre el top 40) no se siente como una demora perceptible.
+
+`diversifyPicks()` (Bloque R) se extiende con un eje de director (solo para candidatos ya enriquecidos, los demás quedan en un balde propio inofensivo) — mismo mecanismo existente, sin inventar uno nuevo.
 
 ### Auditoría: cómo funciona Descubrí hoy (post Bloque R)
 

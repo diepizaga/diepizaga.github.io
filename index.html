@@ -1272,17 +1272,21 @@ function discPopTier(voteCount) {
 // la coherencia con el perfil nunca pierde contra la diversidad.
 function diversifyPicks(pool, n) {
   const cap = Math.max(2, Math.ceil(n * 0.4));
+  // director: solo los candidatos ya enriquecidos (Bloque X) lo tienen -- los
+  // que no, quedan con clave undefined, su propio balde inofensivo, no rompe nada.
   const axesOf = r => ({
     genre: r.data.genre_ids?.[0],
     decade: Math.floor((parseInt((r.data.release_date||r.data.first_air_date||'').slice(0,4))||0)/10)*10,
     pop: discPopTier(r.data.vote_count||0),
+    director: r._director?.[0],
   });
-  const counts = { genre:{}, decade:{}, pop:{} };
+  const counts = { genre:{}, decade:{}, pop:{}, director:{} };
   const picked = []; const remaining = [...pool];
   while (picked.length < n && remaining.length) {
     let idx = remaining.findIndex(r => {
       const a = axesOf(r);
-      return (counts.genre[a.genre]||0) < cap && (counts.decade[a.decade]||0) < cap && (counts.pop[a.pop]||0) < cap;
+      return (counts.genre[a.genre]||0) < cap && (counts.decade[a.decade]||0) < cap && (counts.pop[a.pop]||0) < cap
+        && (!a.director || (counts.director[a.director]||0) < cap);
     });
     if (idx === -1) idx = 0; // ninguno pasa el límite: prioridad es no dejar huecos
     const r = remaining.splice(idx,1)[0];
@@ -1291,6 +1295,7 @@ function diversifyPicks(pool, n) {
     counts.genre[a.genre]=(counts.genre[a.genre]||0)+1;
     counts.decade[a.decade]=(counts.decade[a.decade]||0)+1;
     counts.pop[a.pop]=(counts.pop[a.pop]||0)+1;
+    if (a.director) counts.director[a.director]=(counts.director[a.director]||0)+1;
   }
   return picked.sort((x,y)=>y.score-x.score); // se eligió por diversidad, se muestra por puntaje
 }
@@ -2416,6 +2421,76 @@ function adnSwitchType(el, type) {
 // ============================================================
 // DESCUBRÍ
 // ============================================================
+// ============================================================
+// RANKING PROPIO DE DESCUBRÍ (Bloque X)
+// ============================================================
+// Separación explícita pedida por Diego: TMDB/tmdbRecs() sigue siendo la
+// FUENTE de candidatos (no se toca acá) -- todo lo de abajo es la capa de
+// RANKING propia de Archivo, pensada para poder reemplazarse o crecer
+// (reacciones, memoria, grupos) sin tocar cómo se consiguen los candidatos.
+
+// Con cuánta muestra una afinidad merece su efecto completo. Menos muestra
+// no se descarta (a diferencia del gate de ADN) -- se amortigua en proporción,
+// para que un director con 6 títulos aporte una fracción de su efecto, no
+// cero y no el 100%. Mismo espíritu de "no forzar sin evidencia" que ADN,
+// pero continuo en vez de un corte binario.
+const AFFINITY_CONFIDENCE_N = 20;
+
+function affinityMap(rated, valuesOf, overall) {
+  const stats = {};
+  rated.forEach(i => valuesOf(i).forEach(v => {
+    if (!stats[v]) stats[v] = {sum:0, n:0};
+    stats[v].sum += parseFloat(i.my_rating); stats[v].n++;
+  }));
+  const out = {};
+  Object.entries(stats).forEach(([v, s]) => {
+    const effect = (s.sum/s.n) - overall;
+    out[v] = { effect: effect * Math.min(1, s.n/AFFINITY_CONFIDENCE_N), n: s.n };
+  });
+  return out;
+}
+const runtimeBucket = r => !r ? null : r<90?'<90min':r<110?'90-110min':r<130?'110-130min':'130min+';
+
+// Década confirmada SIN señal real en Bloque T (spread prácticamente plano)
+// -- se excluye a propósito, no por olvido. Reacciones: con ~0 datos reales
+// hoy, computeAffinityMaps ya las dejaría en 0 solas (misma lógica que
+// género/persona) -- no hace falta una bandera aparte para "apagarlas".
+function computeAffinityMaps(watched, type) {
+  const rated = watched.filter(i=>i.type===type && i.my_rating);
+  const overall = rated.length ? rated.reduce((s,i)=>s+parseFloat(i.my_rating),0)/rated.length : 0;
+  return {
+    overall,
+    genre: affinityMap(rated, i=>i.genres||[], overall),
+    director: affinityMap(rated, i=>i.director||[], overall),
+    cast: affinityMap(rated, i=>i.cast_names||[], overall),
+    runtime: affinityMap(rated, i=>{ const b=runtimeBucket(i.runtime); return b?[b]:[]; }, overall),
+  };
+}
+
+// Un solo llamado liviano (no las 3 llamadas AR/ES/EN de tmdbDetail -- para
+// esto solo hace falta duración y créditos, no elegir el mejor título).
+async function tmdbCandidateEnrich(id, type) {
+  const r = await fetchTimeout(`https://api.themoviedb.org/3/${type}/${id}?language=en-US&append_to_response=credits`, { headers:{Authorization:`Bearer ${TMDB_TOKEN}`} });
+  const d = await r.json();
+  return { runtime: d.runtime||(d.episode_run_time?.[0])||null, director: extractDirector(d, type), cast: extractCast(d) };
+}
+
+// Explicación en lenguaje humano, no un desglose de puntaje -- pedido
+// explícito de Diego. Arma la frase a partir de los factores que realmente
+// contribuyeron, no de una plantilla fija con todos los ejes.
+function buildWhyExplanation(r, aff) {
+  const parts = [];
+  if (r._topGenre) parts.push(`solés puntuar alto el género ${esc(r._topGenre.toLowerCase())}`);
+  if (r._topDirector) parts.push(`te funcionan las películas de ${esc(r._topDirector)}`);
+  if (r._topCast) parts.push(`te gustan los títulos con ${esc(r._topCast)}`);
+  if (!parts.length && r.because.length) {
+    return r.because.length===1 ? `Porque te gustó <em>${esc(r.because[0])}</em>` : `Por tu afinidad con <em>${r.because.slice(0,2).map(esc).join('</em> y <em>')}</em>`;
+  }
+  const factorText = parts.slice(0,2).join(' y ');
+  const base = r.because.length ? `Por tu afinidad con <em>${esc(r.because[0])}</em>` : 'Te la recomendamos';
+  return factorText ? `${base} — ${factorText}.` : base;
+}
+
 async function renderDisc() {
   const el = $id('disc-content'); if (!el) return;
   const requestedType = discType; // snapshot: si el usuario cambia de pestaña antes de que termine, esta respuesta queda obsoleta
@@ -2457,11 +2532,49 @@ async function renderDisc() {
 
   // empujón chico por calidad general (vote_average de TMDB), sin pisar la
   // corroboración de tus propias calificaciones -- hasta +15% para un candidato
-  // con nota perfecta, nada para uno mediocre.
-  const sorted = Object.values(scoreMap)
-    .map(r => { r.score *= 1 + ((r.data.vote_average||0)/10)*0.15; return r; })
+  // con nota perfecta, nada para uno mediocre. Género ya viene gratis en el
+  // candidato (genre_ids) -- se suma acá mismo, sin esperar al enriquecido.
+  const affinities = computeAffinityMaps(items, type);
+  let sorted = Object.values(scoreMap)
+    .map(r => {
+      r.score *= 1 + ((r.data.vote_average||0)/10)*0.15;
+      const genreNames = (r.data.genre_ids||[]).map(gid=>TMDB_GENRE_ID_ES[gid]).filter(Boolean);
+      const genreEff = genreNames.map(g=>affinities.genre[g]).filter(Boolean).sort((a,b)=>b.effect-a.effect)[0];
+      if (genreEff && genreEff.effect > 0) { r.score += genreEff.effect*0.3; r._topGenre = genreNames.find(g=>affinities.genre[g]===genreEff); }
+      return r;
+    })
     .sort((a,b)=>b.score-a.score);
   if (!sorted.length) { el.innerHTML = `<div class="empty-state"><h3>Nada por ahora</h3><p>No encontramos recomendaciones. Agregá más ${label}.</p></div>`; return; }
+
+  // Segunda pasada, solo sobre el top ~40 ya bien corroborado: se pide
+  // detalle+créditos (único costo nuevo real, ver DESIGN_MAP Bloque X) y se
+  // suma afinidad de director/reparto/duración -- señal propia de Archivo,
+  // no de TMDB. "apuesta" = el candidato no llegaba a destacado solo por
+  // corroboración de TMDB, pero la afinidad propia lo empuja igual --
+  // diferenciación interna pedida por Diego, sin cambio de UI todavía.
+  const SHORTLIST_N = 40;
+  const shortlist = sorted.slice(0, SHORTLIST_N);
+  await Promise.all(shortlist.map(async r => {
+    try {
+      const preScore = r.score;
+      const enrich = await tmdbCandidateEnrich(r.data.id, type);
+      let bonus = 0;
+      if (enrich.director?.length) {
+        const best = enrich.director.map(d=>({d,a:affinities.director[d]})).filter(x=>x.a).sort((a,b)=>b.a.effect-a.a.effect)[0];
+        if (best && best.a.effect > 0) { bonus += best.a.effect*0.5; r._topDirector = best.d; }
+      }
+      if (enrich.cast?.length) {
+        const best = enrich.cast.map(c=>({c,a:affinities.cast[c]})).filter(x=>x.a).sort((a,b)=>b.a.effect-a.a.effect)[0];
+        if (best && best.a.effect > 0) { bonus += best.a.effect*0.3; r._topCast = best.c; }
+      }
+      const rb = runtimeBucket(enrich.runtime);
+      if (rb && affinities.runtime[rb] && affinities.runtime[rb].effect > 0) bonus += affinities.runtime[rb].effect*0.2;
+      r._director = enrich.director; r._runtime = enrich.runtime;
+      r.score += bonus;
+      r._tier = (preScore < 1.2 && bonus > 0.3) ? 'apuesta' : 'match';
+    } catch { r._tier = 'match'; }
+  }));
+  sorted = [...shortlist, ...sorted.slice(SHORTLIST_N)].sort((a,b)=>b.score-a.score);
 
   const gc={};
   items.filter(i=>i.type===type&&i.my_rating>=8).forEach(i=>(i.genres||[]).forEach(g=>gc[g]=(gc[g]||0)+1));
@@ -2485,12 +2598,12 @@ async function renderDisc() {
 
   const recFeatured = (r) => {
     const d=r.data, title=d.title||d.name, year=(d.release_date||d.first_air_date||'').slice(0,4);
-    const whyText = r.because.length===1 ? `Porque te gustó <em>${esc(r.because[0])}</em>` : `Por tu afinidad con <em>${r.because.slice(0,2).map(esc).join('</em> y <em>')}</em>`;
+    const whyText = buildWhyExplanation(r, affinities);
     const poster = d.poster_path ? `<img src="${TMDB_IMG}w342${d.poster_path}" alt="" loading="lazy" />` : `<div class="rcf-poster-ph">${esc(title.charAt(0))}</div>`;
     return `<div class="rec-featured" onclick="openRecDetail(event,${d.id},'${type}')">
       <div class="rcf-poster">${poster}</div>
       <div class="rcf-body">
-        <div class="rcf-label">Destacada para vos</div>
+        <div class="rcf-label">${r._tier==='apuesta'?'Una apuesta para vos':'Destacada para vos'}</div>
         <div class="rcf-title">${esc(title)}</div>
         <div class="rcf-meta">${year}${d.vote_average ? ' · ★ '+d.vote_average.toFixed(1)+' TMDB' : ''}</div>
         <div class="rcf-why">${whyText}</div>
@@ -2501,7 +2614,7 @@ async function renderDisc() {
 
   const recRow = (r, displayNum) => {
     const d=r.data, title=d.title||d.name, year=(d.release_date||d.first_air_date||'').slice(0,4);
-    const whyLabel = r.because.length===1 ? `Porque te gustó ${r.because[0]}` : r.because.slice(0,2).join(' · ');
+    const whyLabel = buildWhyExplanation(r, affinities).replace(/<\/?em>/g,'');
     const poster = d.poster_path ? `<img src="${TMDB_IMG}w92${d.poster_path}" alt="" loading="lazy" />` : `<div class="ph">${esc(title.charAt(0))}</div>`;
     return `<div class="rec-row" onclick="openRecDetail(event,${d.id},'${type}')">
       <div class="rr-idx">${displayNum}</div>
@@ -2509,7 +2622,7 @@ async function renderDisc() {
       <div class="rr-body">
         <div class="rr-title">${esc(title)}</div>
         <div class="rr-meta">${year}</div>
-        <div class="rr-why">${esc(whyLabel)}</div>
+        <div class="rr-why">${whyLabel}</div>
       </div>
       ${d.vote_average ? `<div class="rr-score">★ ${d.vote_average.toFixed(1)}</div>` : ''}
       <div class="rr-add">+</div>
