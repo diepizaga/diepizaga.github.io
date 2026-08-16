@@ -969,7 +969,19 @@ Con evidencia real de un spread comparable al de género, **sí vale la pena que
 4. Aplica piso de calidad (`vote_count≥50`) y un empujón chico por `vote_average` de TMDB (hasta +15%).
 5. Arma 3 baldes con `diversifyPicks()` (evita que género/década/popularidad dominen >40% de una lista, sin cuota fija).
 
-**Lo que NO usa hoy, aunque ya existe:** calificaciones por género/persona (Bloque T/V), director/reparto (Bloque W), reacciones (Bloque S, todavía sin datos), duración, ni ningún patrón de ADN. El ranking es prácticamente 100% "qué tan corroborado por TMDB", con un empujón menor por calidad general.
+**Señales que el ranking usa hoy, en un solo lugar para no tenerlas dispersas en la prosa:**
+
+| Señal | De dónde sale | Cómo entra al puntaje |
+|---|---|---|
+| Corroboración con tus calificaciones | `tmdbRecs()` de tus 20 mejor calificadas | Base del puntaje (ya existía, Bloque R) |
+| Calidad general (`vote_average` de TMDB) | Viene gratis en el candidato | Empujón hasta +15% (ya existía, Bloque R) |
+| Género | Viene gratis en el candidato (`genre_ids`) | Afinidad por género, todos los candidatos (nuevo, Bloque X) |
+| Director | Requiere detalle+créditos (top ~40 solamente) | Afinidad por director (nuevo, Bloque X) |
+| Reparto principal | Requiere detalle+créditos (top ~40 solamente) | Afinidad por reparto (nuevo, Bloque X) |
+| Duración | Requiere detalle (top ~40 solamente) | Afinidad por bucket de duración (nuevo, Bloque X) |
+| Diversidad (género/década/popularidad/director) | Calculado sobre los candidatos ya puntuados | `diversifyPicks()`, evita que un eje domine >40% de una lista (Bloque R, extendido en Bloque X) |
+
+**Lo que NO usa hoy, aunque ya existe como dato:** ver "Qué se prepara para mañana" y "Qué se descartó" más abajo — son dos categorías distintas, no una sola lista de pendientes.
 
 ### Restricción técnica real, verificada antes de diseñar
 
@@ -1010,12 +1022,19 @@ Donde `afinidad(valor) = (tu_promedio_con_ese_valor − tu_promedio_general) × 
 - **¿Sorpresa sin perder precisión?** Mismo argumento — "Más opciones" ya cumple ese rol. Lo único que cambiaría acá: candidatos con afinidad de género/director fuerte pero corroboración TMDB débil (hoy caerían en "Más opciones" sin destacarse) podrían subir de balde si la afinidad propia es lo bastante fuerte — a evaluar con datos reales una vez implementado, no prometido de antemano.
 - **¿Se puede explicar cada recomendación?** Sí — se construye `buildWhyExplanation()` que arma el texto a partir de qué afinidades realmente contribuyeron (no una plantilla fija). Como pediste, se construye la lógica ahora; el "why" que se muestra en la UI hoy (`Por tu afinidad con X e Y`) puede quedar simple por ahora, sin forzar el cambio visual en este mismo bloque.
 
-### Qué se prepara para mañana, no se implementa ahora
+### Qué se prepara para mañana (la señal existe o va a existir, todavía no se usa)
 
-- **Reacciones:** la señal ya existe en el diseño (Bloque S/V confirmaron el mecanismo), pero con datos reales en ~0 hoy no aporta nada — la fórmula de afinidad ya la ignoraría sola por falta de muestra, así que ni hace falta una bandera especial para excluirla: se prende sola cuando haya uso real.
-- **Década:** confirmado sin señal real en Bloque T (spread prácticamente plano) — no se usa como afinidad, ni ahora ni "preparada para después", salvo que una futura auditoría encuentre lo contrario con más datos.
-- **Alineación con fuente de crítica (Bloque V: más cerca de IMDb que de RT/Metacritic):** se podría usar para reemplazar el empujón actual por `vote_average` de TMDB por uno basado en `imdb_rating` del candidato — mejora chica y coherente con la evidencia, pero no crítica; se deja como ajuste opcional dentro de este mismo bloque si el tiempo alcanza, no como bloque aparte.
-- **Grupos/memoria:** fuera de alcance de este bloque, ya documentado en la hoja de ruta.
+- **Reacciones:** el mecanismo ya está (Bloque S/V), pero con datos reales en ~0 hoy no aporta nada — la fórmula de afinidad ya la ignoraría sola por falta de muestra, ni hace falta una bandera para excluirla: se prende sola cuando haya uso real. Esto es exactamente lo que la conversación con Diego llamó "capa reemplazable" — el día que haya reacciones reales, entran al mismo `archivoScore` sin rediseñar nada.
+- **Alineación con fuente de crítica** (Bloque V: más cerca de IMDb que de RT/Metacritic): se podría usar para reemplazar el empujón actual por `vote_average` de TMDB por uno basado en `imdb_rating` del candidato — mejora chica y coherente con la evidencia, pendiente, no crítica.
+- **Grupos/memoria:** fuera de alcance de este bloque, ya documentado en la hoja de ruta — cuando existan, son la razón concreta por la que el ranking se diseñó como capa aislada y no atada a TMDB (ajuste #2 de Diego).
+
+### Qué se descartó por falta de evidencia (distinto de "preparado para mañana" — esto no se usa aunque los datos ya existan)
+
+- **Década:** confirmado sin señal real en Bloque T (spread prácticamente plano, 6.43 a 6.75 en todas las décadas) — no se usa como afinidad, ni se deja "lista para después". Si una futura auditoría con más datos encuentra señal real, se reabre como hallazgo nuevo, no como algo que ya estaba planeado.
+
+### Esto es la primera versión, no el algoritmo definitivo
+
+Encuadre explícito de Diego al confirmar el diseño, para que quede trazado por qué el código separa `sourceCandidates` (TMDB) del ranking en vez de mezclarlos: *"Hoy: TMDB encuentra candidatos → Archivo ordena. Mañana: Archivo aprende de calificaciones, reacciones, memoria y eventualmente grupos. Quiero que esta capa de ranking sea reemplazable/evolutiva y no quede atada a TMDB."* Bloque X es la primera versión de esa capa — usa lo que hay evidencia hoy (género, director, reparto, duración, calidad de calificación), dejó documentado qué se suma sola cuando haya más datos (reacciones), y qué quedó afuera a propósito (década). No se diseñó pensando que esto es el ranking final de Archivo.
 
 ---
 
