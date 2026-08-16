@@ -104,3 +104,55 @@ Es mi recomendación, no una decisión tomada — la dejo para que la confirmes 
 - **`watch_date` en 0/2153** — ya nombrado como el bloqueo estructural de Memoria, lo dejo también acá como deuda de dato, no solo como "falta implementar una feature".
 - **Los 3 puntos concretos de la auditoría UX/PWA** (pinch-zoom, superposición de Safari, puntitos de estado) — diagnosticados, no corregidos.
 - **Grupos** — infraestructura de "biblioteca compartida" sin uso real, sin auditoría de qué serviría para "inteligencia colectiva".
+
+---
+
+## Revisión del roadmap — 16-ago-2026 (v2), después de Bloques Y/AA/Z
+
+Se cerró la auditoría UX/UI profunda (hero/scrim, estados legibles, estabilidad bajo zoom) recomendada en la revisión anterior. Con eso hecho, Diego pidió repetir el ejercicio sobre los 4 frentes que quedaron abiertos: Descubrí, Memoria, Grupos y deuda técnica. Mismo método que siempre: auditar y medir con datos reales antes de opinar. Los números de abajo son de hoy (16-ago-2026, 2181 ítems), no de la revisión anterior.
+
+### 1. Descubrí — ¿qué falta para que sea realmente diferencial?
+
+**Lo que ya tiene (Bloques R/X, en producción):** ranking propio por afinidad de género/director/reparto/duración sobre `vote_average` de TMDB, explicación en lenguaje humano por candidato, diversificación para no repetir el mismo género/década/director, y una capa interna "match" vs. "apuesta" (no visible en UI, a propósito). Esto ya es una experiencia genuinamente propia, no una copia de "populares en TMDB".
+
+**Lo que NO está usando, verificado hoy:**
+- **Reacciones (Bloque S): 0 de 2181 ítems tienen una reacción guardada.** El mecanismo ya está conectado a `computeAffinityMaps()`/ADN (se activaría solo), pero como fuente de señal para Descubrí hoy no aporta nada — no porque falte código, sino porque falta uso real. No es un hueco de diseño, es un hueco de dato.
+- **Libros quedaron completamente afuera del ranking propio.** Revisé `renderBookDisc()`: sigue siendo la versión original (búsqueda por autor/género favorito en Google Books, sin `archivoScore`, sin afinidad, sin explicación — el campo `.rcf-why` está literalmente vacío en el código). Bloques R y X mejoraron películas/series y nunca tocaron libros. Con solo 28 libros en el archivo (1.3% del catálogo) el volumen es chico, pero la inconsistencia es real: hoy Descubrí es dos productos distintos según el tipo de contenido.
+- **No hay forma de explorar manualmente.** Las 3 secciones (Destacadas/Por género/Más opciones) son fijas — no hay filtro de género, década o "más como esto" a pedido. Todo el descubrimiento pasa por lo que el ranking decide mostrar, sin una vía para que vos dirijas la exploración.
+
+**Mi lectura:** no recomendaría "profundizar explicaciones" (ya cumplen lo que pediste: lenguaje humano, no desglose de puntaje) ni "más sorpresa" (el balde "Más opciones" ya cumple ese rol, confirmado en la auditoría de trazabilidad de Bloque X). Los dos huecos reales son **paridad de libros** (bajo volumen, pero hoy es una experiencia de segunda) y **reacciones sin uso** (no es un problema de Descubrí, es que el mecanismo de captura todavía no generó datos — ver Memoria abajo, mismo síntoma).
+
+### 2. Memoria — ¿hay alguna versión posible hoy?
+
+Volví a medir en vivo, no asumí que seguía en el mismo estado: **`watch_date` sigue en 0 de 2181 ítems**, sin cambios desde la revisión anterior. Antes de descartarlo definitivamente busqué una alternativa: ¿sirve `created_at` (fecha de alta en Archivo) como proxy de "cuándo lo viste"? Medido: **no.** 1048 de 2181 ítems (48%) tienen el mismo `created_at` exacto (2026-06-06, la carga masiva original por CSV) y otros 376 comparten el 2026-08-07 (segunda carga masiva) — dos tercios del catálogo tiene una fecha que dice "cuándo lo cargaste en un import", no "cuándo lo viste". No hay ningún dato retroactivo escondido que habilite una versión inicial de Memoria hoy.
+
+**Lo que sí se puede hacer ahora, de bajo esfuerzo, sin abrir el bloque completo:** empezar a capturar `watch_date` en las altas nuevas (ya existe la columna, solo falta pedirlo en el flujo de agregar/editar, con default "hoy" para no agregar fricción). Esto no da Memoria hoy — da la base de datos que Memoria va a necesitar dentro de unos meses. Es exactamente el mismo patrón que reacciones: el mecanismo se prende solo cuando hay masa crítica, así que cuanto antes arranque la captura, antes deja de estar bloqueado.
+
+### 3. Grupos — auditoría de qué existe realmente hoy
+
+Pediste específicamente auditoría antes de evaluar la idea. Encontré algo más importante que "no hay uso": **hay un bug activo, no solo deuda vieja.**
+
+- **El código ya tiene mucho más de lo que la última auditoría (Bloque 0/L, 30-jul) reflejaba.** Existe una función completa `compareWithMember()`: compatibilidad de géneros (%), coincidencia de notas (%), qué títulos tiene el otro que vos no tenés, y en qué títulos compartidos difieren más las notas. Esto ya es "comparar gustos", no solo "biblioteca compartida" — el código fue más lejos de lo documentado.
+- **Pero nunca se ejecutó con datos reales, y verifiqué por qué: `group_members.role` no existe como columna** (confirmado ahora mismo con un `SELECT` directo — error `42703`, "column does not exist" — no es una suposición vieja, lo repetí en vivo). `createGroup()` y `joinGroup()` insertan `role:'owner'`/`role:'member'` al crear el vínculo — ese INSERT falla siempre, en silencio: el código no revisa si esa segunda escritura tuvo éxito antes de mostrar "Grupo creado" (`index.html:3808`). Confirmé el efecto real en la base: **2 grupos existen, 0 filas en `group_members` — ni siquiera el creador quedó adentro de su propio grupo.** Ambos grupos son los de prueba de Bloque L (30-jul), nunca se limpiaron.
+- **Conclusión: Grupos no es "sin uso todavía", es "roto desde que se escribió".** Nadie pudo haber usado la comparación de gustos aunque hubiera querido, porque no se puede completar el paso de unirse a un grupo.
+
+Sobre la idea en sí (pareja/amigos/familia, comparar gustos, recomendaciones conjuntas): el modelo de datos que ya existe (`watchlist` por usuario + `group_members`) alcanza para todo lo que pediste — no hace falta rediseñar el esquema, hace falta primero que el flujo básico funcione. Privacidad no está resuelta (`compareWithMember()` trae la lista completa de calificaciones del otro miembro vía RLS de grupo, sin diferenciar "ver agregados" de "ver detalle") — auditoría de permisos sigue pendiente si se retoma esta línea.
+
+### 4. Deuda pendiente — repasada con evidencia de hoy
+
+- **Nuevo, con severidad real (no solo documentado, confirmado activo):** el bug de `group_members.role` de arriba. Antes era "EP-11: la columna no existe, se audita y se decide no agregarla" (30-jul) — hoy es "el código nunca se actualizó después de esa decisión, y sigue insertando la columna igual, rompiendo el flujo completo". Esto es lo único de esta revisión que yo marcaría como corrección, no como bloque de mejora — es un flujo que hoy miente ("Grupo creado" cuando no se creó la membresía).
+- **`computeADNInsights()` vs. `computeAffinityMaps()`:** confirmé de nuevo leyendo ambas funciones — mismo patrón (efecto de un valor sobre tu nota, ponderado por confianza) sobre las mismas 4 dimensiones (género/director/reparto/duración), con dos fórmulas de confianza distintas (`log(n)` para ordenar insights vs. `min(1,n/20)` continuo para rankear Descubrí) y dos gates distintos. Sigue funcionando bien en los dos lados, sigue siendo la misma señal calculada dos veces. No urgente, pero cada bloque nuevo que toque afinidad (Memoria, Grupos) es una tercera implementación candidata si no se unifica antes.
+- **`watch_date` 0/2181** — ya cubierto en Memoria arriba, lo repito acá porque es deuda de dato, no de código.
+- **Housekeeping menor:** los 2 grupos de prueba de Bloque L siguen sin borrar en Supabase (no hay política DELETE en `groups` — EP-10, sigue abierto).
+- **Bloque C (bypass `user_id IS NULL` en `watchlist`)** — diseñado en Bloque 0 (30-jul), nunca implementado. Confirmé hoy 0 filas huérfanas en producción, así que el riesgo sigue latente pero no materializado.
+
+### Recomendación — el próximo bloque de mayor impacto
+
+**El bug de Grupos primero (arreglo chico, no un bloque de diseño), y después Descubrí-libros o el arranque de captura de `watch_date` — no Grupos como feature nueva.**
+
+Razonamiento:
+- El bug de `role` es una corrección, no una decisión de producto — un flujo que muestra "éxito" y falla en silencio es el tipo de cosa que se arregla apenas se confirma, sin esperar a que se decida qué hacer con Grupos como visión. Es chico (sacar `role` del INSERT, ya que el producto no lo necesita — mismo veredicto que la auditoría de EP-11 en su momento) y no compromete nada del resto del roadmap.
+- **No recomendaría abrir "Grupos como inteligencia colectiva" como el próximo bloque grande.** No porque la idea esté mal — el código ya muestra que la ambición es correcta y hasta más construida de lo que pensábamos — sino porque **nadie la usó nunca**, ni siquiera en su versión rota. No hay señal de demanda real todavía (a diferencia de Descubrí/ADN, que sí se usan a diario). Diseñar más encima de una feature con 0 uso real y sin validar que a Diego (o a quien invite) le importe compararse con alguien, sería repetir el patrón que ya se evitó con Memoria: construir antes de confirmar que hay para qué.
+- Entre Descubrí-libros y arrancar `watch_date`, el segundo tiene mejor relación esfuerzo/valor futuro: es una sola pregunta más en un flujo que ya existe (agregar/editar), no cambia nada de lo que ya funciona, y es la única forma de que Memoria deje de estar bloqueada — cuanto más se demore, más tarde arranca el reloj. Descubrí-libros es válido pero de impacto menor (28 ítems).
+
+No abro ninguno de los dos sin que lo confirmes — como siempre, esto es una recomendación razonada, no una decisión tomada.
