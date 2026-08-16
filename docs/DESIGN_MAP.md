@@ -926,6 +926,71 @@ Con evidencia real de un spread comparable al de género, **sí vale la pena que
 
 ---
 
+## Bloque X — Ranking propio de Descubrí
+
+*Dimensión de calidad que ataca: que Descubrí sea la primera parte de Archivo donde se note de verdad que te conoce — no "mejores recomendaciones", un ranking que es tuyo.*
+
+- **Objetivo:** separar fuente de candidatos (TMDB, no se toca) de ranking (hoy es ~100% el score de corroboración de TMDB con ajustes chicos; pasa a ser un ranking propio de Archivo sobre esos candidatos).
+- **Estado:** En diseño — presentado para tu confirmación antes de tocar código, como pediste.
+
+### Auditoría: cómo funciona Descubrí hoy (post Bloque R)
+
+1. Toma tus 20 títulos mejor calificados (≥7) del tipo actual.
+2. Pide a TMDB `/recommendations` para cada uno (esto es la fuente de candidatos — se mantiene igual).
+3. Puntúa cada candidato por corroboración: suma `tu_nota_de_la_fuente/10` por cada vez que una fuente lo recomienda.
+4. Aplica piso de calidad (`vote_count≥50`) y un empujón chico por `vote_average` de TMDB (hasta +15%).
+5. Arma 3 baldes con `diversifyPicks()` (evita que género/década/popularidad dominen >40% de una lista, sin cuota fija).
+
+**Lo que NO usa hoy, aunque ya existe:** calificaciones por género/persona (Bloque T/V), director/reparto (Bloque W), reacciones (Bloque S, todavía sin datos), duración, ni ningún patrón de ADN. El ranking es prácticamente 100% "qué tan corroborado por TMDB", con un empujón menor por calidad general.
+
+### Restricción técnica real, verificada antes de diseñar
+
+Los candidatos que devuelve `/recommendations` traen `genre_ids`, `vote_average`, `vote_count`, `popularity`, `release_date` — pero **no traen director ni reparto, y tampoco duración.** Verificado en vivo: `append_to_response` no agrega esos datos en el endpoint de lista (es un parámetro pensado para el endpoint de un solo ítem, no para listas). Conseguir director/reparto/duración de un candidato requiere **una consulta de detalle por candidato** — con hasta ~190 candidatos únicos por sección, eso es el mismo problema de costo ya documentado para disponibilidad por plataforma (DISCOVERY_AUDIT.md).
+**Decisión de diseño para no pagar ese costo en todos los candidatos:** el ranking corre en dos pasadas. Primera pasada (barata, ya existe): puntaje de corroboración + género (`genre_ids` ya viene gratis) sobre **todos** los candidatos. Segunda pasada (la única que cuesta llamados nuevos): se piden detalle+créditos **solo para el top ~40 de la primera pasada** — un candidato ya bien corroborado por TMDB es el que vale la pena refinar con señal propia; no tiene sentido pagar el costo en candidatos que ya van a quedar afuera. Esto acota el costo nuevo a ~40 llamados por render, del mismo orden que los 20 que ya se hacen hoy — no el 3x-10x que hubiera sido evaluar disponibilidad por plataforma sobre todos los candidatos.
+
+### La idea central: afinidad personalizada, no un peso fijo por categoría
+
+Diego preguntó qué peso debería tener compartir director vs. compartir género. Medí ambos con datos reales antes de responder, y la respuesta correcta no es "director pesa X, género pesa Y" fijo — es dejar que el propio dato decida caso por caso, con el mismo mecanismo que ya usa `computeADNInsights()` (fuerza = efecto × log de la muestra):
+
+| Eje | Spread real (n≥20) | Con menos muestra (n≥10) |
+|---|---|---|
+| Género | 1.28 (18 géneros califican) | — |
+| Reparto | 1.35 (16 actores califican) | 1.99 (104 actores) |
+| Director | *ninguno llega a n≥20* | **2.05** (solo 6 directores) |
+
+**Hallazgo real, no esperado:** el efecto de director, cuando hay muestra, es más grande que el de género o reparto — pero califica muchísima menos gente (6 directores vs. 16-18 de género/reparto), porque un director dirige muchas menos películas de las que ves que un actor actúa o un género agrupa. Esto confirma tu intuición ("una persona que define una obra pesa distinto a una que participa") con evidencia, pero también dice que **no hay que forzarle un peso fijo alto** — hay que dejar que la fórmula de fuerza (que ya pondera efecto Y confianza) decida solo, igual que en ADN. Un director con muestra chica no debería poder pisar un género con muestra grande solo por tener un efecto nominal más grande.
+
+### Diseño del ranking
+
+Para cada candidato del top ~40 (con detalle+créditos ya obtenido):
+
+```
+archivoScore = corrobScore                                    (ya existe, Bloque R)
+  + Σ afinidad(género_i)   para cada género del candidato
+  + Σ afinidad(director_i) para cada director del candidato
+  + Σ afinidad(actor_i)    para cada actor del top 5 del candidato
+  + afinidad(bucket_duración)                                  (bucket, no minuto a minuto)
+```
+
+Donde `afinidad(valor) = (tu_promedio_con_ese_valor − tu_promedio_general) × pequeño_factor`, y solo se suma si esa afinidad ya pasó el mismo umbral de "sostenible" que usa ADN (muestra mínima + efecto no trivial) — **un valor sin muestra suficiente aporta 0, no un supuesto**. Esto responde directamente tu pedido de no inventar señal que los datos no sostienen: la propia fórmula se auto-apaga para valores sin evidencia.
+
+### Tus preguntas, respondidas
+
+- **¿Peso director vs. género?** Ninguno fijo — lo decide la fuerza real de cada valor específico (ver tabla arriba). En promedio, hoy director pesa más *cuando aplica* (raro, alto efecto), género pesa más *en general* (frecuente, efecto medio).
+- **¿Qué pasa si ya tengo demasiadas del mismo estilo?** Ya resuelto por `diversifyPicks()` (Bloque R) — se extiende para también capear por director principal del candidato (no solo género/década/popularidad), reusando el mismo mecanismo, no uno nuevo.
+- **¿Cómo evitamos recomendar solo más de lo mismo?** Mismo mecanismo de arriba + el balde "Más opciones" ya es la zona de baja corroboración/alta variedad por diseño (Bloque R) — no hace falta inventar una cuarta sección para esto, ya existe.
+- **¿Sorpresa sin perder precisión?** Mismo argumento — "Más opciones" ya cumple ese rol. Lo único que cambiaría acá: candidatos con afinidad de género/director fuerte pero corroboración TMDB débil (hoy caerían en "Más opciones" sin destacarse) podrían subir de balde si la afinidad propia es lo bastante fuerte — a evaluar con datos reales una vez implementado, no prometido de antemano.
+- **¿Se puede explicar cada recomendación?** Sí — se construye `buildWhyExplanation()` que arma el texto a partir de qué afinidades realmente contribuyeron (no una plantilla fija). Como pediste, se construye la lógica ahora; el "why" que se muestra en la UI hoy (`Por tu afinidad con X e Y`) puede quedar simple por ahora, sin forzar el cambio visual en este mismo bloque.
+
+### Qué se prepara para mañana, no se implementa ahora
+
+- **Reacciones:** la señal ya existe en el diseño (Bloque S/V confirmaron el mecanismo), pero con datos reales en ~0 hoy no aporta nada — la fórmula de afinidad ya la ignoraría sola por falta de muestra, así que ni hace falta una bandera especial para excluirla: se prende sola cuando haya uso real.
+- **Década:** confirmado sin señal real en Bloque T (spread prácticamente plano) — no se usa como afinidad, ni ahora ni "preparada para después", salvo que una futura auditoría encuentre lo contrario con más datos.
+- **Alineación con fuente de crítica (Bloque V: más cerca de IMDb que de RT/Metacritic):** se podría usar para reemplazar el empujón actual por `vote_average` de TMDB por uno basado en `imdb_rating` del candidato — mejora chica y coherente con la evidencia, pero no crítica; se deja como ajuste opcional dentro de este mismo bloque si el tiempo alcanza, no como bloque aparte.
+- **Grupos/memoria:** fuera de alcance de este bloque, ya documentado en la hoja de ruta.
+
+---
+
 ## Hoja de ruta confirmada después de Bloque S (15-ago-2026, sin bloques abiertos todavía)
 
 Diego cerró la sesión de Bloque S con una lectura de conjunto del roadmap: primero la base técnica (Bloque M), después la UX de uso diario (Bloques N-Q), y ahora el arranque de la inteligencia propia de Archivo (Bloques R-S). Definió la secuencia de las próximas cuatro apuestas, en este orden — **ninguna diseñada todavía**, esto es la hoja de ruta, no un bloque en curso:
