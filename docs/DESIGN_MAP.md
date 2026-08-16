@@ -931,7 +931,7 @@ Con evidencia real de un spread comparable al de género, **sí vale la pena que
 *Dimensión de calidad que ataca: que Descubrí sea la primera parte de Archivo donde se note de verdad que te conoce — no "mejores recomendaciones", un ranking que es tuyo.*
 
 - **Objetivo:** separar fuente de candidatos (TMDB, no se toca) de ranking (hoy es ~100% el score de corroboración de TMDB con ajustes chicos; pasa a ser un ranking propio de Archivo sobre esos candidatos).
-- **Estado:** Implementado y validado con datos reales — pendiente commit → push → deploy → verificación.
+- **Estado:** Finalizado (16-ago-2026), commit `a403b11`, pusheado y verificado en vivo en producción.
 
 ### Ajustes de Diego antes de implementar (confirmados en el código)
 
