@@ -913,7 +913,7 @@ Con evidencia real de un spread comparable al de género, **sí vale la pena que
 
 - **Objetivo:** Diego confirmó la separación de rol planteada en Bloque V — no es una mejora visual, es preparar la estructura para que ADN, Descubrí y grupos puedan pesar distinto "quién define una obra" (director) de "quién participa" (reparto), más adelante.
 - **Alcance explícito de Diego:** sin complejidad visual nueva; sin forzar insights nuevos hasta que haya muestra suficiente; dejar la estructura lista para uso futuro.
-- **Estado:** En diseño → implementando.
+- **Estado:** Implementado y validado — segundo backfill completo, 2153/2153 procesados, 0 fallos, mismos 2145/2153 (99.6%) con datos reales que Bloque U (los 8 sin datos son el mismo límite de TMDB ya confirmado, no nuevos). Buscador e insight de ADN validados sin regresión ("nolan" 8, "tom hanks" 23, mismos resultados que antes de la migración). `people` queda en desuso — pendiente confirmación de Diego para el `DROP COLUMN`.
 
 ### Diseño
 

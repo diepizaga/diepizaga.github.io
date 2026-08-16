@@ -1306,13 +1306,20 @@ async function tmdbRecs(tmdbId, type) {
 // Película: credits.crew no tiene director estable en serie (viene vacío) --
 // para serie el equivalente real es created_by (showrunner), que tmdbDetail()
 // ya trae sin llamados extra. Reparto: top 5 de credits.cast en ambos casos.
-function extractPeople(d, type) {
-  const director = type === 'tv'
+// Bloque W: director y reparto por separado -- dos relaciones distintas con
+// la obra (quién la define vs. quién participa), no una lista plana. Mismos
+// datos que ya trae tmdbDetail() (credits/created_by), sin llamados nuevos.
+function extractDirector(d, type) {
+  const names = type === 'tv'
     ? (d.created_by||[]).map(c=>c.name)
     : (d.credits?.crew||[]).filter(c=>c.job==='Director').map(c=>c.name);
-  const cast = (d.credits?.cast||[]).slice(0,5).map(c=>c.name);
-  const people = [...new Set([...director, ...cast])];
-  return people.length ? people : null;
+  const uniq = [...new Set(names)];
+  return uniq.length ? uniq : null;
+}
+function extractCast(d) {
+  const names = (d.credits?.cast||[]).slice(0,5).map(c=>c.name);
+  const uniq = [...new Set(names)];
+  return uniq.length ? uniq : null;
 }
 
 // Backfill de `people` para lo ya guardado (Bloque U) -- operación única, se
@@ -1320,19 +1327,23 @@ function extractPeople(d, type) {
 // es un script de migración, versionado igual que el resto del código, pero
 // no una feature permanente. Idempotente (salta lo que ya tiene people), así
 // que se puede volver a correr sin duplicar trabajo si se corta a mitad.
-async function backfillPeople(batchSize=12, pauseMs=800) {
-  const targets = items.filter(i => i.type !== 'book' && i.tmdb_id && !(i.people && i.people.length));
-  console.log(`Backfill people: ${targets.length} ítems sin datos.`);
+// Bloque W: mismo mecanismo que backfillPeople (Bloque U), reapuntado a
+// director/cast_names por separado. Umbral seguro de paralelismo con TMDB ya
+// calibrado en Bloque U: 10-12, no más (40 dispara 429).
+async function backfillDirectorCast(batchSize=12, pauseMs=800) {
+  const targets = items.filter(i => i.type !== 'book' && i.tmdb_id && !(i.director && i.director.length) && !(i.cast_names && i.cast_names.length));
+  console.log(`Backfill director/cast: ${targets.length} ítems sin datos.`);
   let done = 0, failed = 0;
   for (let i = 0; i < targets.length; i += batchSize) {
     const batch = targets.slice(i, i + batchSize);
     await Promise.all(batch.map(async item => {
       try {
         const d = await tmdbDetail(item.tmdb_id, item.type);
-        const people = extractPeople(d, item.type);
-        if (people) {
-          await sbFetch(`watchlist?id=eq.${item.id}`, { method:'PATCH', body: JSON.stringify({people}), prefer:'return=minimal' });
-          item.people = people;
+        const director = extractDirector(d, item.type);
+        const cast_names = extractCast(d);
+        if (director || cast_names) {
+          await sbFetch(`watchlist?id=eq.${item.id}`, { method:'PATCH', body: JSON.stringify({director, cast_names}), prefer:'return=minimal' });
+          item.director = director; item.cast_names = cast_names;
         }
         done++;
       } catch(e) { failed++; console.warn('Backfill falló:', item.title, e); }
@@ -1340,7 +1351,7 @@ async function backfillPeople(batchSize=12, pauseMs=800) {
     console.log(`Backfill: ${Math.min(i+batchSize,targets.length)}/${targets.length} (ok:${done} fail:${failed})`);
     await new Promise(r=>setTimeout(r, pauseMs));
   }
-  console.log(`Backfill people terminado. OK: ${done}, fallidos: ${failed}.`);
+  console.log(`Backfill director/cast terminado. OK: ${done}, fallidos: ${failed}.`);
 }
 
 function buildTmdbItem(d, omdb, tmdbId, type) {
@@ -1355,7 +1366,7 @@ function buildTmdbItem(d, omdb, tmdbId, type) {
     tmdb_rating: d.vote_average?parseFloat(d.vote_average.toFixed(1)):null,
     imdb_rating: omdb.imdb_rating||null, rt_score: omdb.rt_score||null,
     metacritic_score: omdb.metacritic_score||null,
-    people: extractPeople(d, type),
+    director: extractDirector(d, type), cast_names: extractCast(d),
     status: 'watched', my_rating: null
   };
 }
@@ -1658,7 +1669,7 @@ function getBibFiltered() {
   const fSort   = $id('filter-sort')?.value || 'recent';
   const q       = ($id('bib-search')?.value || '').trim().toLowerCase();
   if (fStatus) list = list.filter(i=>i.status===fStatus);
-  if (q) list = list.filter(i=>i.title.toLowerCase().includes(q)||(i.original_title||'').toLowerCase().includes(q)||(i.author||'').toLowerCase().includes(q)||(i.people||[]).some(p=>p.toLowerCase().includes(q)));
+  if (q) list = list.filter(i=>i.title.toLowerCase().includes(q)||(i.original_title||'').toLowerCase().includes(q)||(i.author||'').toLowerCase().includes(q)||[...(i.director||[]),...(i.cast_names||[])].some(p=>p.toLowerCase().includes(q)));
   if (fGenre) list = list.filter(i=>(i.genres||[]).some(g=>canonGenre(i.type,g)===fGenre));
   if (fDecade) {
     if (fDecade==='old') list = list.filter(i=>(i.release_year||0)<1980 && i.release_year);
@@ -2020,18 +2031,22 @@ function computeADNInsights(watched, rated) {
     }
   }
 
-  // 6. Persona (director/reparto, sin distinguir rol -- Bloque V) con
-  // promedio de nota más alejado del tuyo general. Validado con datos reales:
-  // a muestra comparable a género (n≥20) el spread es del mismo orden de
-  // magnitud (1.35 vs. 1.29) -- ninguno de los dos ejes domina claramente,
-  // así que esto es un candidato más, no una señal "superior" a género.
-  // Gate más bajo que género (n≥8, no 20) porque el dato es más granular por
-  // naturaleza -- documentado así, no porque sea más confiable a igual n.
-  const peopleRated = watched.filter(i=>i.my_rating && i.people && i.people.length);
+  // 6. Persona (director/reparto, sin distinguir rol todavía -- Bloque V/W)
+  // con promedio de nota más alejado del tuyo general. Validado con datos
+  // reales: a muestra comparable a género (n≥20) el spread es del mismo
+  // orden de magnitud (1.35 vs. 1.29) -- ninguno de los dos ejes domina
+  // claramente, así que esto es un candidato más, no una señal "superior" a
+  // género. Gate más bajo que género (n≥8, no 20) porque el dato es más
+  // granular por naturaleza -- documentado así, no porque sea más confiable
+  // a igual n. director/cast_names se combinan acá mismo (Bloque W: una sola
+  // fuente de verdad, sin distinguir rol todavía -- eso es un candidato
+  // futuro aparte, recién si hay muestra real que lo sostenga).
+  const peopleOf = i => [...(i.director||[]), ...(i.cast_names||[])];
+  const peopleRated = watched.filter(i=>i.my_rating && peopleOf(i).length);
   if (peopleRated.length >= 30) {
     const overallP = peopleRated.reduce((s,i)=>s+parseFloat(i.my_rating),0)/peopleRated.length;
     const personStats = {};
-    peopleRated.forEach(i=>i.people.forEach(p=>{
+    peopleRated.forEach(i=>peopleOf(i).forEach(p=>{
       if(!personStats[p]) personStats[p]={sum:0,n:0};
       personStats[p].sum+=parseFloat(i.my_rating); personStats[p].n++;
     }));
