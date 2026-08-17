@@ -1414,6 +1414,16 @@ Todo probado contra Supabase real, sobre un ítem real de Diego ("Pobres criatur
 - **Edición sin transición:** guardar el ítem ya `watched` (cambiando solo notas) no tocó `watch_date` ni `precision` — confirma que el gate de transición real funciona, no solo el de precisión null.
 - **Convivencia con reacciones:** confirmado en código que `maybeShowReactionPrompt()` ahora devuelve `true`/`false` y que el chip de `watch_date` respeta esa prioridad — no se pudo forzar un caso real de colisión (requiere una reacción estadísticamente notable, poco frecuente hoy) pero la lógica está probada por lectura directa del flujo.
 
+### Auditoría de Memoria v1 (17-ago-2026) — pausada con criterio de reapertura, no implementada
+
+Con Bloque AH recién cerrado, Diego pidió auditar cuál debería ser la primera experiencia de Memoria antes de diseñarla — 4 direcciones candidatas: memoria temporal pura (aniversarios/épocas), evolución de gustos (etapas, períodos con géneros/personas dominantes), recuerdos contextuales ("tuviste una etapa de Nolan"), integración con Descubrí como señal adicional.
+
+**Dato real que decidió todo:** consultado en vivo contra Supabase, **0 de 2185 ítems tienen `watch_date` no nulo** — cero, no "poca muestra". Bloque AH captura hacia adelante, sin backfill, y recién se cerró — es exactamente el estado esperable el día 1, no una falla.
+
+**Las 4 direcciones dependen todas de la misma pieza inexistente:** un eje temporal real de cuándo Diego consumió cada cosa. Sin eso, "aniversarios" no tiene fecha que narrar, "evolución de gustos" no tiene manera de saber cuándo dominaba cada género, "recuerdos contextuales" no tiene secuencia real que reconstruir, y "señal para Descubrí" es una señal de muestra cero. Se descartó explícitamente sustituir con `release_year` (es la época del contenido, no de cuándo lo viste) o `created_at` (ya auditado y descartado antes — 48% del catálogo comparte fecha de carga masiva, no dice nada real).
+
+**Decisión:** Memoria queda en pausa — no como bloque incompleto, sino como infraestructura preparada (`watch_date`/`watch_date_precision` ya capturan lo que van a necesitar) esperando su insumo real. **Criterio de reapertura, explícito y no basado en calendario:** cuando haya ~15-20 ítems con `watch_date` real acumulado por uso normal, idealmente distribuidos en distintos momentos y con mezcla de tipos si aparece naturalmente — ahí se repite esta misma auditoría (qué patrones temporales aparecen, qué historias se pueden contar sin inventar, qué nivel de precisión permite cada dato), no se diseña a ciegas sobre una hipótesis. Mientras tanto, explícitamente prohibido: `created_at`, fecha de estreno, fecha de carga masiva, o cualquier aproximación no declarada como tal. Única excepción permitida: una experiencia que use la señal de tiempo de forma opcional/lateral, no Memoria como producto en sí.
+
 ---
 
 ## Hoja de ruta confirmada después de Bloque S (15-ago-2026, sin bloques abiertos todavía)
