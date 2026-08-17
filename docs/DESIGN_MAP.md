@@ -1144,6 +1144,41 @@ DELETE FROM groups WHERE name IN ('Prueba Bloque K 3', 'Validacion Grupo L', 'QA
 
 ---
 
+## Bloque AC — Bottom nav contextual (auto-hide con scroll)
+
+- **Objetivo:** Diego retomó un punto pendiente de la auditoría UX profunda — el header y el bottom nav fijos "encajonan" la app en mobile, con un costo de espacio permanente (~100px) incluso durante una navegación larga de Biblioteca o consumo de contenido. Mandato explícito: no es un problema de sacar navegación, es un problema de costo permanente — auditar la decisión, no asumir que hay que eliminarlos.
+- **Estado:** Finalizado. Diseño discutido y confirmado en 2 rondas antes de tocar código; validado con datos reales de la app (Biblioteca con 2185 entradas).
+
+### Decisión de producto
+
+Se mantiene la navegación fija en su forma (header sticky arriba, bottom nav abajo) pero el bottom nav pasa a ser **contextual**: visible mientras el usuario navega o está cerca del tope, oculto mientras scrollea hacia abajo consumiendo contenido, visible de nuevo apenas sube o necesita cambiar de contexto. El header (`#masthead`) no se toca — permanece sticky siempre visible, ya es liviano en mobile (solo wordmark, sin la fila de links de desktop) y sirve de referencia de ubicación constante.
+
+### Comportamiento (diseñado antes de implementar, confirmado por Diego en 2 rondas)
+
+- **Umbral con histéresis, no reacción a cada pixel:** se acumula el desplazamiento desde el último cambio de sentido; recién se actúa cuando el acumulado supera 14px en una dirección — un scroll tembloroso o un rebote chico no dispara nada. Zona muerta cerca del tope (`scrollY<60px`): siempre visible, sin importar la dirección.
+- **Dirección:** bajar oculta, subir muestra.
+- **Transición sin layout shift:** un solo `transform: translateY()` con `transition` (`var(--ease)`, 220ms — misma curva que el resto de la app). El `padding-bottom` de `#app` no cambia nunca: el nav se desliza sobre el espacio ya reservado, no lo redimensiona.
+- **FAB:** sigue viviendo adentro de `#bottomnav` (no se separó en un segundo elemento flotante) — se oculta y aparece como una sola unidad con el resto del nav. Decisión explícita de Diego para no terminar con "dos elementos flotantes compitiendo": agregar es una acción de gestión, no de consumo, tiene sentido que desaparezca junto con la navegación.
+- **Modal abierto/cerrado:** durante un modal abierto no hay scroll en `window` (ya existe scroll-lock vía `body{position:fixed}`), así que el listener no interviene solo. Al cerrar, se fuerza el nav a visible — estado limpio y predecible en vez de heredar el último signo de scroll de antes de abrir.
+- **Teclado abierto/cerrado:** reusa el mismo listener de `visualViewport.resize` que ya alimentaba `--kb-vh` (no un mecanismo nuevo) — si el alto visible baja >150px respecto de `window.innerHeight`, se oculta sin importar la dirección de scroll; vuelve al cerrarse el teclado.
+- **Cambio de sección:** `switchTab()` ya hacía `scrollTo(top:0)` — cae solo en la zona muerta del tope. Se agregó `wakeBottomNav()` explícito para resetear el acumulador y no arrastrar delta de la sección anterior.
+- **Interactuar con búsqueda/filtros (agregado por Diego en la segunda ronda de diseño):** tocar el buscador de Biblioteca, el botón "Filtros" o cualquier control del panel de filtros trae el nav de vuelta aunque esté oculto — no tiene que desaparecer justo cuando el usuario quiere cambiar de contexto. Implementado con delegación de eventos sobre `#pane-biblioteca` (`click` + `focusin` combinados — ver nota de validación abajo sobre por qué los dos, no uno solo).
+
+### Un bug real encontrado durante la propia validación (no solo un artefacto de test)
+
+El primer diseño throttleaba el listener de scroll con `requestAnimationFrame` (patrón común, `if (bnTicking) return; bnTicking = true; requestAnimationFrame(() => {...; bnTicking = false;})`). Validando el mecanismo se detectó que si ese `requestAnimationFrame` no llega a dispararse (pestaña en segundo plano, limitación del motor), `bnTicking` queda trabado en `true` para siempre — el nav deja de reaccionar al scroll de forma permanente, sin ningún camino de recuperación. Se reemplazó por un throttle basado en `performance.now()` (ventana de 100ms, sin dependencia de rAF) — mismo efecto de limitar el trabajo por scroll, sin el riesgo de bloqueo. No se descarta que el disparo original fuera solo un artefacto del entorno de pruebas (pestañas automatizadas se backgroundean distinto que una app real en primer plano), pero el fix en sí es una mejora de robustez válida independientemente de la causa — un throttle que puede quedar trabado para siempre es un defecto de diseño, no depende de si se manifestó por una causa "real" o de test.
+
+### Validación
+
+- **Umbral, dirección y zona muerta:** validados con eventos de scroll reales (`scrollTo`+`dispatchEvent`, espaciados en el tiempo para no chocar con el throttle) sobre Biblioteca con las 2185 entradas reales: movimiento chico (8px) no dispara nada; acumulado que cruza 14px sí; zona muerta bajo 60px siempre visible; bajar oculta, subir muestra — los 4 casos confirmados por separado.
+- **Cambio de sección:** confirmado que salir de una pantalla con el nav oculto y entrar a otra lo deja visible.
+- **Cierre de modal:** confirmado que abrir un modal con el nav oculto y cerrarlo lo deja visible, con el scroll de fondo restaurado a la posición correcta.
+- **Interacción con búsqueda/filtros:** confirmado por click (tocar el buscador, "Filtros", o los pills de tipo trae el nav de vuelta). **El disparo por `focusin` no se pudo validar en vivo** — en este entorno de pruebas, `.focus()` programático mueve `document.activeElement` pero no dispara el evento `focus`/`focusin` real (limitación del entorno automatizado, no del código: la estructura DOM y el registro del listener se confirmaron correctos por separado). Por eso se reforzó el trigger con `click` además de `focusin` en el mismo conjunto de controles — en cualquier dispositivo real un toque dispara ambos eventos, así que la cobertura no depende de uno solo.
+- **Captura visual:** confirmado que al scrollear la grilla de Biblioteca el nav y el FAB desaparecen juntos, dejando toda la pantalla para el contenido; overflow horizontal medido en 0px después del cambio (mismo criterio de Bloque Z).
+- **Limitación honesta, mismo patrón que Bloques O/Z:** no se pudo probar el gesto de scroll táctil real ni el teclado nativo abriéndose de verdad en un dispositivo físico — herramienta de este entorno no los reproduce fielmente. Confirmación final en Safari real y PWA instalada queda de tu lado.
+
+---
+
 ## Hoja de ruta confirmada después de Bloque S (15-ago-2026, sin bloques abiertos todavía)
 
 Diego cerró la sesión de Bloque S con una lectura de conjunto del roadmap: primero la base técnica (Bloque M), después la UX de uso diario (Bloques N-Q), y ahora el arranque de la inteligencia propia de Archivo (Bloques R-S). Definió la secuencia de las próximas cuatro apuestas, en este orden — **ninguna diseñada todavía**, esto es la hoja de ruta, no un bloque en curso:

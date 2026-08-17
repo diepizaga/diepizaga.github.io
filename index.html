@@ -194,7 +194,11 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
   border-top: 1px solid var(--hair);
   height: calc(var(--bottomnav-h) + env(safe-area-inset-bottom, 0px));
   padding-bottom: env(safe-area-inset-bottom, 0px);
+  /* nav contextual: se desliza sobre el espacio ya reservado en #app, nunca lo
+     redimensiona -- el "respiro" es superficie visible, no un recálculo de layout. */
+  transform: translateY(0); transition: transform .22s var(--ease);
 }
+#bottomnav.bn-hidden { transform: translateY(100%); }
 .bn-inner { display: flex; height: var(--bottomnav-h); align-items: stretch; }
 .bn-tab { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 4px; cursor: pointer; -webkit-tap-highlight-color: transparent; min-width: 0; }
@@ -2803,6 +2807,7 @@ function switchTab(tab) {
   document.querySelectorAll('.pane').forEach(p => p.classList.remove('active'));
   $id(`pane-${tab}`)?.classList.add('active');
   window.scrollTo({ top: 0, behavior: 'instant' });
+  wakeBottomNav(); // reset explícito del acumulador -- no arrastra delta de la sección anterior
   try { localStorage.setItem('archivo_tab', tab); } catch {}
   if (tab === 'descubri') renderDisc();
   if (tab === 'adn') renderADN();
@@ -3304,6 +3309,7 @@ function closeModal(id) {
     document.body.style.width = '';
     document.body.style.paddingRight = '';
     window.scrollTo(0, y);
+    wakeBottomNav(); // estado limpio al cerrar -- no hereda el hidden/visible de antes de abrir
   }
 }
 document.querySelectorAll('.modal-overlay').forEach(o=>o.addEventListener('click',e=>{ if(e.target===o) closeModal(o.id); }));
@@ -3317,6 +3323,72 @@ if (window.visualViewport) {
   setKbVh();
   window.visualViewport.addEventListener('resize', setKbVh);
 }
+
+// ============================================================
+// BOTTOM NAV CONTEXTUAL -- menos chrome mientras se consume contenido,
+// navegación disponible apenas hace falta. No es "sacar navegación": el nav
+// se desliza (transform, sin tocar el padding de #app) sobre el espacio que
+// ya estaba reservado -- cero salto de layout.
+// ============================================================
+let bnLastY = window.scrollY, bnAccum = 0, bnHidden = false;
+const BN_THRESHOLD = 14; // px acumulados antes de reaccionar -- evita nerviosismo
+const BN_TOP_ZONE = 60;  // px desde el tope: siempre visible
+
+function setBottomNavHidden(hidden) {
+  if (hidden === bnHidden) return;
+  bnHidden = hidden;
+  $id('bottomnav')?.classList.toggle('bn-hidden', hidden);
+}
+// se llama al cerrar un modal, al cambiar de sección, al cerrar el teclado y
+// al interactuar con búsqueda/filtros -- siempre vuelve a un estado limpio y
+// predecible en vez de arrastrar el último signo de scroll.
+function wakeBottomNav() {
+  bnAccum = 0;
+  bnLastY = window.scrollY;
+  setBottomNavHidden(false);
+}
+
+function onBnScroll() {
+  const y = window.scrollY;
+  const delta = y - bnLastY;
+  bnLastY = y;
+  if (y < BN_TOP_ZONE) { setBottomNavHidden(false); bnAccum = 0; return; }
+  if ((delta > 0 && bnAccum < 0) || (delta < 0 && bnAccum > 0)) bnAccum = 0; // cambio de sentido: arranca de nuevo
+  bnAccum += delta;
+  if (bnAccum > BN_THRESHOLD) { setBottomNavHidden(true); bnAccum = 0; }
+  else if (bnAccum < -BN_THRESHOLD) { setBottomNavHidden(false); bnAccum = 0; }
+}
+let bnLastTick = 0;
+window.addEventListener('scroll', () => {
+  // throttle por tiempo, no por rAF -- un rAF que nunca llega a dispararse
+  // (pestaña en segundo plano, limitación del motor) dejaría el listener
+  // trabado para siempre; un timestamp no tiene ese riesgo.
+  const now = performance.now();
+  if (now - bnLastTick < 100) return;
+  bnLastTick = now;
+  onBnScroll();
+}, { passive: true });
+
+// teclado abierto: oculta sin importar el scroll -- reusa el mismo visualViewport
+// que ya alimenta --kb-vh, no un mecanismo nuevo.
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', () => {
+    const kbOpen = (window.innerHeight - window.visualViewport.height) > 150;
+    if (kbOpen) setBottomNavHidden(true); else wakeBottomNav();
+  });
+}
+
+// interactuar con búsqueda/filtros de Biblioteca trae el nav de vuelta -- no
+// tiene que desaparecer justo cuando el usuario quiere cambiar de contexto.
+// click + focusin (no solo uno): un tap real dispara ambos, pero no queremos
+// depender de un solo tipo de evento para algo tan chico.
+$id('pane-biblioteca')?.addEventListener('focusin', e => {
+  if (e.target.closest('.bib-search-hero, .bib-filters-panel')) wakeBottomNav();
+});
+$id('pane-biblioteca')?.addEventListener('click', e => {
+  if (e.target.closest('.bib-pills, .bib-search-hero, .bib-filters-panel')) wakeBottomNav();
+});
+
 // Al enfocar un campo dentro de un modal abierto, lo trae a la vista dentro del
 // contenedor scrolleable del modal -- si no, el teclado puede taparlo sin que el
 // usuario note que tiene que scrollear manualmente para encontrarlo.
