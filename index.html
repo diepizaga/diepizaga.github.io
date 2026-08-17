@@ -2563,7 +2563,10 @@ function adnSwitchType(el, type) {
 // pero continuo en vez de un corte binario.
 const AFFINITY_CONFIDENCE_N = 20;
 
-function affinityMap(rated, valuesOf, overall) {
+// confidenceN opcional (Bloque AI, libros) -- default AFFINITY_CONFIDENCE_N
+// preserva el comportamiento de siempre para película/serie, sin tocar esas
+// 4 llamadas existentes.
+function affinityMap(rated, valuesOf, overall, confidenceN = AFFINITY_CONFIDENCE_N) {
   const stats = {};
   rated.forEach(i => valuesOf(i).forEach(v => {
     if (!stats[v]) stats[v] = {sum:0, n:0};
@@ -2572,11 +2575,38 @@ function affinityMap(rated, valuesOf, overall) {
   const out = {};
   Object.entries(stats).forEach(([v, s]) => {
     const effect = (s.sum/s.n) - overall;
-    out[v] = { effect: effect * Math.min(1, s.n/AFFINITY_CONFIDENCE_N), n: s.n };
+    out[v] = { effect: effect * Math.min(1, s.n/confidenceN), n: s.n };
   });
   return out;
 }
 const runtimeBucket = r => !r ? null : r<90?'<90min':r<110?'90-110min':r<130?'110-130min':'130min+';
+
+// Bloque AI -- afinidad de libros. Mismo motor genérico de arriba, umbrales
+// propios: 28 libros es un orden de magnitud menor que el catálogo de
+// película, copiar los mismos números (20) apagaría el sistema para siempre.
+// n mínimo bajo a propósito -- repetir autor es poco frecuente en un lector,
+// 2 libros del mismo autor ya es un patrón real, no ruido. Auditado con datos
+// reales de Diego (16 libros calificados ≥8 de 28 -- más de la mitad, sin
+// variación real) antes de decidir: no hay una "porción de favoritos" que
+// aísle nada distinto de lo que ya mide la afinidad contra el promedio, así
+// que no se agrega esa señal aparte -- el desempate usa el n que ya se
+// calcula, no un cálculo nuevo.
+const BOOK_AUTHOR_CONFIDENCE_N = 5;
+const BOOK_GENRE_CONFIDENCE_N = 6;
+const BOOK_AUTHOR_GATE_N = 2;   // mínimo para dejar de ser una sola observación
+const BOOK_GENRE_GATE_N = 3;
+const pageBucket = p => !p ? null : p<250?'<250p':p<400?'250-400p':p<600?'400-600p':'600p+';
+
+function computeBookAffinityMaps(watched) {
+  const rated = watched.filter(i=>i.type==='book' && i.my_rating);
+  const overall = rated.length ? rated.reduce((s,i)=>s+parseFloat(i.my_rating),0)/rated.length : 0;
+  return {
+    overall,
+    author: affinityMap(rated, i=>i.author?i.author.split(',').map(a=>a.trim()).filter(Boolean):[], overall, BOOK_AUTHOR_CONFIDENCE_N),
+    genre:  affinityMap(rated, i=>i.genres||[], overall, BOOK_GENRE_CONFIDENCE_N),
+    extent: affinityMap(rated, i=>{ const b=pageBucket(i.runtime); return b?[b]:[]; }, overall, BOOK_GENRE_CONFIDENCE_N),
+  };
+}
 
 // Década confirmada SIN señal real en Bloque T (spread prácticamente plano)
 // -- se excluye a propósito, no por olvido. Reacciones: con ~0 datos reales
@@ -2780,12 +2810,19 @@ async function renderDisc() {
   discCache[discType] = html; el.innerHTML = html;
 }
 
+// Bloque AI -- ranking propio de libros. Candidatos: misma búsqueda por
+// autor/género favorito de siempre (no hay "TMDB de libros" que traiga
+// candidatos de calidad ambigua -- el pool ya viene sesgado a tus gustos por
+// construcción, no hace falta un piso de calidad separado). Lo que faltaba
+// era CÓMO se ordenan y CÓMO se explican -- eso es lo que agrega este bloque,
+// reusando affinityMap() con umbrales propios de este dominio.
 async function renderBookDisc() {
   const el = $id('disc-content'); if (!el) return;
   const requestedType = discType; // snapshot: si el usuario cambia de pestaña antes de que termine, esta respuesta queda obsoleta
   if (discCache.books) { el.innerHTML = discCache.books; return; }
   el.innerHTML = `<div class="loading-block"><div class="spinner" style="margin:0 auto 10px"></div>Buscando libros…</div>`;
 
+  const watched = items.filter(i=>i.status!=='watchlist');
   const topBooks = items.filter(i=>i.type==='book'&&i.my_rating&&parseFloat(i.my_rating)>=7).sort((a,b)=>parseFloat(b.my_rating)-parseFloat(a.my_rating)).slice(0,10);
   if (topBooks.length < 2) { el.innerHTML = `<div class="empty-state"><h3>Faltan datos</h3><p>Calificá al menos 2 libros con 7 o más para ver recomendaciones.</p></div>`; return; }
 
@@ -2806,6 +2843,52 @@ async function renderBookDisc() {
 
   if (!allBooks.length) { el.innerHTML = `<div class="empty-state"><h3>Nada por ahora</h3><p>No encontramos recomendaciones de libros.</p></div>`; return; }
 
+  // Score + clasificación por confianza real -- no por de dónde salió la
+  // búsqueda. "alta"/"inicial" usan el mismo n que ya calcula affinityMap(),
+  // nada de fórmula nueva; el desempate (auditado con datos reales: un corte
+  // fijo tipo "top 8+" es más de la mitad de tus libros, no aísla nada) usa
+  // ese mismo n como segunda clave de orden.
+  const aff = computeBookAffinityMaps(watched);
+  allBooks.forEach(b => {
+    let score = 0, best = null; // {n, kind:'alta'|'inicial'}
+    const authorNames = b.author ? b.author.split(',').map(a=>a.trim()).filter(Boolean) : [];
+    const authorHit = authorNames.map(a=>aff.author[a]).filter(Boolean).sort((x,y)=>y.effect-x.effect)[0];
+    if (authorHit && authorHit.effect > 0) {
+      score += authorHit.effect;
+      b._topAuthor = authorNames.find(a=>aff.author[a]===authorHit);
+      b._topAuthorN = authorHit.n;
+      if (authorHit.n >= BOOK_AUTHOR_GATE_N) best = pickBetter(best, {n:authorHit.n, kind: authorHit.n>=BOOK_AUTHOR_CONFIDENCE_N?'alta':'inicial'});
+    }
+    const genreHit = (b.categories||[]).map(g=>aff.genre[g]).filter(Boolean).sort((x,y)=>y.effect-x.effect)[0];
+    if (genreHit && genreHit.effect > 0) {
+      score += genreHit.effect;
+      b._topGenre = (b.categories||[]).find(g=>aff.genre[g]===genreHit);
+      b._topGenreN = genreHit.n;
+      if (genreHit.n >= BOOK_GENRE_GATE_N) best = pickBetter(best, {n:genreHit.n, kind: genreHit.n>=BOOK_GENRE_CONFIDENCE_N?'alta':'inicial'});
+    }
+    const extentHit = aff.extent[pageBucket(b.pageCount)];
+    if (extentHit && extentHit.effect > 0) score += extentHit.effect;
+    b._score = score;
+    b._tier = best ? best.kind : 'exploracion';
+    b._tieBreakN = best ? best.n : 0;
+  });
+  function pickBetter(cur, cand) { return (!cur || cand.n > cur.n) ? cand : cur; }
+  allBooks.sort((x,y) => y._score - x._score || y._tieBreakN - x._tieBreakN);
+
+  const bookWhy = b => {
+    if (b._tier === 'alta') {
+      const parts = [];
+      if (b._topAuthor) parts.push(`te funcionan los libros de ${esc(b._topAuthor)}`);
+      if (b._topGenre) parts.push(`solés puntuar alto ${esc(b._topGenre.toLowerCase())}`);
+      return `Te lo recomendamos porque ${parts.slice(0,2).join(' y ')}.`;
+    }
+    if (b._tier === 'inicial') {
+      if (b._topAuthor) return `Todavía es poca evidencia, pero los ${b._topAuthorN} libro${b._topAuthorN!==1?'s':''} que leíste de ${esc(b._topAuthor)} te gustaron bastante.`;
+      if (b._topGenre) return `Un patrón que recién empieza: los pocos libros de ${esc(b._topGenre.toLowerCase())} que leíste te fueron bien.`;
+    }
+    return `Relacionado con tus géneros o autores favoritos, sin evidencia suficiente todavía.`;
+  };
+
   const bookFeatured = (b, sectionLabel) => {
     const cover = b.cover ? `<img src="${escAttr(b.cover)}" alt="" loading="lazy" />` : `<div class="rcf-poster-ph" style="background:${bookColor(b.title)}">${bookInitial(b.title)}</div>`;
     return `<div class="rec-featured" onclick="qAddBookRec(event,'${escAttr(b.id)}')">
@@ -2814,7 +2897,7 @@ async function renderBookDisc() {
         <div class="rcf-label">${sectionLabel}</div>
         <div class="rcf-title">${esc(b.title)}</div>
         <div class="rcf-meta">${esc(b.author||'')}${b.year ? ' · '+b.year : ''}</div>
-        <div class="rcf-why" style="flex:1"></div>
+        <div class="rcf-why">${bookWhy(b)}</div>
         <div class="rcf-footer"><button class="rcf-cta">+ Agregar →</button></div>
       </div>
     </div>`;
@@ -2827,22 +2910,22 @@ async function renderBookDisc() {
       <div class="rr-body">
         <div class="rr-title">${esc(b.title)}</div>
         <div class="rr-meta">${esc(b.author||'')}${b.year?' · '+b.year:''}</div>
+        <div class="rr-why">${bookWhy(b)}</div>
       </div>
       <div class="rr-add">+</div>
     </div>`;
   };
 
+  const section = (arr, label, sub, featLabel) => {
+    if (!arr.length) return '';
+    const [f, ...rest] = arr;
+    return `<div class="disc-section"><div class="disc-section-title">${esc(label)}</div>${sub?`<div class="disc-section-why">${esc(sub)}</div>`:''}${bookFeatured(f,featLabel)}${rest.length?`<div class="recs-list">${rest.map((b,i)=>bookRow(b,i+2)).join('')}</div>`:''}</div>`;
+  };
   let html = '';
-  const authorBooks = allBooks.filter(b=>topAuthors.some(a=>(b.author||'').includes(a))).slice(0,12);
-  const otherBooks  = allBooks.filter(b=>!topAuthors.some(a=>(b.author||'').includes(a))).slice(0,12);
-  if (authorBooks.length) {
-    const [f, ...rest] = authorBooks;
-    html += `<div class="disc-section"><div class="disc-section-title">De tus autores favoritos</div><div class="disc-section-why">${topAuthors.slice(0,2).map(esc).join(' · ')}</div>${bookFeatured(f,'Autor favorito')}${rest.length?`<div class="recs-list">${rest.map((b,i)=>bookRow(b,i+2)).join('')}</div>`:''}</div>`;
-  }
-  if (otherBooks.length) {
-    const [f, ...rest] = otherBooks;
-    html += `<div class="disc-section"><div class="disc-section-title">Por tus géneros</div><div class="disc-section-why">${topGenres.slice(0,2).map(esc).join(' · ')}</div>${bookFeatured(f,'Género favorito')}${rest.length?`<div class="recs-list">${rest.map((b,i)=>bookRow(b,i+2)).join('')}</div>`:''}</div>`;
-  }
+  html += section(allBooks.filter(b=>b._tier==='alta').slice(0,12), 'Para vos', 'Afinidad real con tus gustos', 'Alta afinidad');
+  html += section(allBooks.filter(b=>b._tier==='inicial').slice(0,12), 'Un patrón que empieza', 'Todavía poca evidencia, pero ya hay algo', 'Patrón inicial');
+  html += section(allBooks.filter(b=>b._tier==='exploracion').slice(0,12), 'Para explorar', topAuthors.slice(0,2).concat(topGenres.slice(0,1)).map(esc).join(' · '), 'Para explorar');
+
   discCache.books = html; el.innerHTML = html;
 }
 

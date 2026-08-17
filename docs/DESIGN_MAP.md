@@ -1426,6 +1426,50 @@ Con Bloque AH recién cerrado, Diego pidió auditar cuál debería ser la primer
 
 ---
 
+## Bloque AI — Ranking propio de Descubrí-libros (sin copiar el algoritmo de película/serie)
+
+- **Objetivo:** asimetría real de producto — películas/series ya pasan por ranking propio + señales de ADN + explicación (Bloque R/X), libros seguía en la lógica anterior (frecuencia de búsqueda, sin afinidad, `rcf-why` literalmente vacío). Mandato explícito de Diego: no buscar un falso "TMDB de libros", no copiar el algoritmo de película si el dominio necesita otra lógica, no aplicar umbrales heredados, no inventar explicaciones sin evidencia.
+- **Estado:** Finalizado en el entorno de pruebas. Los 2 niveles de mayor confianza (`alta`/`inicial`) validados con datos reales + candidatos simulados porque Google Books agotó su cuota diaria durante las pruebas (condición externa, no relacionada con el código) — el nivel `exploracion` sí se validó con datos 100% reales y en vivo.
+
+### Auditoría previa al diseño
+
+Diferencia estructural clave, no una limitación de implementación: TMDB tiene `/recommendations` con `vote_count`/`vote_average`; Open Library y Google Books no tienen equivalente — no existe una fuente externa de "libros similares" confiable. Los candidatos de siempre (búsqueda por autor/género favorito) ya vienen sesgados hacia los gustos de Diego por construcción, así que no hace falta un piso de calidad tipo `DISC_MIN_VOTES` (no hay una fuente de calidad ambigua que filtrar, a diferencia de TMDB). Esto reformuló la pregunta: el valor real que Archivo puede aportar no está en encontrar mejores candidatos (no hay cómo), está en cómo los ordena y explica.
+
+Auditado con datos reales antes de diseñar: 16 de 28 libros calificados ≥8 (más de la mitad) — un corte fijo tipo "tus favoritos" no aísla nada distinto de lo que ya mide la afinidad contra el promedio general, a diferencia de película donde sí hay variación real de notas. Esto descartó agregar una señal nueva de "parecido a tus mejores libros" (punto 2 del ajuste de Diego) — en su lugar, el desempate usa el mismo `n` (tamaño de muestra) que ya se calcula para clasificar por confianza, sin cálculo adicional.
+
+### Diseño confirmado
+
+**Señales de ranking** — reusa `affinityMap()` (Bloque X) tal cual, con `confidenceN` ahora parametrizable (antes era un `const` fijo de 20, ahora acepta un 4to argumento opcional — las 4 llamadas existentes de película/serie no cambian, siguen usando el default 20):
+- Afinidad de autor (`BOOK_AUTHOR_CONFIDENCE_N = 5`, gate mínimo `n≥2`).
+- Afinidad de género (`BOOK_GENRE_CONFIDENCE_N = 6`, gate mínimo `n≥3`).
+- Afinidad de extensión/`pageCount` (mismo `confidenceN` que género) — incluida con el mismo mecanismo de amortiguación continua de `affinityMap()`, sin gate separado ni decisión previa de si "aporta": si la muestra real no la sostiene, el propio damping la deja en ~0 sola.
+
+Umbrales bajos a propósito y proporcionales al tamaño real del catálogo de libros de Diego (28), no una fracción arbitraria de los de película (1862) — validado contra sus autores reales: Rowling (n=7) ya en confianza plena, Ruiz Zafón/Anna Todd (n=3) en el rango inicial, Flynn/Meyer (n=2) en el gate mínimo.
+
+**3 niveles de confianza, no 2 baldes por origen de búsqueda:**
+- **"Para vos"** — al menos una señal en confianza plena. Explicación confiada: *"Te lo recomendamos porque te funcionan los libros de [autor]."*
+- **"Un patrón que empieza"** — señal entre el gate mínimo y la confianza plena. Explicación que nombra la muestra chica en vez de esconderla: *"Todavía es poca evidencia, pero los 3 libros que leíste de [autor] te gustaron bastante."*
+- **"Para explorar"** — ninguna señal cruzó su gate. Sin frase de afinidad: *"Relacionado con tus géneros o autores favoritos, sin evidencia suficiente todavía."*
+
+**Desempate:** al ordenar por score, segunda clave es el `n` que respalda la señal ganadora — el mismo dato ya usado para clasificar el nivel, no un cálculo nuevo.
+
+### Implementación
+
+- `affinityMap(rated, valuesOf, overall, confidenceN = AFFINITY_CONFIDENCE_N)` — parámetro nuevo con default, cero cambio de comportamiento para las 4 llamadas de película/serie existentes.
+- `computeBookAffinityMaps(watched)` — nueva función, misma forma que `computeAffinityMaps()` pero con autor en vez de director/reparto y `pageBucket()` en vez de `runtimeBucket()` (buckets de páginas, no de minutos).
+- `renderBookDisc()` reescrito: score = suma de afinidades positivas que aplican al candidato; clasificación por el `n` de la señal ganadora; `bookWhy()` arma la explicación solo con lo que realmente contribuyó, nunca una plantilla fija; 3 `disc-section` en vez de 2, mismo componente visual (`rec-featured`/`recs-list`) ya existente. Se agregó explicación (`.rr-why`) también a las filas compactas, que antes no tenían ninguna.
+- Sin cambios en la fuente de candidatos (`booksSearch()`, queries por autor/género favorito) ni en `qAddBookRec()`.
+
+### Validación
+
+- `computeBookAffinityMaps()` confirmado con los 28 libros reales de Diego: Rowling `effect=0.54, n=7`; Ruiz Zafón `effect=0.72, n=3`; Anna Todd `effect=-0.88, n=3` (negativo, correctamente excluido del score — no se recomienda algo que históricamente calificó bajo solo porque el autor se repite).
+- Clasificación por tier confirmada con candidatos simulados sobre la afinidad real: autor de alta confianza → `alta`; autor de confianza inicial → `inicial`; autor sin datos → `exploracion` — los 3 casos exactos.
+- Nivel `exploracion` validado además con datos 100% reales y en vivo: la búsqueda por género devolvió candidatos reales (ej. *Siege and Storm*) sin afinidad medible, con la explicación honesta exacta diseñada, sin ningún dato inventado.
+- **Limitación de la validación, no del código:** Google Books devolvió `429 Quota exceeded` durante las pruebas de este bloque (uso intensivo de la API en la sesión) — los niveles `alta`/`inicial` se confirmaron con la lógica real (`computeBookAffinityMaps()` sobre datos reales) pero con candidatos simulados en el render, no con una búsqueda en vivo end-to-end. Vale la pena que Diego confirme el balde "Para vos" con una recarga real cuando la cuota se reponga (usualmente diaria).
+- `affinityMap()` con `confidenceN` opcional: confirmado que las 4 llamadas existentes de película/serie no pasan el 4to argumento, preservan el comportamiento de siempre (default 20).
+
+---
+
 ## Hoja de ruta confirmada después de Bloque S (15-ago-2026, sin bloques abiertos todavía)
 
 Diego cerró la sesión de Bloque S con una lectura de conjunto del roadmap: primero la base técnica (Bloque M), después la UX de uso diario (Bloques N-Q), y ahora el arranque de la inteligencia propia de Archivo (Bloques R-S). Definió la secuencia de las próximas cuatro apuestas, en este orden — **ninguna diseñada todavía**, esto es la hoja de ruta, no un bloque en curso:
