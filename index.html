@@ -784,6 +784,21 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
      intacto -- ese es el camino para encontrar dentro del archivo existente, un
      propósito distinto al de este ícono. */
   .mh-icon { display: none; }
+  /* iOS hace zoom automático de página completa al enfocar un campo de texto
+     con letra menor a 16px -- la base tipográfica de Archivo es 14.5px
+     (identidad visual del cuerpo del texto, no se toca), pero cualquier
+     input/select/textarea que la heredara sin override quedaba por debajo del
+     umbral. Confirmado como causa real de "la pantalla queda agrandada" en
+     iPhone (login, con .auth-input a 14.5px). Regla general primero (cubre
+     notas, fecha, selects de Biblioteca sin regla propia); .auth-input,
+     #ms-input y .bib-filters-panel select tienen su propia declaración con
+     más especificidad que la regla general, así que necesitan su propio
+     override acá para que el 16px les gane. Solo mobile -- desktop no sufre
+     este comportamiento de iOS. */
+  input, select, textarea { font-size: 16px; }
+  .auth-input { font-size: 16px; }
+  #ms-input { font-size: 16px; }
+  .bib-filters-panel select { font-size: 16px; }
   #bottomnav { display: block; }
   #app { padding: 22px 16px calc(var(--bottomnav-h) + env(safe-area-inset-bottom, 0px) + 30px); }
   .grid-cards { grid-template-columns: repeat(3, 1fr); gap: 16px 9px; }

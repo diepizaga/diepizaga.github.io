@@ -1275,6 +1275,44 @@ Se dejaron **explícitamente sin tocar**, por falta de evidencia suficiente (con
 
 ---
 
+## Bloque AF — Saneamiento mobile (3 hallazgos de la validación real de Bloque AE)
+
+- **Objetivo:** validando Bloque AE en su iPhone real, Diego reportó tres cosas que no eran parte del alcance de ese bloque: la sensación de "pantalla agrandada" en la PWA, un cartel "Cargando..." que parecía quedarse pegado, y una inconsistencia entre calificar algo y su estado. Los tres se auditaron con causa raíz antes de tocar código, mismo criterio de siempre.
+- **Estado:** Parte A finalizada. Partes B y C en diseño, sin implementar.
+
+### A) Zoom automático de iOS por inputs menores a 16px — CONFIRMADO Y CERRADO
+
+**Causa raíz:** la base tipográfica de todo Archivo es `body{font-size:14.5px}` — una decisión de identidad visual del cuerpo de texto, no un error. El problema es que varios campos de formulario heredaban o declaraban ese mismo tamaño chico: `.auth-input` (login/contraseña) a 14.5px, `#ms-input` (buscador de agregar) a 15px, y `#det-notes`/`#det-status`/`#det-date`/los `<select>` de filtros de Biblioteca sin ninguna declaración propia (heredaban 14.5px del body). iOS Safari hace zoom automático de página completa al enfocar cualquier campo de texto con letra menor a 16px — comportamiento nativo de accesibilidad, no algo que Archivo dispare. Evidencia de que el patrón correcto ya existía en el propio código: `.bib-search-hero input` (buscador de Biblioteca) ya estaba en exactamente 16px — alguien ya había resuelto esto ahí puntualmente, sin aplicarlo al resto.
+
+**Cómo se identificó:** Diego reportó "pantalla agrandada que se mueve" al usar la PWA; una primera ronda de capturas no alcanzó a mostrar la causa (una imagen fija no puede mostrar movimiento); un video de pantalla permitió que el propio Diego identificara el patrón — se agranda específicamente al tocar los campos de usuario/contraseña. Confirmado después con el código: mismo umbral de 16px, mismo mecanismo, con evidencia de que Archivo ya conocía el problema (un input ya arreglado) pero no lo había aplicado sistemáticamente.
+
+**Fix — regla general, no parche por input, pedido explícito de Diego:**
+```css
+@media (max-width: 840px) {
+  input, select, textarea { font-size: 16px; }
+  .auth-input { font-size: 16px; }
+  #ms-input { font-size: 16px; }
+  .bib-filters-panel select { font-size: 16px; }
+}
+```
+La regla general cubre todo lo que no tenía una declaración propia (notas, fecha, estado, selects de Biblioteca). Los tres selectores con su propia declaración (`.auth-input`, `#ms-input`, `.bib-filters-panel select`) necesitan su propio override porque tienen más especificidad que una regla de tipo genérica — sin esto, el 16px general no les habría ganado. Solo dentro del breakpoint mobile ya existente — desktop no sufre este comportamiento de iOS y no se toca.
+
+**Validación:**
+- `getComputedStyle` confirmó 16px en mobile (375px) para: `#auth-email`, `#ms-input`, `#bib-search`, `#filter-status`, `#filter-genre`, `#det-notes`, `#det-status`, `#det-date`.
+- Desktop (1280px) confirmado sin cambios: `#ms-input` sigue en 15px, `#filter-genre` sigue en 12px.
+- Captura visual del panel de filtros de Biblioteca en mobile con el texto más grande: "Estado / Género / Década / Recientes" se leen completos, sin corte ni desborde — la preocupación de que el layout de 2 columnas se rompiera con letra más grande no se confirmó.
+- **Pendiente de Diego:** la confirmación real de que esto elimina el zoom en su iPhone — es exactamente el tipo de comportamiento nativo que este entorno no puede reproducir.
+
+### B) "Cargando..." global — en diseño, sin implementar
+
+Pendiente de análisis: cuándo aparece exactamente (se disparó en las 4 llamadas a `showToast('Cargando…')`, todas al seleccionar un resultado de búsqueda para agregar), por qué se percibe como pegado (es un toast global compartido por toda la app, no ligado a una pantalla — si el usuario cambia de pestaña mientras está visible, lo sigue viendo en la pantalla nueva sin contexto), y si bloquea interacción (no bloquea — `pointer-events` no se tocan — pero no hay ninguna confirmación explícita de éxito cuando termina, solo se autolimpia a los 3 segundos). Diego pidió explícitamente no solo esconderlo o extenderlo, sino entender el comportamiento completo antes de decidir el fix. Sin diseño de solución todavía.
+
+### C) Calificar vs. estado "Visto" — hallazgo de producto, en discusión
+
+`status` (dropdown "Estado") y `my_rating` (estrellas) son campos completamente independientes en `saveDetail()` — nada los conecta hoy. Preexistente desde que Bloque N (15-ago) cambió el default de altas nuevas a "watchlist"; nunca se vinculó con la calificación. Diego lo identificó como decisión de producto, no bug técnico — pidió analizar antes de decidir si calificar algo debería promover automáticamente el estado a "Visto", o si deben mantenerse separados a propósito. Sin diseño ni decisión todavía — toca el modelo mental de estados, no se resuelve con un cambio chico sin pensarlo.
+
+---
+
 ## Hoja de ruta confirmada después de Bloque S (15-ago-2026, sin bloques abiertos todavía)
 
 Diego cerró la sesión de Bloque S con una lectura de conjunto del roadmap: primero la base técnica (Bloque M), después la UX de uso diario (Bloques N-Q), y ahora el arranque de la inteligencia propia de Archivo (Bloques R-S). Definió la secuencia de las próximas cuatro apuestas, en este orden — **ninguna diseñada todavía**, esto es la hoja de ruta, no un bloque en curso:
