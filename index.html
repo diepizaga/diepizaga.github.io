@@ -572,7 +572,20 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
 /* búsqueda */
 #modal-search .search-header { padding: 24px 24px 16px; }
 #modal-search h2 { font-family: var(--serif); font-style: italic; font-weight: 400; font-size: 24px; margin-bottom: 14px; }
-#ms-input { width: 100%; font-size: 15px; padding: 12px 15px; }
+.ms-input-wrap { position: relative; }
+#ms-input { width: 100%; font-size: 15px; padding: 12px 38px 12px 15px; }
+/* botón de limpiar (patrón nativo de buscador iOS) -- distinto en tamaño y
+   posición del ✕ que cierra el modal (arriba a la derecha del todo) para que
+   nunca se confundan; solo aparece con texto, ver toggle en el listener de input. */
+.ms-clear {
+  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+  width: 22px; height: 22px; border-radius: 50%; padding: 0;
+  background: rgba(255,255,255,.08); border: none; color: var(--paper3);
+  font-size: 11px; line-height: 1; align-items: center; justify-content: center;
+  cursor: pointer; display: none; transition: background .12s, color .12s;
+}
+.ms-clear.show { display: flex; }
+.ms-clear:hover { background: rgba(255,255,255,.15); color: var(--paper); }
 .ms-type-btns { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
 .ms-type-btns .pill { padding: 6px 12px; font-size: 9.5px; }
 #ms-results { padding: 0 12px 18px; max-height: min(430px, 55vh); overflow-y: auto; }
@@ -1011,7 +1024,10 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
     <button class="modal-close" onclick="closeModal('modal-search')">✕</button>
     <div class="search-header">
       <h2>Buscar y agregar</h2>
-      <input type="text" id="ms-input" placeholder="Película, serie o libro…" autocomplete="off" />
+      <div class="ms-input-wrap">
+        <input type="text" id="ms-input" placeholder="Película, serie o libro…" autocomplete="off" />
+        <button type="button" class="ms-clear" id="ms-clear" onclick="clearSearchInput()" aria-label="Borrar búsqueda">✕</button>
+      </div>
       <div class="ms-type-btns">
         <button class="pill active" data-type="multi">Todo</button>
         <button class="pill" data-type="movie">Películas</button>
@@ -2841,6 +2857,7 @@ function cancelAddFlow() {
   searchType = lastSearchType || 'multi';
   document.querySelectorAll('.ms-type-btns .pill').forEach(b=>b.classList.toggle('active', b.dataset.type===searchType));
   $id('ms-input').value = lastSearchQuery;
+  $id('ms-clear').classList.toggle('show', !!lastSearchQuery);
   doSearch(lastSearchQuery);
 }
 
@@ -2848,13 +2865,26 @@ function openSearchModal() {
   openModal('modal-search');
   setTimeout(()=>$id('ms-input').focus(), 80);
   $id('ms-results').innerHTML = '';
+  $id('ms-clear').classList.remove('show');
   searchType = (currentTab==='biblioteca' && ['movie','tv','book'].includes(libType)) ? libType : 'multi';
   document.querySelectorAll('.ms-type-btns .pill').forEach(b=>b.classList.toggle('active', b.dataset.type===searchType));
+}
+
+// patrón nativo de buscador iOS: limpiar de un toque en vez de borrar letra a
+// letra -- mantiene el input enfocado para seguir escribiendo de inmediato.
+function clearSearchInput() {
+  clearTimeout(searchTimeout);
+  const input = $id('ms-input');
+  input.value = '';
+  $id('ms-results').innerHTML = '';
+  $id('ms-clear').classList.remove('show');
+  input.focus();
 }
 
 $id('ms-input').addEventListener('input', e => {
   clearTimeout(searchTimeout);
   const q = e.target.value.trim();
+  $id('ms-clear').classList.toggle('show', !!q);
   if (!q) { $id('ms-results').innerHTML = ''; return; }
   $id('ms-results').innerHTML = '<div class="loading-block"><div class="spinner" style="margin:0 auto"></div></div>';
   searchTimeout = setTimeout(()=>doSearch(q), 380);
@@ -2866,6 +2896,7 @@ document.querySelectorAll('.ms-type-btns .pill').forEach(btn => {
     btn.classList.add('active'); searchType = btn.dataset.type;
     const q = $id('ms-input').value.trim();
     if (q) doSearch(q);
+    $id('ms-input').focus(); // mantener el teclado abierto -- iOS puede cerrarlo igual al tocar un <button>, validar en dispositivo real
   });
 });
 
@@ -3315,7 +3346,7 @@ function openModal(id) {
 }
 function closeModal(id) {
   $id(id).classList.remove('open');
-  if (id==='modal-search') { $id('ms-input').value=''; $id('ms-results').innerHTML=''; }
+  if (id==='modal-search') { $id('ms-input').value=''; $id('ms-results').innerHTML=''; $id('ms-clear').classList.remove('show'); }
   if (id==='modal-detail') { currentRating=null; editingItem=null; pendingItem=null; }
   if (!document.querySelector('.modal-overlay.open')) {
     const y = parseInt(document.body.dataset.scrollY || '0');

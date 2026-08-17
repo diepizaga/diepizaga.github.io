@@ -1236,6 +1236,43 @@ Pedido explícito de Diego: que no haya animaciones ni estados artificiales para
 - **ADN completo, sin contenido tapado:** confirmado por captura — el insight 04 (el que aparecía cortado por el bottom nav en las capturas reales de la auditoría) ahora se lee completo.
 - **Limitación honesta, mismo patrón que Bloques O/Z/AC:** lo que no se puede validar desde este entorno es exactamente lo que motivó esta auditoría — Safari real con su barra visible, pinch-zoom real, y la sensación completa en tu dispositivo. Los 6 casos que pediste probar (Biblioteca larga, volver arriba, FAB, Safari con barra, pinch-zoom, ADN completo) quedan para tu validación en el iPhone real antes de dar este bloque por cerrado del todo.
 
+### Validación real en iPhone (16-ago-2026) — Diego aprueba el bloque
+
+Confirmado en dispositivo real: Biblioteca larga con mucho más espacio útil y el contenido ganando protagonismo; ADN sin el bottom nav tapando insights, lectura natural; convivencia con la barra de Safari bastante menos invasiva al haber un solo chrome propio en vez de dos. FAB confirmado: la lupa del header no hace falta, el "+" tiene presencia suficiente y la acción tiene sentido ahí. **Bloque AD aprobado y cerrado del todo.**
+
+Dos observaciones que Diego registra explícitamente **sin abrir como bloque**, para no perderlas:
+1. **Bottom nav sigue siendo protagonista durante lectura/scroll largo** (ADN, fichas, Biblioteca) — con un solo chrome ya mejoró, pero ocupa espacio incluso con el auto-hide actual. Hipótesis sin validar: quizás en contenido de lectura larga debería ocultarse más agresivamente. No se abre ahora.
+2. **Pinch-zoom mejoró pero sigue siendo una limitación real de iOS** — menos elementos fijos hicieron el problema menos grave, pero Archivo todavía no se comporta como una app nativa bajo zoom. Se mantiene como criterio de validación en futuros bloques de mobile, no como algo a resolver de punta ahora.
+
+---
+
+## Bloque AE — Buscador: mantener foco + limpiar de un toque
+
+- **Objetivo:** hallazgo #2 de la auditoría PWA real — el flujo de buscar/agregar perdía el teclado en medio de una edición. Diego pidió auditar el flujo completo (abrir, escribir, borrar, cambiar criterio, cerrar teclado, volver a buscar), no solo tratar el síntoma.
+- **Estado:** Finalizado en el entorno de pruebas. Validación completa en iPhone real queda de tu lado, mismo patrón que los bloques anteriores de esta etapa.
+
+### Auditoría — separar causa de alta confianza de hipótesis sin confirmar
+
+Trazando el flujo completo en código se encontró una causa concreta y verificable, distinta de la hipótesis original de la auditoría PWA real (interferencia del chrome dinámico de Safari): los pills de tipo (Todo/Películas/Series/Libros) son `<button>` sin ningún código que preserve el foco del input al tocarlos. En iOS Safari, tocar un `<button>` mientras un `<input>` de texto tiene el foco cierra el teclado por defecto — comportamiento nativo de la plataforma, no algo que Archivo dispare a propósito. Esto explica el paso "cambiar criterio" del flujo que describió Diego. Se confirmó además, por ausencia en el código, que nada propio llama `.blur()`, reemplaza el nodo `#ms-input`, ni escucha `scroll`/`resize` para cerrar el modal — el cierre es un efecto de la plataforma reaccionando a un toque en un botón, no una acción explícita.
+
+Se identificó un segundo hallazgo, de oportunidad más que de bug: no existía ningún botón de limpiar de un toque dentro del campo (el patrón nativo estándar de iOS) — solo el ✕ que cierra el modal entero. El flujo "borrar" de Diego solo se podía hacer letra por letra.
+
+Se dejaron **explícitamente sin tocar**, por falta de evidencia suficiente (confianza media/baja, pedido de Diego de no tocar arquitectura sin evidencia): la estructura de scroll anidado (`.modal` + `#ms-results`, cada uno con su propio `overflow-y:auto`) y la hipótesis de interferencia del chrome de Safari.
+
+### Cambios
+
+- **Refoco tras cambiar de tipo:** `$id('ms-input').focus()` agregado al final del handler de cada pill, después de disparar `doSearch()`. Si el teclado ya se cerró nativamente antes de que corra el JS, puede que no alcance para reabrirlo (comportamiento de iOS fuera de nuestro control) — pero es el fix directo a la causa identificada.
+- **Botón de limpiar (`.ms-clear`):** nuevo botón ✕ dentro del campo de búsqueda, visible solo con texto (toggle en el listener de `input`, en `cancelAddFlow()` y al cerrar/abrir el modal). Deliberadamente distinto en tamaño y posición del ✕ que cierra el modal (ese sigue arriba a la derecha del todo, más grande, con borde) para que nunca se confundan — pedido explícito de Diego. `clearSearchInput()` limpia valor + resultados + cancela cualquier búsqueda con debounce pendiente (`clearTimeout(searchTimeout)`) y **vuelve a enfocar el input inmediatamente**, listo para seguir escribiendo sin perder el lugar.
+- **Sin cambios** en la estructura del modal, el scroll anidado, ni el viewport — alcance acotado a los dos hallazgos confirmados, tal como pediste.
+
+### Validación
+
+- **Toggle del botón de limpiar:** confirmado con texto real ("matrix") — aparece con contenido, desaparece al vaciar.
+- **`clearSearchInput()` end-to-end:** confirmado por llamada directa — vacía el valor, vacía resultados, oculta el botón, y `document.activeElement` vuelve a ser `#ms-input` (no se pierde el foco).
+- **Refoco tras cambiar de pill:** confirmado — tras tocar "Películas" con el input previamente enfocado, `document.activeElement` sigue siendo `#ms-input`, `searchType` y el pill activo se actualizan correctamente. Captura visual: el input mantiene el cursor y el borde de foco activo tras el cambio.
+- **Búsqueda real (no mockeada):** validado contra TMDB real ("matrix" trajo Matrix/Matrix Reloaded/Matrix Revolutions/Matrix Resurrections con datos reales) — el flujo completo de escribir→debounce→resultados sigue intacto.
+- **Limitación honesta, mismo patrón que toda esta etapa:** el entorno de pruebas no reproduce un toque táctil real ni el comportamiento exacto del teclado nativo de iOS — la confirmación de que el refoco realmente reabre o mantiene el teclado en tu dispositivo (que puede tener comportamientos particulares, como vos mismo señalaste) queda pendiente de tu validación. Los 7 pasos que pediste (abrir desde FAB, escribir, cambiar tipo sin perder teclado, limpiar con ✕, seguir escribiendo, sin resultados, teclado abriendo/cerrando varias veces) son exactamente lo que corresponde probar en tu iPhone antes de cerrar el bloque del todo.
+
 ---
 
 ## Hoja de ruta confirmada después de Bloque S (15-ago-2026, sin bloques abiertos todavía)
