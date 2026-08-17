@@ -1303,9 +1303,22 @@ La regla general cubre todo lo que no tenía una declaración propia (notas, fec
 - Captura visual del panel de filtros de Biblioteca en mobile con el texto más grande: "Estado / Género / Década / Recientes" se leen completos, sin corte ni desborde — la preocupación de que el layout de 2 columnas se rompiera con letra más grande no se confirmó.
 - **Pendiente de Diego:** la confirmación real de que esto elimina el zoom en su iPhone — es exactamente el tipo de comportamiento nativo que este entorno no puede reproducir.
 
-### B) "Cargando..." global — en diseño, sin implementar
+### B) "Cargando..." global — CERRADO
 
-Pendiente de análisis: cuándo aparece exactamente (se disparó en las 4 llamadas a `showToast('Cargando…')`, todas al seleccionar un resultado de búsqueda para agregar), por qué se percibe como pegado (es un toast global compartido por toda la app, no ligado a una pantalla — si el usuario cambia de pestaña mientras está visible, lo sigue viendo en la pantalla nueva sin contexto), y si bloquea interacción (no bloquea — `pointer-events` no se tocan — pero no hay ninguna confirmación explícita de éxito cuando termina, solo se autolimpia a los 3 segundos). Diego pidió explícitamente no solo esconderlo o extenderlo, sino entender el comportamiento completo antes de decidir el fix. Sin diseño de solución todavía.
+**Diagnóstico:** el toast aparece en los 4 puntos donde se selecciona un resultado para agregar (`selectResult`, `selectBookResult`, `openRecDetail`, `qAddBookRec`), justo antes de traer el detalle de TMDB/OMDB/Google Books. No bloquea interacción (`pointer-events` no se tocan), pero antes se apagaba por un timer fijo de 3000ms sin relación con si la operación había terminado de verdad — si la carga (2 llamadas de red en cadena) tardaba menos de 3s, el toast quedaba de más después de que el modal ya estaba abierto; si tardaba más, desaparecía antes de tiempo. Como es un componente global (no ligado a una pantalla), si el usuario cambiaba de pestaña mientras estaba visible lo seguía viendo sin contexto — exactamente lo que reportó Diego. Causa raíz: `showToast()` se usa para dos propósitos distintos (confirmación instantánea de algo que ya pasó, y aviso de una operación en curso de duración variable) con el mismo mecanismo de timer fijo, que solo le queda bien al primero.
+
+**Decisión de Diego:** no tocar `showToast()` en general (las confirmaciones actuales funcionan bien con timer) — cambiar solo el ciclo de vida del toast en los 4 flujos de carga.
+
+**Cambio:** nueva función `hideToast()` (limpia el timer pendiente + vacía la clase del toast, sin depender de un `setTimeout`). Se llama en dos lugares:
+- **En los 4 flujos de carga**, justo antes de abrir el modal en el caso de éxito — el toast se cierra en el momento exacto en que la operación termina, no por temporizador. El camino de error no se tocó: sigue usando `showToast(msg,'error')`, que ya sobreescribe correctamente cualquier toast anterior con su propio timer de 3s (comportamiento de siempre, sin cambios).
+- **En `switchTab()`** — cualquier toast activo (cargando, éxito o error) se cierra al cambiar de pestaña, sin excepción. Resuelve directamente "nunca debería sobrevivir al cambio de contexto de pantalla".
+
+Sin barra de progreso, sin loader nuevo, sin animación — solo sincronizar el cierre con el evento real, tal como pidió Diego.
+
+**Validación:**
+- Flujo real contra TMDB (Inception, tmdb_id 27205, no estaba en el archivo): confirmado que al abrirse el modal de detalle, `$id('toast').className` ya está vacío — no esperó los 3 segundos. Captura visual: modal abierto, limpio, sin ningún toast superpuesto.
+- `switchTab()`: confirmado que un toast "Cargando…" activo (`className:"show "`) se vacía (`className:""`) inmediatamente al cambiar a otra pestaña.
+- **Hallazgo aparte, fuera de alcance de este bloque:** probando el camino de error con un `tmdb_id` inexistente, `tmdbDetail()` no lanza excepción — no valida `response.ok` antes de tratar el JSON como válido, así que TMDB devuelve un cuerpo de error (`status_message`) que se interpreta como éxito con campos vacíos, abriendo la ficha con título en blanco en vez de mostrar el toast de error. Es un gap preexistente de manejo de errores de red, no relacionado con este cambio (no se toca acá) — registrado para una futura revisión de robustez si corresponde.
 
 ### C) Calificar vs. estado "Visto" — hallazgo de producto, en discusión
 

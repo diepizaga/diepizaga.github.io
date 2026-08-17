@@ -2829,7 +2829,7 @@ async function openRecDetail(e, tmdbId, type) {
     const omdb = await omdbGetRatings(d.original_title||d.title||d.name, (d.release_date||d.first_air_date||'').slice(0,4), d.external_ids?.imdb_id);
     pendingItem = buildTmdbItem(d, omdb, tmdbId, type);
     pendingItem.status = 'watchlist'; // alta nueva: default "ver después", no "visto"
-    openDetailModal(pendingItem, false);
+    hideToast(); openDetailModal(pendingItem, false);
   } catch { showToast('No se pudo cargar el detalle. Probá de nuevo.', 'error'); }
 }
 
@@ -2840,7 +2840,7 @@ async function qAddBookRec(e, bookId) {
     const b = await booksDetail(bookId);
     pendingItem = buildBookItem(b);
     pendingItem.status = 'watchlist'; // alta nueva: default "ver después", no "visto"
-    openDetailModal(pendingItem, false);
+    hideToast(); openDetailModal(pendingItem, false);
   } catch { showToast('No se pudo cargar el libro. Probá de nuevo.', 'error'); }
 }
 
@@ -2854,6 +2854,7 @@ function switchTab(tab) {
   $id(`pane-${tab}`)?.classList.add('active');
   window.scrollTo({ top: 0, behavior: 'instant' });
   wakeBottomNav(); // reset explícito del acumulador -- no arrastra delta de la sección anterior
+  hideToast(); // ningún toast (cargando, éxito, error) sobrevive a un cambio de pantalla
   try { localStorage.setItem('archivo_tab', tab); } catch {}
   if (tab === 'descubri') renderDisc();
   if (tab === 'adn') renderADN();
@@ -2994,7 +2995,7 @@ async function selectBookResult(bookId) {
     const b = await booksDetail(bookId);
     pendingItem = buildBookItem(b);
     pendingItem.status = 'watchlist'; // alta nueva: default "ver después", no "visto"
-    openDetailModal(pendingItem, false);
+    hideToast(); openDetailModal(pendingItem, false);
   } catch { showToast('No se pudo cargar el libro. Probá de nuevo.', 'error'); }
 }
 
@@ -3010,7 +3011,7 @@ async function selectResult(tmdbId, type) {
     const omdb = await omdbGetRatings(d.original_title||d.title||d.name, (d.release_date||d.first_air_date||'').slice(0,4), d.external_ids?.imdb_id);
     pendingItem = buildTmdbItem(d, omdb, tmdbId, type);
     pendingItem.status = 'watchlist'; // alta nueva: default "ver después", no "visto"
-    openDetailModal(pendingItem, false);
+    hideToast(); openDetailModal(pendingItem, false);
   } catch { showToast('No se pudo cargar el detalle. Probá de nuevo.', 'error'); }
 }
 
@@ -3463,6 +3464,13 @@ document.addEventListener('focusin', e => {
 function showToast(msg, type='') {
   const t = $id('toast'); t.textContent = msg; t.className = `show ${type}`;
   clearTimeout(toastTimeout); toastTimeout = setTimeout(()=>t.className='', 3000);
+}
+// para los avisos de "operación en curso" (duración real variable, no una
+// confirmación de algo que ya pasó) -- cierra el toast en el momento real en
+// que termina, en vez de dejar que el timer fijo de showToast() decida solo.
+function hideToast() {
+  clearTimeout(toastTimeout);
+  $id('toast').className = '';
 }
 
 // ============================================================
