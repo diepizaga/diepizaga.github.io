@@ -1371,6 +1371,51 @@ Se mapeó el inventario completo de la pantalla (no solo la lista de 6 insights,
 
 ---
 
+## Bloque AH — `watch_date`: captura de baja fricción, preparando Memoria
+
+- **Objetivo:** retomar `watch_date` (pausado desde antes de la etapa de auditoría mobile) ahora que ADN y Descubrí ya tienen una primera capa funcionando — la dimensión temporal es el conocimiento que le falta a Archivo, no más análisis. Mandato: capturar señal desde ahora, sin completar artificialmente el historial viejo, sin inventar fechas, sin bloquear el flujo de agregar/calificar.
+- **Estado:** Finalizado y validado en el entorno de pruebas contra Supabase real (con limpieza posterior, sin dejar rastro en los datos de Diego). Validación de la sensación real (¿se siente el chip natural, sin fricción?) queda para el uso normal de Diego.
+
+### Modelo confirmado
+
+**Semántica:** `watch_date` = cuándo terminaste algo (transición a Visto/Leído) — no cuándo se agregó, no cuándo se empezó. Mismo evento para películas, series y libros, sin lógica condicional por tipo, porque Archivo ya unificó "terminado" como concepto de estado.
+
+**Precisión — nueva columna `watch_date_precision` (texto libre, sin `CHECK constraint` en la base — deja espacio a granularidad de mes/año más adelante sin migración):**
+| `watch_date` | `watch_date_precision` | Significa |
+|---|---|---|
+| `null` | `null` | Nunca se preguntó (así quedan los 2181+ ítems ya existentes, para siempre) |
+| `null` | `declined` | Se preguntó, dijo que no |
+| fecha | `approx` | Aproximada — fallback silencioso o "fue hace más" |
+| fecha | `exact` | Confirmada — "es de hoy" o edición manual del campo Fecha |
+
+**SQL corrido por Diego en Supabase:** `ALTER TABLE watchlist ADD COLUMN watch_date_precision text;` — confirmado exitoso antes de implementar.
+
+### Implementación
+
+- **Disparador — en `saveDetail()`:** `isRealTransitionToWatched = base.status !== 'watched' && status === 'watched'`. Solo se ofrece el chip si además `watch_date_precision` del ítem sigue en `null` (nunca preguntado) — imposible que se dispare sobre historial viejo (ya está en `watched`, no hay transición) e imposible que se repregunte dos veces sobre el mismo ítem.
+- **Escritura optimista:** en el momento de la transición, se guarda `watch_date = hoy, watch_date_precision = 'approx'` sin esperas — el dato existe aunque el usuario no interactúe con nada más.
+- **Chip (reusa `#reaction-prompt` de Bloque S, mismo elemento, mismas clases `.rp-*`, cero CSS nuevo):** *"¿Cuándo lo terminaste? · Es de hoy · Fue hace más · Prefiero no decir"*. "Es de hoy" → `PATCH precision:'exact'`. "Fue hace más" → sin red, ya quedó `approx`. "Prefiero no decir" → `PATCH watch_date:null, precision:'declined'`.
+- **Campo "Fecha" manual (ya existente en la ficha):** editarlo a mano en cualquier momento marca `precision:'exact'` — es siempre una elección deliberada, gana por sobre cualquier otro camino.
+- **Convivencia con el chip de reacciones (Bloque S):** los dos comparten el mismo elemento flotante — nunca se muestran a la vez. `maybeShowReactionPrompt()` ahora devuelve `true`/`false` según si realmente se mostró; el chip de `watch_date` solo aparece si el de reacción no se disparó en ese guardado. La reacción tiene prioridad porque su propio gate (`isNotableReaction`) ya es más exigente — cuando ambos aplicarían, el dato de `watch_date` ya quedó guardado como `approx` igual, no se pierde nada.
+- **Sin backfill:** los 2181+ ítems existentes no se tocan, quedan en `null`/`null` para siempre.
+
+### Cómo prepara esto a Memoria (el motivo real del bloque, no solo prolijidad de dato)
+
+El valor de `watch_date_precision` no es de presentación — es lo que le va a permitir a una futura Memoria decir la verdad sobre cuánto sabe, en vez de fabricar precisión. Con `exact`, Memoria puede narrar al nivel más específico ("hace exactamente un año"); con `approx`, solo a nivel de época, sin fingir el día ("por esta época, el año pasado"); con `declined`/`null`, el ítem simplemente no participa de narrativas de tiempo — se omite, no se inventa. Es la misma disciplina de "no forzar sin evidencia" que ya rige ADN, aplicada a la dimensión temporal antes de que exista código de Memoria que la consuma.
+
+### Validación
+
+Todo probado contra Supabase real, sobre un ítem real de Diego ("Pobres criaturas", id `19134d66-...`), con su estado original capturado antes de empezar y restaurado al final (status/rating/watch_date/precision idénticos a como estaban, sin dejar ninguna nota ni fecha de prueba):
+- **Transición real sin tocar rating:** `watchlist→watched` guardó `watch_date=hoy, precision=approx` de inmediato (confirmado por lectura directa a la base) y mostró el chip (confirmado por captura visual — el mensaje, los 3 botones, posicionado igual que el chip de reacciones).
+- **"Es de hoy":** `precision` pasó a `exact`, fecha sin cambios.
+- **"Prefiero no decir":** `watch_date` se limpió a `null`, `precision` a `declined`.
+- **No repregunta:** ciclando el ítem `watched→watchlist→watched` de nuevo sin resetear `precision` (ya en `declined`), el chip no volvió a aparecer.
+- **Edición manual del campo Fecha:** guardó la fecha elegida con `precision=exact`, sin pasar por el chip.
+- **Edición sin transición:** guardar el ítem ya `watched` (cambiando solo notas) no tocó `watch_date` ni `precision` — confirma que el gate de transición real funciona, no solo el de precisión null.
+- **Convivencia con reacciones:** confirmado en código que `maybeShowReactionPrompt()` ahora devuelve `true`/`false` y que el chip de `watch_date` respeta esa prioridad — no se pudo forzar un caso real de colisión (requiere una reacción estadísticamente notable, poco frecuente hoy) pero la lógica está probada por lectura directa del flujo.
+
+---
+
 ## Hoja de ruta confirmada después de Bloque S (15-ago-2026, sin bloques abiertos todavía)
 
 Diego cerró la sesión de Bloque S con una lectura de conjunto del roadmap: primero la base técnica (Bloque M), después la UX de uso diario (Bloques N-Q), y ahora el arranque de la inteligencia propia de Archivo (Bloques R-S). Definió la secuencia de las próximas cuatro apuestas, en este orden — **ninguna diseñada todavía**, esto es la hoja de ruta, no un bloque en curso:

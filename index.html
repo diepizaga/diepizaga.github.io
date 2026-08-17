@@ -3223,9 +3223,9 @@ function isNotableReaction(item) {
 let reactionPromptTimeout = null;
 
 function maybeShowReactionPrompt(item) {
-  if (!item || (item.reactions && item.reactions.length)) return; // ya respondió una vez -- no se repregunta
-  if (!isNotableReaction(item)) return;
-  const el = $id('reaction-prompt'); if (!el) return;
+  if (!item || (item.reactions && item.reactions.length)) return false; // ya respondió una vez -- no se repregunta
+  if (!isNotableReaction(item)) return false;
+  const el = $id('reaction-prompt'); if (!el) return false;
   const qLabel = item.type === 'book' ? '¿Qué te generó este libro?' : '¿Qué te generó esta película o serie?';
   el.innerHTML = `<span class="rp-close" onclick="closeReactionPrompt()">✕</span>
     <div class="rp-q">${esc(qLabel)}</div>
@@ -3233,11 +3233,39 @@ function maybeShowReactionPrompt(item) {
   el.classList.add('show');
   clearTimeout(reactionPromptTimeout);
   reactionPromptTimeout = setTimeout(closeReactionPrompt, 9000);
+  return true;
 }
 
 function closeReactionPrompt() {
   $id('reaction-prompt')?.classList.remove('show');
   clearTimeout(reactionPromptTimeout);
+}
+
+// Bloque AH -- watch_date: mismo elemento flotante que las reacciones (nunca
+// los dos a la vez; si la reacción ya ocupó el slot, este chip no compite,
+// approx ya quedó guardado igual). "Fue hace más" no necesita PATCH -- approx
+// ya es lo que se guardó optimistamente al hacer la transición.
+function maybeShowWatchDatePrompt(item) {
+  if (!item) return;
+  const el = $id('reaction-prompt'); if (!el) return;
+  el.innerHTML = `<span class="rp-close" onclick="closeReactionPrompt()">✕</span>
+    <div class="rp-q">¿Cuándo lo terminaste?</div>
+    <div class="rp-chips">
+      <button class="rp-chip" onclick="setWatchDatePrecision('${item.id}','exact')">Es de hoy</button>
+      <button class="rp-chip" onclick="setWatchDatePrecision('${item.id}','approx')">Fue hace más</button>
+      <button class="rp-chip" onclick="setWatchDatePrecision('${item.id}','declined')">Prefiero no decir</button>
+    </div>`;
+  el.classList.add('show');
+  clearTimeout(reactionPromptTimeout);
+  reactionPromptTimeout = setTimeout(closeReactionPrompt, 9000);
+}
+
+async function setWatchDatePrecision(itemId, choice) {
+  closeReactionPrompt();
+  if (choice === 'approx') return; // ya quedó guardado así por el fallback silencioso, nada que corregir
+  const patch = choice === 'declined' ? { watch_date: null, watch_date_precision: 'declined' } : { watch_date_precision: 'exact' };
+  try { await saveItem({ id: itemId, ...patch }); }
+  catch { /* gesto opcional -- no vale la pena una alarma de error por esto */ }
 }
 
 async function toggleReaction(itemId, chip, btnEl) {
@@ -3262,16 +3290,37 @@ async function saveDetail(isEdit) {
   if (!base) return;
   const status = $id('det-status').value;
   const notes = $id('det-notes').value.trim();
-  const watchDate = $id('det-date').value;
+  const watchDateInput = $id('det-date').value;
   // currentRating: null = no tocó las estrellas (queda lo que había); 0 = limpió
   const ratingTouched = currentRating !== null;
   const rating = currentRating !== null ? (currentRating || null) : (base.my_rating ?? null);
-  const data = { ...base, status, notes: notes||null, watch_date: watchDate||null, my_rating: rating };
+
+  // watch_date (Bloque AH): dispara solo en una transición real hacia "watched"
+  // (estado anterior distinto, nuevo = watched) y solo si nunca se preguntó
+  // antes (precision sigue en null) -- nunca sobre los 2181 ítems que ya
+  // estaban en watched (no hay transición) ni se repregunta dos veces sobre
+  // el mismo ítem. Editar el campo "Fecha" a mano es siempre una elección
+  // deliberada -> exact, sea cual sea el estado.
+  const dateManuallyEdited = watchDateInput && watchDateInput !== (base.watch_date || '');
+  const isRealTransitionToWatched = base.status !== 'watched' && status === 'watched';
+  let watchDate = watchDateInput || base.watch_date || null;
+  let watchDatePrecision = base.watch_date_precision ?? null;
+  const offerWatchDatePrompt = !dateManuallyEdited && isRealTransitionToWatched && watchDatePrecision == null;
+  if (dateManuallyEdited) {
+    watchDatePrecision = 'exact';
+  } else if (offerWatchDatePrompt) {
+    watchDate = new Date().toISOString().slice(0,10); // fallback silencioso -- el chip puede afinarlo después
+    watchDatePrecision = 'approx';
+  }
+
+  const data = { ...base, status, notes: notes||null, watch_date: watchDate, watch_date_precision: watchDatePrecision, my_rating: rating };
   try {
     await saveItem(data);
     closeModal('modal-detail');
     showToast(isEdit?'Actualizado':'Agregado a tu archivo','success');
-    if (ratingTouched && rating) maybeShowReactionPrompt(findSavedItem(data));
+    const savedItem = findSavedItem(data);
+    const reactionShown = (ratingTouched && rating) ? maybeShowReactionPrompt(savedItem) : false;
+    if (!reactionShown && offerWatchDatePrompt) maybeShowWatchDatePrompt(savedItem);
     currentRating=null; editingItem=null; pendingItem=null;
   } catch(e) { showToast('Error al guardar. Probá de nuevo.','error'); }
 }
