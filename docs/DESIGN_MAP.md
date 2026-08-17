@@ -1179,6 +1179,65 @@ El primer diseño throttleaba el listener de scroll con `requestAnimationFrame` 
 
 ---
 
+## Auditoría — Archivo como PWA real en iPhone (16-ago-2026, `78fa14c`, docs/UX_MOBILE_REAL_AUDIT.md)
+
+Diego probó Bloque AC en su iPhone real (Safari, no el entorno de pruebas) y encontró problemas que el DOM auditado en frío no mostraba — 7 capturas reales como evidencia. Frase guía: *"No quiero corregir síntomas aislados; quiero que auditemos Archivo como PWA real en iPhone."* 3 hallazgos con causa diagnosticada, detalle completo en el documento: (1) navegación/chrome — el pinch-zoom sigue rompiendo composición incluso sin `backdrop-filter` (el fix de Bloque Z no era la causa completa: el pinch-zoom es zoom del viewport visual, no re-layout, así que cualquier elemento `fixed`/`sticky` pierde su ancla mientras dura el gesto); `position:sticky` del header se desincroniza durante momentum scroll real (limitación de WebKit, no bug propio); bottom nav de Archivo y toolbar de Safari pueden quedar visibles a la vez, sin API para coordinarlos. (2) buscador/teclado — hipótesis fundada, no confirmada del todo: el pill de Safari se reposiciona sobre el modal mientras el teclado está abierto. (3) ADN mobile — confirmado en código: 6 insights en filas idénticas sin jerarquía visual. Prioridad confirmada: navegación/chrome primero (Bloque AD) → teclado/búsqueda → ADN mobile → recién después `watch_date`.
+
+---
+
+## Bloque AD — Header no-sticky en mobile (causa estructural, no otra capa de ocultar/mostrar)
+
+- **Objetivo:** hallazgo #1 de la auditoría PWA real. Diego reformuló el problema en la discusión de diseño: no es "el footer" ni "el zoom" por separado, es que Archivo tiene demasiada interfaz permanente (2 elementos `fixed`/`sticky` propios + el chrome de Safari) compitiendo con el contenido. Mandato explícito: resolver la causa estructural (menos elementos fijos) antes que seguir agregando lógica de mostrar/ocultar sobre elementos que no deberían competir por espacio en primer lugar.
+- **Estado:** Finalizado. 4 opciones de header evaluadas y descartadas con criterio antes de elegir; validado en el entorno de pruebas con las limitaciones honestas de siempre (Safari real y pinch-zoom quedan de tu lado).
+
+### Opciones evaluadas para el header
+
+**A. Fijo siempre (estado previo).** Costo de espacio máximo, expuesto siempre al glitch de composición del zoom.
+**B. Auto-hide como el bottom nav.** Reduce el tiempo visible, pero no reduce la causa: sigue siendo `position:sticky` todo el tiempo (oculto = trasladado fuera de pantalla, no removido de la ecuación) — sigue siendo candidato al glitch cada vez que está visible durante un gesto de zoom.
+**C. Reducido durante scroll (logo/búsqueda/avatar más chico).** Descartada: sigue siendo un elemento fijo permanente, va en contra del criterio de "menos elementos fixed/sticky, no una versión más chica de los mismos".
+**D. No-sticky en mobile — elegida.** El header deja de ser `fixed`/`sticky` y pasa a ser contenido normal que scrollea con la página.
+
+### Por qué D no sacrifica ninguna función real (hallazgo clave antes de decidir)
+
+Se encontró en el código, no se asumió: el ícono de búsqueda del header (`.mh-icon`) y el FAB del bottom nav llaman **la misma función exacta**, `openSearchModal()` — son 100% redundantes, no una aproximación. Además, en mobile la navegación real (Inicio/Biblioteca/Descubrí/ADN) ya vive enteramente en el bottom nav — los links del header (`.mh-nav`) ya estaban ocultos ahí desde antes de este bloque. Es decir: el header en mobile no tenía ninguna función de navegación propia, y su única función no duplicada era el ícono de perfil (la de menor frecuencia de uso de las tres).
+
+### Decisión de producto (documentada explícitamente, para que esto no se vuelva a leer como "se perdió una función")
+
+- El buscador del header **no se elimina porque la búsqueda perdió importancia** — la búsqueda de agregar contenido nuevo sigue siendo una capacidad central de Archivo.
+- Se elimina en mobile **porque era una duplicación real**: dos accesos distintos a la misma acción de agregar (`openSearchModal()`), uno en un elemento que además competía con Safari y el bottom nav por espacio fijo.
+- Esa acción sigue disponible desde el elemento principal de gestión de contenido, el FAB — presente en las 4 pestañas, único ícono con color relleno de todo el bottom nav.
+- El buscador de Biblioteca (`#bib-search`) no se toca — sigue siendo, como siempre, el camino para encontrar algo *dentro* del archivo ya existente, un propósito distinto al del ícono que se sacó (que era para *agregar* algo nuevo).
+- Análisis de riesgo hecho antes de implementar (pedido de Diego): buscar es conceptualmente una acción de gestión acá (no hay un modo "solo consultar", el modal siempre termina en agregar), no de exploración casual — la exploración de tu propio archivo ya tiene su herramienta separada. El único riesgo real y no verificable desde código es de hábito (alguien acostumbrado a la lupa del header puede no pensar en el "+" al principio) — queda marcado como algo a observar en el uso real, no bloqueante.
+- **Alcance: solo mobile.** En desktop el header sigue `sticky` y el ícono de búsqueda (con su propia duplicación against `.mh-add`, no tocada) queda intacto — es la única navegación ahí, no hay bottom nav equivalente, sacarlo hubiera sido un error real, no una simplificación.
+
+### Implementación
+
+Dos reglas nuevas dentro del breakpoint mobile ya existente (`@media max-width:840px`), sin JS nuevo:
+```css
+#masthead { position: static; }
+.mh-icon { display: none; }
+```
+Sin padding compensatorio en ningún lado: `position:sticky` antes de "pegarse" ya ocupa su lugar en el flujo normal — sacar el sticky solo cambia que el header se va con el scroll en vez de reanclarse arriba, no cambia el espacio que ocupa mientras está a la vista.
+
+### "Volver arriba" — ya existía, no se agregó nada
+
+`switchTab()` ya hacía `scrollTo(top:0)` sin ninguna guarda que evite re-dispararse si tocás la pestaña en la que ya estás — tocar de nuevo "Biblioteca" estando en Biblioteca ya te sube al tope, el mismo patrón que usan apps nativas (tocar tu pestaña activa = scroll al inicio). No se escribió ningún mecanismo nuevo para esto.
+
+### Sin animación de reaparición — decisión deliberada, no un olvido
+
+Pedido explícito de Diego: que no haya animaciones ni estados artificiales para el header. Cuando volvés arriba, el header reaparece porque es contenido normal en su lugar de siempre — ni fade ni slide. Cualquier efecto ahí hubiera sido agregar un momento más de "chrome llamando la atención", exactamente lo opuesto de lo que busca este bloque.
+
+### Validación
+
+- **CSS aplicado correctamente:** confirmado por `getComputedStyle` — `position:static` y `.mh-icon{display:none}` en mobile (375px); `position:sticky` y `.mh-icon` visible sin cambios en desktop (1280px).
+- **El header se va con el scroll:** confirmado — a 900px de scroll, `getBoundingClientRect()` del header da `top:-900`, coherente con contenido normal (no un remanente sticky).
+- **Biblioteca con las 2185 entradas reales, scrolleada:** confirmado por captura — sin header ni bottom nav visibles, pantalla completa para el contenido.
+- **Volver arriba tocando la pestaña activa:** confirmado — `scrollY` vuelve a 0.
+- **ADN completo, sin contenido tapado:** confirmado por captura — el insight 04 (el que aparecía cortado por el bottom nav en las capturas reales de la auditoría) ahora se lee completo.
+- **Limitación honesta, mismo patrón que Bloques O/Z/AC:** lo que no se puede validar desde este entorno es exactamente lo que motivó esta auditoría — Safari real con su barra visible, pinch-zoom real, y la sensación completa en tu dispositivo. Los 6 casos que pediste probar (Biblioteca larga, volver arriba, FAB, Safari con barra, pinch-zoom, ADN completo) quedan para tu validación en el iPhone real antes de dar este bloque por cerrado del todo.
+
+---
+
 ## Hoja de ruta confirmada después de Bloque S (15-ago-2026, sin bloques abiertos todavía)
 
 Diego cerró la sesión de Bloque S con una lectura de conjunto del roadmap: primero la base técnica (Bloque M), después la UX de uso diario (Bloques N-Q), y ahora el arranque de la inteligencia propia de Archivo (Bloques R-S). Definió la secuencia de las próximas cuatro apuestas, en este orden — **ninguna diseñada todavía**, esto es la hoja de ruta, no un bloque en curso:

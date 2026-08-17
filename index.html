@@ -751,11 +751,26 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
 
 /* ── RESPONSIVE ─────────────────────────────────────────── */
 @media (max-width: 840px) {
+  /* Bloque AD: el header deja de ser sticky en mobile -- la navegación real ya
+     vive en el bottom nav (mh-nav está oculto acá abajo), así que fijar el
+     header no protegía ninguna función necesaria, solo agregaba una segunda
+     superficie fixed/sticky compitiendo con Safari y el bottom nav. Sin
+     padding compensatorio en ningún lado: sticky-sin-pegar ya ocupaba su
+     lugar en el flujo normal, esto solo cambia que se va con el scroll en vez
+     de reanclarse arriba. Sin animación de reaparición a propósito -- volver
+     a estar en pantalla es contenido normal, no un "reveal". */
+  #masthead { position: static; }
   .mh-inner { padding: 0 18px; }
   .mh-top { padding: 14px 0 12px; }
   .mh-wordmark { font-size: 14px; letter-spacing: .35em; }
   .mh-wordmark::before { width: 8px; height: 8px; margin-right: 12px; }
   .mh-nav, .mh-date { display: none; }
+  /* buscador del header: redundante en mobile con el FAB (mismo openSearchModal()) --
+     no se saca porque buscar perdió importancia, se saca porque hay dos accesos
+     a la misma acción de agregar. El buscador de Biblioteca (#bib-search) sigue
+     intacto -- ese es el camino para encontrar dentro del archivo existente, un
+     propósito distinto al de este ícono. */
+  .mh-icon { display: none; }
   #bottomnav { display: block; }
   #app { padding: 22px 16px calc(var(--bottomnav-h) + env(safe-area-inset-bottom, 0px) + 30px); }
   .grid-cards { grid-template-columns: repeat(3, 1fr); gap: 16px 9px; }
