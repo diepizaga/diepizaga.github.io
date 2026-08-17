@@ -426,11 +426,6 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
 }
 #adn-inner { position: relative; z-index: 1; }
 .adn-eyebrow { font-family: var(--mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: .3em; color: var(--acc); margin-bottom: 22px; }
-.adn-stats-row { display: flex; gap: 1px; background: var(--hair); border: 1px solid var(--hair); margin-bottom: 30px; flex-wrap: wrap; }
-.adn-stats-row > div { background: var(--ink2); padding: 18px 24px; flex: 1; min-width: 130px; }
-.adn-stat-val { font-family: var(--mono); font-size: clamp(26px, 3.6vw, 40px); line-height: 1; letter-spacing: -1px; }
-.adn-stat-val.gold { color: var(--acc); }
-.adn-stat-lbl { font: 600 9px var(--sans); text-transform: uppercase; letter-spacing: .2em; color: var(--paper4); margin-top: 9px; }
 .adn-type-toggle { display: flex; gap: 8px; margin-bottom: 34px; flex-wrap: wrap; }
 .adn-profile-block { margin-bottom: 44px; border-left: 3px solid var(--acc); padding-left: 28px; }
 .adn-profile-archetype { font-family: var(--serif); font-style: italic; font-weight: 380;
@@ -465,6 +460,19 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
 .criterio-lbl { font-size: 13px; color: var(--paper2); }
 .criterio-val { font-family: var(--mono); font-size: 17px; }
 .criterio-narrative { margin-top: 12px; font-size: 13px; color: var(--paper3); line-height: 1.7; border-top: 1px solid var(--hair); padding-top: 14px; }
+
+/* Bloque AG -- ADN como espejo, no dashboard. El destacado (insights[0], el
+   de mayor strength) lleva más peso tipográfico que el resto -- si mañana
+   cambia el insight más fuerte, este bloque cambia solo, no es una tarjeta
+   fija. Las categorías temáticas agrupan lo que antes eran secciones sueltas
+   (géneros/décadas/criterio/etc.) sin cambiar ese contenido, solo su lugar. */
+.adn-hero-insight { margin-bottom: 44px; padding: 26px 26px 28px; background: var(--ink2); border: 1px solid var(--hair2); }
+.adn-hero-label { font: 600 9.5px var(--sans); text-transform: uppercase; letter-spacing: .22em; color: var(--acc); margin-bottom: 14px; }
+.adn-hero-text { font-family: var(--serif); font-style: italic; font-size: clamp(19px, 2.6vw, 25px); line-height: 1.5; color: var(--paper); }
+.adn-category { margin-bottom: 48px; }
+.adn-category-header { font-family: var(--serif); font-style: italic; font-weight: 380;
+  font-size: clamp(21px, 2.8vw, 27px); color: var(--paper); margin-bottom: 20px;
+  padding-bottom: 12px; border-bottom: 1px solid var(--hair2); }
 
 /* ADN 2.0 (Bloque T): insights, no estadísticas -- misma voz editorial que
    adn-profile-desc, cada uno con su índice, sin gráficos de por medio. */
@@ -2025,6 +2033,9 @@ function genreChipsHTML(genreEntries) {
 // se activa solo a medida que se acumulan más datos (reacciones, sobre
 // todo), sin tocar código de nuevo. "strength" = tamaño del efecto ×
 // log(muestra), para mostrar primero lo más fuerte, no lo más reciente.
+// "category" (Bloque AG, presentación de ADN) es solo una etiqueta de
+// agrupación temática para renderADN() -- no participa del cálculo, del
+// orden por strength, ni de ningún gate. Mismos 6 candidatos de siempre.
 function computeADNInsights(watched, rated) {
   const insights = [];
   if (rated.length < 15) return insights; // gate propio, más exigente que el resto de ADN
@@ -2042,7 +2053,7 @@ function computeADNInsights(watched, rated) {
       const gap = best.avg - movieAvg;
       if (Math.abs(gap) >= 0.5) {
         const label = best.t==='tv' ? 'las series' : 'los libros';
-        insights.push({ strength: Math.abs(gap)*Math.log(best.n), text: gap>0
+        insights.push({ category: 'como-soy', strength: Math.abs(gap)*Math.log(best.n), text: gap>0
           ? `Calificás ${label} en promedio ${gap.toFixed(1)} puntos más alto que las películas (${best.avg.toFixed(1)} vs. ${movieAvg.toFixed(1)}) — no es la misma vara para todo.`
           : `Calificás las películas ${Math.abs(gap).toFixed(1)} puntos más alto que ${label} (${movieAvg.toFixed(1)} vs. ${best.avg.toFixed(1)}).` });
       }
@@ -2057,7 +2068,7 @@ function computeADNInsights(watched, rated) {
     const shortAvg = short.reduce((s,i)=>s+parseFloat(i.my_rating),0)/short.length;
     const longAvg  = long.reduce((s,i)=>s+parseFloat(i.my_rating),0)/long.length;
     const gap = longAvg - shortAvg;
-    if (Math.abs(gap) >= 0.4) insights.push({ strength: Math.abs(gap)*Math.log(short.length+long.length), text: gap>0
+    if (Math.abs(gap) >= 0.4) insights.push({ category: 'gustos', strength: Math.abs(gap)*Math.log(short.length+long.length), text: gap>0
       ? `Las películas de más de 2 horas te gustan en promedio ${gap.toFixed(1)} puntos más que las de menos de 100 minutos (${longAvg.toFixed(1)} vs. ${shortAvg.toFixed(1)}).`
       : `Preferís las películas cortas: rendís ${Math.abs(gap).toFixed(1)} puntos más alto a las de menos de 100 minutos que a las de más de 2 horas.` });
   }
@@ -2079,7 +2090,7 @@ function computeADNInsights(watched, rated) {
       const gAvgVal = gAvg[polGenre].sum/gAvg[polGenre].n;
       const share = polCount/topRated.length;
       if (gAvgVal <= overallAvg+0.15 && share >= 0.25) {
-        insights.push({ strength: share*Math.log(gAvg[polGenre].n), text:
+        insights.push({ category: 'contradicciones', strength: share*Math.log(gAvg[polGenre].n), text:
           `${esc(polGenre)} es tu género más polarizante: tu promedio ahí (${gAvgVal.toFixed(1)}) no se destaca del resto, pero es el género de ${Math.round(share*100)}% de tus calificaciones de 9 o más. Cuando te convence, te convence a fondo.` });
       }
     }
@@ -2098,7 +2109,7 @@ function computeADNInsights(watched, rated) {
     const closest  = validSources.slice().sort((a,b)=>Math.abs(a[1].delta)-Math.abs(b[1].delta))[0];
     const farthest = validSources.slice().sort((a,b)=>Math.abs(b[1].delta)-Math.abs(a[1].delta))[0];
     if (farthest[0]!==closest[0] && Math.abs(farthest[1].delta)>=0.5) {
-      insights.push({ strength: Math.abs(farthest[1].delta)*Math.log(farthest[1].n), text:
+      insights.push({ category: 'diferencia', strength: Math.abs(farthest[1].delta)*Math.log(farthest[1].n), text:
         `Tu criterio está más cerca de ${closest[0]} que de cualquier otra fuente. Sos ${farthest[1].delta>0?'más generoso':'más exigente'} que ${farthest[0]} por ${Math.abs(farthest[1].delta).toFixed(1)} puntos en promedio.` });
     }
   }
@@ -2117,7 +2128,7 @@ function computeADNInsights(watched, rated) {
       withTopChip.forEach(i=>(i.genres||[]).forEach(g=>chipGc[g]=(chipGc[g]||0)+1));
       const [chipTopGenre, chipTopGenreN] = Object.entries(chipGc).sort((a,b)=>b[1]-a[1])[0] || [];
       const share = chipTopGenre ? chipTopGenreN/withTopChip.length : 0;
-      if (share >= 0.5) insights.push({ strength: share*Math.log(withTopChip.length), text:
+      if (share >= 0.5) insights.push({ category: 'contradicciones', strength: share*Math.log(withTopChip.length), text:
         `Cuando algo te genera "${esc(topChip.toLowerCase())}", ${Math.round(share*100)}% de las veces es ${esc(chipTopGenre.toLowerCase())}.` });
     }
   }
@@ -2146,7 +2157,7 @@ function computeADNInsights(watched, rated) {
     if (withN.length) {
       const extreme = withN.sort((a,b)=>Math.abs(b.avg-overallP)-Math.abs(a.avg-overallP))[0];
       const diff = extreme.avg - overallP;
-      if (Math.abs(diff) >= 0.6) insights.push({ strength: Math.abs(diff)*Math.log(extreme.n), text:
+      if (Math.abs(diff) >= 0.6) insights.push({ category: 'gustos', strength: Math.abs(diff)*Math.log(extreme.n), text:
         `En los títulos donde participa ${esc(extreme.p)} (${extreme.n} en tu archivo), calificás en promedio ${Math.abs(diff).toFixed(1)} puntos ${diff>0?'más alto':'más bajo'} que tu general (${extreme.avg.toFixed(1)} vs. ${overallP.toFixed(1)}).` });
     }
   }
@@ -2303,17 +2314,28 @@ function renderADN() {
   if (movies.length) statParts.push(`<span>${movies.length}</span> película${movies.length!==1?'s':''}`);
   if (series.length) statParts.push(`<span>${series.length}</span> serie${series.length!==1?'s':''}`);
   if (books.length)  statParts.push(`<span>${books.length}</span> libro${books.length!==1?'s':''}`);
+  if (avg)           statParts.push(`promedio <span>${avg}</span>`);
+  if (totalHours)    statParts.push(`<span>${totalHours}</span>h de cine`);
   if (topAuthor)     statParts.push(`autor top: <span>${esc(topAuthor)}</span>`);
   const statsLine = statParts.join(' · ');
 
-  el.innerHTML = `
-    <div class="adn-stats-row">
-      <div><div class="adn-stat-val gold">${watched.length}</div><div class="adn-stat-lbl">Títulos</div></div>
-      ${avg ? `<div><div class="adn-stat-val">${avg}</div><div class="adn-stat-lbl">Promedio</div></div>` : ''}
-      ${totalHours ? `<div><div class="adn-stat-val">${totalHours}</div><div class="adn-stat-lbl">Horas de cine</div></div>` : ''}
-      ${diffImdb!=null ? `<div><div class="adn-stat-val" style="color:${parseFloat(diffImdb)>=0?'var(--green)':'var(--red)'}">${parseFloat(diffImdb)>=0?'+':''}${diffImdb}</div><div class="adn-stat-lbl">vs IMDb</div></div>` : ''}
-    </div>
+  // Bloque AG -- ADN como espejo, no dashboard. insights[0] (el de mayor
+  // strength) es el destacado; el resto se agrupa por category (etiqueta de
+  // presentación agregada en computeADNInsights(), el cálculo/orden no cambia)
+  // junto con el contenido estructural que ya existía para ese mismo tema.
+  // Nada de esto decide "a mano" qué es importante -- si mañana cambia el
+  // patrón dominante, insights[0] cambia solo y el destacado cambia con él.
+  const heroInsight = insights[0] || null;
+  const secondaryInsights = insights.slice(1);
+  const insightRowsFor = cat => secondaryInsights.filter(ins => ins.category === cat)
+    .map((ins,i) => `<div class="adn-insight-row"><div class="adn-insight-idx">${String(i+1).padStart(2,'0')}</div><div class="adn-insight-text">${ins.text}</div></div>`).join('');
 
+  const comoSoyRows = insightRowsFor('como-soy');
+  const gustosRows = insightRowsFor('gustos');
+  const diferenciaRows = insightRowsFor('diferencia');
+  const contradiccionesRows = insightRowsFor('contradicciones');
+
+  el.innerHTML = `
     <div class="adn-type-toggle">
       <button class="pill active" onclick="adnSwitchType(this,'all')">Todo</button>
       ${movies.length ? `<button class="pill" onclick="adnSwitchType(this,'movie')">Películas</button>` : ''}
@@ -2327,82 +2349,104 @@ function renderADN() {
       ${statsLine ? `<div class="adn-stats-line">${statsLine}</div>` : ''}
     </div>
 
-    ${insights.length ? `
-    <div class="adn-section">
-      <div class="adn-section-header">Lo que dicen tus datos</div>
-      <div class="adn-insights">
-        ${insights.slice(0,6).map((ins,i)=>`<div class="adn-insight-row"><div class="adn-insight-idx">${String(i+1).padStart(2,'0')}</div><div class="adn-insight-text">${ins.text}</div></div>`).join('')}
+    ${heroInsight ? `
+    <div class="adn-hero-insight">
+      <div class="adn-hero-label">Lo más particular de tu archivo</div>
+      <div class="adn-hero-text">${heroInsight.text}</div>
+    </div>` : ''}
+
+    ${comoSoyRows ? `
+    <div class="adn-category">
+      <div class="adn-category-header">Cómo soy</div>
+      <div class="adn-insights">${comoSoyRows}</div>
+    </div>` : ''}
+
+    <div class="adn-category">
+      <div class="adn-category-header">Lo que me gusta</div>
+      ${gustosRows ? `<div class="adn-insights">${gustosRows}</div>` : ''}
+
+      ${topGenres.length > 2 ? `
+      <div class="adn-section">
+        <div class="adn-section-header">Géneros</div>
+        <div class="adn-genres">${genreChipsHTML(topGenres)}</div>
+      </div>` : ''}
+
+      <div class="adn-section" id="adn-directors-section" style="display:none">
+        <div class="adn-section-header" id="adn-directors-header"></div>
+        <div id="adn-director-list"></div>
       </div>
-    </div>` : ''}
 
-    ${topGenres.length > 2 ? `
-    <div class="adn-section">
-      <div class="adn-section-header">Géneros</div>
-      <div class="adn-genres">${genreChipsHTML(topGenres)}</div>
-    </div>` : ''}
-
-    <div class="adn-section" id="adn-directors-section" style="display:none">
-      <div class="adn-section-header" id="adn-directors-header"></div>
-      <div id="adn-director-list"></div>
+      ${topDecades.length > 2 ? `
+      <div class="adn-section">
+        <div class="adn-section-header">Décadas</div>
+        ${topDecades.slice(0,8).map(([d,c],i)=>`
+          <div class="decade-row">
+            <div class="decade-name" style="${i===0?'color:var(--t-1)':'color:var(--t-2)'}">${d}s</div>
+            <div class="bar-track"><div class="bar-fill" style="width:${(c/topDecades[0][1])*100}%"></div></div>
+            <div class="decade-count">${c}</div>
+          </div>`).join('')}
+      </div>` : ''}
     </div>
 
-    ${topDecades.length > 2 ? `
-    <div class="adn-section">
-      <div class="adn-section-header">Décadas</div>
-      ${topDecades.slice(0,8).map(([d,c],i)=>`
-        <div class="decade-row">
-          <div class="decade-name" style="${i===0?'color:var(--t-1)':'color:var(--t-2)'}">${d}s</div>
-          <div class="bar-track"><div class="bar-fill" style="width:${(c/topDecades[0][1])*100}%"></div></div>
-          <div class="decade-count">${c}</div>
-        </div>`).join('')}
-    </div>` : ''}
+    <div class="adn-category">
+      <div class="adn-category-header">Lo que me diferencia</div>
+      ${diferenciaRows ? `<div class="adn-insights">${diferenciaRows}</div>` : ''}
 
-    ${avg && avgImdb ? `
-    <div class="adn-section">
-      <div class="adn-section-header">Tu criterio vs. IMDb</div>
-      <div class="criterio-card">
-        <div class="criterio-row"><span class="criterio-lbl">Tu promedio</span><span class="criterio-val" style="color:var(--gold)">${avg}</span></div>
-        <div class="criterio-row"><span class="criterio-lbl">Promedio IMDb</span><span class="criterio-val">${avgImdb}</span></div>
-        <div class="criterio-row"><span class="criterio-lbl">Diferencia</span><span class="criterio-val" style="color:${parseFloat(diffImdb)>=0?'var(--green)':'var(--red)'}">${parseFloat(diffImdb)>=0?'+':''}${diffImdb}</span></div>
-        ${critNarrativa ? `<p class="criterio-narrative">${critNarrativa}</p>` : ''}
+      <div id="adn-diferencia-imdb">
+        ${avg && avgImdb ? `
+        <div class="adn-section">
+          <div class="adn-section-header">Tu criterio vs. IMDb</div>
+          <div class="criterio-card">
+            <div class="criterio-row"><span class="criterio-lbl">Tu promedio</span><span class="criterio-val" style="color:var(--gold)">${avg}</span></div>
+            <div class="criterio-row"><span class="criterio-lbl">Promedio IMDb</span><span class="criterio-val">${avgImdb}</span></div>
+            <div class="criterio-row"><span class="criterio-lbl">Diferencia</span><span class="criterio-val" style="color:${parseFloat(diffImdb)>=0?'var(--green)':'var(--red)'}">${parseFloat(diffImdb)>=0?'+':''}${diffImdb}</span></div>
+            ${critNarrativa ? `<p class="criterio-narrative">${critNarrativa}</p>` : ''}
+          </div>
+        </div>` : ''}
+
+        ${(coincImdb!=null||coincTmdb!=null||coincRt!=null) ? `
+        <div class="adn-section">
+          <div class="adn-section-header">Coincidencia con la crítica</div>
+          ${coincImdb!=null ? `<div class="coincidencia-row"><span class="coinc-src">IMDb</span><div class="bar-track"><div class="bar-fill fill-imdb" style="width:${coincImdb}%"></div></div><span class="coinc-pct">${coincImdb}%</span></div>` : ''}
+          ${coincTmdb!=null ? `<div class="coincidencia-row"><span class="coinc-src">TMDB</span><div class="bar-track"><div class="bar-fill fill-tmdb" style="width:${coincTmdb}%"></div></div><span class="coinc-pct">${coincTmdb}%</span></div>` : ''}
+          ${coincRt!=null   ? `<div class="coincidencia-row"><span class="coinc-src">Rotten</span><div class="bar-track"><div class="bar-fill fill-rt" style="width:${coincRt}%"></div></div><span class="coinc-pct">${coincRt}%</span></div>` : ''}
+        </div>` : ''}
+
+        ${top10diffs.length >= 4 ? `
+        <div class="adn-section">
+          <div class="adn-section-header">Tus mayores diferencias con IMDb</div>
+          ${top10diffs.map(d => {
+            const v = d.my - d.imdb; const sign = v>=0?'+':'';
+            const col = v>=1.5?'var(--green)':v<=-1.5?'var(--red)':'var(--t-2)';
+            return `<div class="idt-row">
+              <span class="idt-title">${esc(d.title)}</span>
+              <span class="idt-scores">vos ${d.my} · imdb ${d.imdb}</span>
+              <span class="idt-diff" style="color:${col}">${sign}${v.toFixed(1)}</span>
+            </div>`;
+          }).join('')}
+        </div>` : ''}
       </div>
-    </div>` : ''}
 
-    ${(coincImdb!=null||coincTmdb!=null||coincRt!=null) ? `
-    <div class="adn-section">
-      <div class="adn-section-header">Coincidencia con la crítica</div>
-      ${coincImdb!=null ? `<div class="coincidencia-row"><span class="coinc-src">IMDb</span><div class="bar-track"><div class="bar-fill fill-imdb" style="width:${coincImdb}%"></div></div><span class="coinc-pct">${coincImdb}%</span></div>` : ''}
-      ${coincTmdb!=null ? `<div class="coincidencia-row"><span class="coinc-src">TMDB</span><div class="bar-track"><div class="bar-fill fill-tmdb" style="width:${coincTmdb}%"></div></div><span class="coinc-pct">${coincTmdb}%</span></div>` : ''}
-      ${coincRt!=null   ? `<div class="coincidencia-row"><span class="coinc-src">Rotten</span><div class="bar-track"><div class="bar-fill fill-rt" style="width:${coincRt}%"></div></div><span class="coinc-pct">${coincRt}%</span></div>` : ''}
-    </div>` : ''}
+      ${avgBooks && diffGoodreads ? `
+      <div class="adn-section" id="adn-goodreads-section" style="display:none">
+        <div class="adn-section-header">Tu criterio vs. Goodreads</div>
+        <div class="criterio-card">
+          <div class="criterio-row"><span class="criterio-lbl">Tu promedio en libros</span><span class="criterio-val" style="color:var(--gold)">${avgBooks}</span></div>
+          <div class="criterio-row"><span class="criterio-lbl">Goodreads (escala ×2)</span><span class="criterio-val">${avgGoodreads10}</span></div>
+          <div class="criterio-row"><span class="criterio-lbl">Diferencia</span><span class="criterio-val" style="color:${parseFloat(diffGoodreads)>=0?'var(--green)':'var(--red)'}">${parseFloat(diffGoodreads)>=0?'+':''}${diffGoodreads}</span></div>
+          <p class="criterio-narrative">${parseFloat(diffGoodreads) < -0.5
+            ? 'Sos más exigente que la comunidad de Goodreads. Cada libro tiene que ganarse su lugar.'
+            : parseFloat(diffGoodreads) > 0.5
+              ? 'Sos más generoso que Goodreads. Encontrás valor donde otros pasan de largo.'
+              : 'Tu criterio está muy alineado con la comunidad de Goodreads.'}</p>
+        </div>
+      </div>` : ''}
+    </div>
 
-    ${top10diffs.length >= 4 ? `
-    <div class="adn-section">
-      <div class="adn-section-header">Tus mayores diferencias con IMDb</div>
-      ${top10diffs.map(d => {
-        const v = d.my - d.imdb; const sign = v>=0?'+':'';
-        const col = v>=1.5?'var(--green)':v<=-1.5?'var(--red)':'var(--t-2)';
-        return `<div class="idt-row">
-          <span class="idt-title">${esc(d.title)}</span>
-          <span class="idt-scores">vos ${d.my} · imdb ${d.imdb}</span>
-          <span class="idt-diff" style="color:${col}">${sign}${v.toFixed(1)}</span>
-        </div>`;
-      }).join('')}
-    </div>` : ''}
-
-    ${avgBooks && diffGoodreads ? `
-    <div class="adn-section" id="adn-goodreads-section" style="display:none">
-      <div class="adn-section-header">Tu criterio vs. Goodreads</div>
-      <div class="criterio-card">
-        <div class="criterio-row"><span class="criterio-lbl">Tu promedio en libros</span><span class="criterio-val" style="color:var(--gold)">${avgBooks}</span></div>
-        <div class="criterio-row"><span class="criterio-lbl">Goodreads (escala ×2)</span><span class="criterio-val">${avgGoodreads10}</span></div>
-        <div class="criterio-row"><span class="criterio-lbl">Diferencia</span><span class="criterio-val" style="color:${parseFloat(diffGoodreads)>=0?'var(--green)':'var(--red)'}">${parseFloat(diffGoodreads)>=0?'+':''}${diffGoodreads}</span></div>
-        <p class="criterio-narrative">${parseFloat(diffGoodreads) < -0.5
-          ? 'Sos más exigente que la comunidad de Goodreads. Cada libro tiene que ganarse su lugar.'
-          : parseFloat(diffGoodreads) > 0.5
-            ? 'Sos más generoso que Goodreads. Encontrás valor donde otros pasan de largo.'
-            : 'Tu criterio está muy alineado con la comunidad de Goodreads.'}</p>
-      </div>
+    ${contradiccionesRows ? `
+    <div class="adn-category">
+      <div class="adn-category-header">Contradicciones y particularidades</div>
+      <div class="adn-insights">${contradiccionesRows}</div>
     </div>` : ''}`;
 }
 
@@ -2423,14 +2467,11 @@ function adnSwitchType(el, type) {
 
   const contentEl = $id('adn-content'); if (!contentEl) return;
 
-  // Mostrar/ocultar secciones IMDb para libros
-  contentEl.querySelectorAll('.adn-section').forEach(sec => {
-    const header = sec.querySelector('.adn-section-header');
-    if (!header) return;
-    const txt = header.textContent.toLowerCase();
-    const isImdbSection = (txt.includes('criterio') && txt.includes('imdb')) || txt.includes('coincidencia') || txt.includes('diferencias con imdb');
-    if (sec.id !== 'adn-goodreads-section') sec.style.display = (isBooks && isImdbSection) ? 'none' : '';
-  });
+  // Mostrar/ocultar el bloque IMDb (criterio + coincidencia + diferencias) para
+  // libros -- las 3 secciones viven juntas en #adn-diferencia-imdb (Bloque AG),
+  // se togglean como una sola unidad en vez de buscarlas por texto del header.
+  const imdbBlockEl = $id('adn-diferencia-imdb');
+  if (imdbBlockEl) imdbBlockEl.style.display = isBooks ? 'none' : '';
   const goodreadsEl = $id('adn-goodreads-section');
   if (goodreadsEl) goodreadsEl.style.display = isBooks ? '' : 'none';
 

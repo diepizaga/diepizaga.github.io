@@ -1330,6 +1330,47 @@ Sin barra de progreso, sin loader nuevo, sin animación — solo sincronizar el 
 
 ---
 
+## Bloque AG — ADN como espejo, no dashboard
+
+- **Objetivo:** hallazgo #3 de la auditoría PWA real — ADN se leía pesado en mobile, mismo patrón repetido 6 veces, sin jerarquía, "el contenido importante queda enterrado". Diego elevó el encuadre: no es una feature pendiente (el conocimiento calculado ya es sólido, uno de los diferenciales reales de Archivo), es un problema de presentación. Mandato explícito, con la frase ya documentada en Bloque T como ancla: *"ADN es un espejo, no un dashboard"* — no agregar datos, no inventar insights, no cambiar la lógica de cálculo. Solo reorganizar cómo se cuenta lo que Archivo ya sabe.
+- **Estado:** Finalizado en el entorno de pruebas. Validación real en iPhone (primera pantalla, scroll completo, lectura del insight destacado, sensación "espejo vs. dashboard") pendiente de Diego.
+
+### Auditoría previa al diseño
+
+Se mapeó el inventario completo de la pantalla (no solo la lista de 6 insights, que fue el foco original del hallazgo): stats numéricos sueltos arriba, perfil/arquetipo, "Lo que dicen tus datos" (6 filas idénticas), géneros, décadas, autores/directores, criterio vs. IMDb, coincidencia con la crítica, mayores diferencias con IMDb, criterio vs. Goodreads — 9 bloques tratados como secciones de dashboard independientes, sin relación narrativa entre sí. Se evaluó el valor real "espejo" de cada uno de los 6 insights (género polarizante y persona como los de mayor impacto — el primero ya documentado en Bloque T como "lo que un dashboard nunca muestra"; reacciones con ~0 efecto real hoy por falta de datos) y se confirmó que las 4 categorías temáticas que propuso Diego (cómo soy / lo que me gusta / lo que me diferencia / contradicciones) cruzan varias de esas 9 secciones — confirmó que el alcance del bloque era la pantalla completa, no solo la lista.
+
+### Diseño confirmado
+
+**Jerarquía narrativa:** identidad (arquetipo) → insight destacado → categorías temáticas (con sus insights secundarios + evidencia de apoyo) → contradicciones al final.
+
+**Agrupación** (mapeo de contenido existente, sin crear nada nuevo):
+- *Cómo soy:* arquetipo/statement + insight de brecha películas/series/libros.
+- *Lo que me gusta:* insight de persona + insight de duración vs. nota + géneros + décadas + autores/directores.
+- *Lo que me diferencia:* insight de alineación con fuente de crítica + criterio vs. IMDb + coincidencia con la crítica + mayores diferencias + criterio vs. Goodreads.
+- *Contradicciones y particularidades:* insight de género polarizante + insight de reacciones consolidadas.
+
+**Jerarquía dinámica, sin decidir a mano:** el insight destacado es `insights[0]` — el de mayor `strength`, tal cual ya lo devuelve `computeADNInsights()` ordenado. Si el patrón dominante cambia con más datos acumulados, el destacado cambia solo, no es una tarjeta fija.
+
+**Profundidad progresiva:** dentro de cada categoría, los insights narrativos (texto itálico, editorial) van primero; el contenido estructural (barras, tarjetas de comparación, filas de diferencias) va después, con el mismo tratamiento visual que ya tenía — la jerarquía es de orden y contraste tipográfico, no un mecanismo nuevo de expandir/colapsar (decisión deliberada para esta primera vuelta: menos superficie nueva, más fácil de validar).
+
+### Implementación — solo visual, cero cambios de cálculo
+
+- **`computeADNInsights()`:** se agregó un campo `category` (`'como-soy'|'gustos'|'diferencia'|'contradicciones'`) a cada uno de los 6 candidatos ya existentes — es una etiqueta de agrupación para el render, no participa del cálculo de `strength`, del orden, ni de ningún gate. Cero líneas de lógica de cálculo tocadas.
+- **`renderADN()`:** reescrito el armado del HTML — se sacó el bloque de 4 tiles numéricos grandes de arriba (Títulos/Promedio/Horas de cine/vs IMDb), con `avg` y `totalHours` movidos a la línea liviana de contexto que ya vivía bajo el arquetipo (mismos valores, mismo cálculo, sin la caja de dashboard). Nuevo bloque `.adn-hero-insight` para `insights[0]`. Las 9 secciones existentes (géneros, décadas, autores, criterio vs. IMDb, coincidencia, diferencias, Goodreads) no cambiaron su HTML interno ni sus condiciones de aparición — solo se movieron adentro de su categoría correspondiente.
+- **`adnSwitchType()`:** el toggle Todo/Películas/Series/Libros ya escondía las secciones de comparación con IMDb al ver solo libros (mostrando Goodreads en su lugar) buscando el texto del header de cada `.adn-section` — reemplazado por un wrapper `#adn-diferencia-imdb` con las 3 secciones adentro, togglado directo por id. Mismo comportamiento, selector más robusto (ya no depende de que el texto del header no cambie).
+
+### Validación
+
+- Sin errores de consola al cargar ADN con los 2185 ítems reales de Diego.
+- Insight destacado confirmado: `insights[0]` se renderiza en `.adn-hero-insight` con el texto correcto (duración de película, el más fuerte en los datos reales actuales).
+- Las 4 categorías se renderizan con sus headers; "Cómo soy" y "Contradicciones" solo aparecen cuando tienen contenido (se confirmó que no dejan un título vacío si no hay insight secundario para esa categoría).
+- Captura visual de las 4 secciones completas: identidad → destacado → Cómo soy → Lo que me gusta (persona + géneros + décadas) → Lo que me diferencia (alineación + criterio vs IMDb + coincidencia + diferencias) → Contradicciones (género polarizante) — sigue exactamente la jerarquía narrativa diseñada.
+- Toggle Todo/Películas/Series/Libros confirmado funcionando: al tocar "Libros", `#adn-diferencia-imdb` pasa a `display:none` y el arquetipo cambia a "El lector voraz"; al volver a "Todo" se restaura. (Goodreads específicamente no se pudo probar con datos reales de Diego porque su combinación de libros calificados + con `google_rating` no alcanza el umbral que ya existía antes de este bloque — condición sin cambios, no es una regresión.)
+- Desktop confirmado sin romperse — misma estructura, legible, sin cambios de ancho/layout inesperados.
+- **Pendiente de Diego en iPhone real:** primera impresión al entrar ("Archivo me entendió" vs. "estas son las estadísticas"), scroll completo, lectura del insight destacado, sensación general de espejo vs. dashboard — exactamente los 4 puntos que pidió validar.
+
+---
+
 ## Hoja de ruta confirmada después de Bloque S (15-ago-2026, sin bloques abiertos todavía)
 
 Diego cerró la sesión de Bloque S con una lectura de conjunto del roadmap: primero la base técnica (Bloque M), después la UX de uso diario (Bloques N-Q), y ahora el arranque de la inteligencia propia de Archivo (Bloques R-S). Definió la secuencia de las próximas cuatro apuestas, en este orden — **ninguna diseñada todavía**, esto es la hoja de ruta, no un bloque en curso:
