@@ -1249,7 +1249,7 @@ Dos observaciones que Diego registra explícitamente **sin abrir como bloque**, 
 ## Bloque AE — Buscador: mantener foco + limpiar de un toque
 
 - **Objetivo:** hallazgo #2 de la auditoría PWA real — el flujo de buscar/agregar perdía el teclado en medio de una edición. Diego pidió auditar el flujo completo (abrir, escribir, borrar, cambiar criterio, cerrar teclado, volver a buscar), no solo tratar el síntoma.
-- **Estado:** Finalizado en el entorno de pruebas. Validación completa en iPhone real queda de tu lado, mismo patrón que los bloques anteriores de esta etapa.
+- **Estado:** Finalizado y validado en iPhone real. Cerrado del todo.
 
 ### Auditoría — separar causa de alta confianza de hipótesis sin confirmar
 
@@ -1272,6 +1272,10 @@ Se dejaron **explícitamente sin tocar**, por falta de evidencia suficiente (con
 - **Refoco tras cambiar de pill:** confirmado — tras tocar "Películas" con el input previamente enfocado, `document.activeElement` sigue siendo `#ms-input`, `searchType` y el pill activo se actualizan correctamente. Captura visual: el input mantiene el cursor y el borde de foco activo tras el cambio.
 - **Búsqueda real (no mockeada):** validado contra TMDB real ("matrix" trajo Matrix/Matrix Reloaded/Matrix Revolutions/Matrix Resurrections con datos reales) — el flujo completo de escribir→debounce→resultados sigue intacto.
 - **Limitación honesta, mismo patrón que toda esta etapa:** el entorno de pruebas no reproduce un toque táctil real ni el comportamiento exacto del teclado nativo de iOS — la confirmación de que el refoco realmente reabre o mantiene el teclado en tu dispositivo (que puede tener comportamientos particulares, como vos mismo señalaste) queda pendiente de tu validación. Los 7 pasos que pediste (abrir desde FAB, escribir, cambiar tipo sin perder teclado, limpiar con ✕, seguir escribiendo, sin resultados, teclado abriendo/cerrando varias veces) son exactamente lo que corresponde probar en tu iPhone antes de cerrar el bloque del todo.
+
+### Validación real en iPhone (17-ago-2026, después de Bloque AF-A) — funciona perfecto
+
+Primera validación real había quedado pendiente porque el zoom automático de iOS (Bloque AF-A, `#ms-input` a 15px) estaba activo en el momento del primer intento — Diego sospechó que contaminaba la percepción del problema, y así fue: con el zoom corregido, repitió el flujo completo (FAB → escribir → cambiar Películas/Series/Libros con teclado abierto → limpiar con ✕ → escribir de nuevo → probar sin resultados → abrir/cerrar teclado varias veces) y confirmó que el teclado no desaparece solo, el foco queda en el input, y no hay saltos raros del modal. **No hizo falta abrir el análisis de scroll anidado ni la hipótesis de interferencia de Safari** — ambos quedan descartados como causa real, no por falta de evidencia sino porque el síntoma que iban a explicar dejó de existir una vez resuelta la causa real (el zoom).
 
 ---
 
