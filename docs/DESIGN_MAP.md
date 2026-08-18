@@ -1470,6 +1470,31 @@ Umbrales bajos a propósito y proporcionales al tamaño real del catálogo de li
 
 ---
 
+## Bloque AJ — Personas en Buscar y agregar + Rating promueve a Visto
+
+Dos líneas independientes, mismo cierre porque llegaron juntas en la misma sesión.
+
+### 1. Personas en Buscar y agregar
+
+- **Objetivo:** hoy se puede buscar por actor/director dentro de Biblioteca (dato ya guardado), pero no descubrir algo nuevo buscando una persona en el buscador de agregar. Auditoría confirmó que `tmdbSearch()` ya recibía personas de `search/multi` y las descartaba a propósito (`filter(x=>x.media_type!=='person')`) — no hacía falta ninguna API nueva.
+- **Estado:** Finalizado y validado con datos reales de TMDB (Ben Affleck, actor y director).
+- **Diseño:** drill-down dentro del mismo modal, no una pantalla nueva. Una persona se renderiza visualmente distinta de un título (foto circular vs. póster, meta = rol conocido + por qué se lo conoce en vez de tipo+año) — el buscador "entiende" que es una persona antes de que la toques. Tocarla no agrega nada: llama a `/person/{id}/combined_credits` y reemplaza los resultados por su filmografía, separada en dos secciones si aplica — **"Como director/a"** (`crew` filtrado por `job==='Director'`, no todo crew) y **"Como actor/actriz"** (`cast`) — no una lista fusionada. Un título que es verdad en los dos roles (dirigió y actuó) puede aparecer una vez en cada sección, nunca dos veces en la misma. Orden por popularidad de TMDB, igual que el resto del buscador; cada sección se corta en 15 para que una filmografía larga no se vuelva otra lista interminable. "← Volver a resultados" restaura los resultados de texto guardados en `lastResultsHTML`, sin repetir la búsqueda.
+- **Cambios:** `tmdbSearch()` deja de filtrar personas. `renderTmdbResults()` rama a `personResultRow()` cuando `media_type==='person'`. Nuevas: `selectPerson()`, `renderPersonCredits()`, `personCreditRow()`, `dedupeSortedCredits()`, `backToSearchResults()`, variable `lastResultsHTML`. Sin cambios en `selectResult()` — cada fila de la filmografía usa el flujo de agregar de siempre.
+- **Validación real:** buscar "Ben Affleck" trajo su resultado de persona con foto circular y "Actor/actriz · Perdida, Batman vs Superman..."; abrir su filmografía mostró "Como director/a" (Air, The Town, Argo...) y "Como actor/actriz" separados, 0 IDs duplicados dentro de cada sección (confirmado programáticamente, no solo visual); "Volver a resultados" restauró exactamente los resultados de texto originales, incluida la fila de la persona.
+
+### 2. Rating promueve el estado a Visto
+
+- **Objetivo:** retomar la pausa de Bloque AF-C. Calificar algo que estaba "Ver después" es una contradicción — si ya lo calificaste, ya tuviste la experiencia. Regla confirmada: `watchlist+rating→watched`; `watching`/`watched` no se tocan.
+- **Estado:** Finalizado. Validado por simulación exacta de la lógica (mismo patrón que Bloque AI cuando no hay sesión disponible en el entorno de pruebas) — pendiente de tu confirmación en uso real.
+- **Diseño:** `saveDetail()` computa `promotedByRating = base.status==='watchlist' && ratingTouched && !!rating` **antes** del bloque de `watch_date` de Bloque AH — el status ya promovido entra a la detección de transición existente (`base.status!=='watched' && status==='watched'`) sin ningún cambio en esa lógica, tal como pediste ("mismo mecanismo, sin duplicar"). Sin confirmación intermedia — se infiere y se comunica después del hecho: el toast pasa a decir *"Marcado como Visto"* en vez de *"Actualizado"* cuando la promoción ocurrió, reusando el componente existente.
+- **Validación (simulada, sin sesión real disponible en el entorno de pruebas):**
+  - `watchlist` + rating → `status:'watched'`, `watchDate` se dispara (`approx`, chip elegible), toast *"Marcado como Visto"*.
+  - `watching` + rating → `status:'watching'` intacto, `watchDate` sin tocar, toast genérico.
+  - `watched` (con `watch_date`/`precision` ya `exact`) + cambio de rating → `status` y fecha existentes preservados exactamente, no se repregunta.
+  - **Pendiente de Diego:** confirmar los 3 casos con datos reales en su próxima sesión — la lógica está probada por cálculo directo, no por un guardado real contra Supabase.
+
+---
+
 ## Hoja de ruta confirmada después de Bloque S (15-ago-2026, sin bloques abiertos todavía)
 
 Diego cerró la sesión de Bloque S con una lectura de conjunto del roadmap: primero la base técnica (Bloque M), después la UX de uso diario (Bloques N-Q), y ahora el arranque de la inteligencia propia de Archivo (Bloques R-S). Definió la secuencia de las próximas cuatro apuestas, en este orden — **ninguna diseñada todavía**, esto es la hoja de ruta, no un bloque en curso:

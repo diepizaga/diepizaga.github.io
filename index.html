@@ -608,6 +608,15 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
 .ms-overview { font-size: 12px; color: var(--paper2); margin-top: 5px; line-height: 1.5;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 
+/* Bloque AJ -- filmografía de una persona dentro del modal de búsqueda */
+.ms-person-header { display: flex; flex-direction: column; gap: 8px; padding: 4px 12px 14px; }
+.ms-person-back { align-self: flex-start; font-family: var(--mono); font-size: 11px; color: var(--paper3);
+  text-transform: uppercase; letter-spacing: .08em; cursor: pointer; }
+.ms-person-back:hover { color: var(--paper); }
+.ms-person-name { font-family: var(--serif); font-style: italic; font-size: 20px; color: var(--paper); }
+.ms-person-role { font: 600 10px var(--sans); text-transform: uppercase; letter-spacing: .18em;
+  color: var(--paper3); padding: 14px 12px 6px; }
+
 /* detalle (ficha) */
 #modal-detail .modal { max-width: 760px; }
 #detail-content { position: relative; }
@@ -1181,6 +1190,7 @@ let searchType   = 'multi';
 let editingItem  = null;
 let pendingItem  = null;
 let lastSearchQuery = null, lastSearchType = null;
+let lastResultsHTML = ''; // Bloque AJ -- resultados de texto antes de entrar a una filmografía, para volver sin repetir la búsqueda
 let importRows   = [];
 let discCache    = { movies: null, series: null, books: null };
 let searchTimeout = null, bibSearchTimeout = null, toastTimeout = null;
@@ -1283,7 +1293,9 @@ async function tmdbSearch(query, type) {
     const r = await fetch(`https://api.themoviedb.org/3/${ep}?query=${encodeURIComponent(query)}&language=${lang}&page=1`, { headers:{Authorization:`Bearer ${TMDB_TOKEN}`} });
     if (!r.ok) continue;
     const d = await r.json();
-    const res = (d.results||[]).filter(x=>x.media_type!=='person').sort((a,b)=>(b.popularity||0)-(a.popularity||0));
+    // Bloque AJ -- personas ya no se descartan: search/multi las devuelve con
+    // media_type:'person', se renderizan distinto (ver renderTmdbResults).
+    const res = (d.results||[]).sort((a,b)=>(b.popularity||0)-(a.popularity||0));
     if (res.length) return res.slice(0,10);
   }
   return [];
@@ -3058,8 +3070,28 @@ function renderBookResults(books) {
   }).join('');
 }
 
+// Bloque AJ -- una persona se ve claramente distinta de un título (foto
+// circular, no póster; meta = rol conocido + por qué se la conoce, no
+// tipo+año) para que el buscador "entienda" que es una persona, no un
+// título más. Tocarla no agrega nada -- entra a su filmografía.
+function personResultRow(r) {
+  const dept = r.known_for_department === 'Directing' ? 'Director/a'
+    : r.known_for_department === 'Acting' ? 'Actor/actriz'
+    : (r.known_for_department || 'Persona');
+  const knownFor = (r.known_for||[]).map(k=>k.title||k.name).filter(Boolean).slice(0,2).join(', ');
+  const photo = r.profile_path ? `<img src="${TMDB_IMG}w92${r.profile_path}" alt="" style="border-radius:50%">` : `<div class="ms-thumb" style="border-radius:50%"></div>`;
+  return `<div class="ms-result" onclick="selectPerson(${r.id},'${escAttr(r.name)}')">
+    ${photo}
+    <div class="ms-info">
+      <div class="ms-title">${esc(r.name)}</div>
+      <div class="ms-meta">${esc(dept)}${knownFor?' · '+esc(knownFor):''}</div>
+    </div>
+  </div>`;
+}
+
 function renderTmdbResults(results) {
   return results.map(r => {
+    if (r.media_type === 'person') return personResultRow(r);
     const type=(r.media_type||searchType)==='movie'?'movie':'tv';
     const title=r.title||r.name, year=(r.release_date||r.first_air_date||'').slice(0,4);
     const inList = items.find(i=>i.tmdb_id===r.id&&i.type===type);
@@ -3074,6 +3106,59 @@ function renderTmdbResults(results) {
     </div>`;
   }).join('');
 }
+
+// Bloque AJ -- filmografía de una persona, dentro del mismo modal (no una
+// pantalla nueva). Separada por rol (actor vs. director) en vez de una lista
+// fusionada -- si TMDB devuelve ambas cosas para la misma persona, se
+// muestran las dos secciones; un título que es verdad en los dos roles
+// (ej. actuó y dirigió la misma película) aparece una vez en cada sección
+// correspondiente, nunca dos veces en la misma. Orden por popularidad, igual
+// que el resto del buscador -- una filmografía completa puede ser enorme,
+// se corta para que no se vuelva otra lista interminable.
+function dedupeSortedCredits(list) {
+  const seen = new Set(), out = [];
+  [...list].sort((a,b)=>(b.popularity||0)-(a.popularity||0)).forEach(r => {
+    if (r.id && (r.title||r.name) && !seen.has(r.id)) { seen.add(r.id); out.push(r); }
+  });
+  return out;
+}
+function personCreditRow(r) {
+  const type = r.media_type==='movie' ? 'movie' : 'tv';
+  const title = r.title||r.name, year=(r.release_date||r.first_air_date||'').slice(0,4);
+  const inList = items.find(i=>i.tmdb_id===r.id&&i.type===type);
+  const poster = r.poster_path ? `<img src="${TMDB_IMG}w92${r.poster_path}" alt="">` : `<div class="ms-thumb"></div>`;
+  return `<div class="ms-result" onclick="selectResult(${r.id},'${type}')">
+    ${poster}
+    <div class="ms-info">
+      <div class="ms-title">${esc(title)}${year?` <span class="yr">(${year})</span>`:''}</div>
+      <div class="ms-meta">${typeLabel(type)}${inList?' · <span style="color:var(--green)">✓ En tu archivo</span>':''}</div>
+    </div>
+  </div>`;
+}
+function renderPersonCredits(name, credits) {
+  const directing = dedupeSortedCredits((credits.crew||[]).filter(c=>c.job==='Director')).slice(0,15);
+  const acting = dedupeSortedCredits(credits.cast||[]).slice(0,15);
+  const header = `<div class="ms-person-header">
+    <button class="ms-person-back" onclick="backToSearchResults()">← Volver a resultados</button>
+    <div class="ms-person-name">${esc(name)}</div>
+  </div>`;
+  if (!directing.length && !acting.length) return header + `<div class="loading-block">Sin filmografía disponible.</div>`;
+  let html = header;
+  if (directing.length) html += `<div class="ms-person-role">Como director/a</div>${directing.map(personCreditRow).join('')}`;
+  if (acting.length) html += `<div class="ms-person-role">Como actor/actriz</div>${acting.map(personCreditRow).join('')}`;
+  return html;
+}
+async function selectPerson(personId, name) {
+  lastResultsHTML = $id('ms-results').innerHTML;
+  const c = $id('ms-results');
+  c.innerHTML = `<div class="loading-block"><div class="spinner" style="margin:0 auto"></div>Filmografía de ${esc(name)}…</div>`;
+  try {
+    const r = await fetchTimeout(`https://api.themoviedb.org/3/person/${personId}/combined_credits?language=es-AR`, { headers:{Authorization:`Bearer ${TMDB_TOKEN}`} });
+    const credits = await r.json();
+    c.innerHTML = renderPersonCredits(name, credits);
+  } catch { c.innerHTML = `<div class="loading-block" style="color:var(--red)">Error al cargar. Probá de nuevo.</div>`; }
+}
+function backToSearchResults() { $id('ms-results').innerHTML = lastResultsHTML; }
 
 async function doSearch(q) {
   const c = $id('ms-results');
@@ -3371,12 +3456,22 @@ function findSavedItem(data) {
 async function saveDetail(isEdit) {
   const base = isEdit ? editingItem : pendingItem;
   if (!base) return;
-  const status = $id('det-status').value;
   const notes = $id('det-notes').value.trim();
   const watchDateInput = $id('det-date').value;
   // currentRating: null = no tocó las estrellas (queda lo que había); 0 = limpió
   const ratingTouched = currentRating !== null;
   const rating = currentRating !== null ? (currentRating || null) : (base.my_rating ?? null);
+
+  // Bloque AJ -- calificar algo que estaba "Ver después" es una contradicción:
+  // si ya lo calificaste, ya tuviste la experiencia. Se infiere sin pedir
+  // confirmación (pedido explícito de Diego) -- el feedback es el toast de
+  // abajo, no un paso intermedio. No toca "Viendo" (calificar mientras
+  // estás viendo no significa que terminaste) ni "Visto" (ya es no-op).
+  // Se computa antes del bloque de watch_date para que la transición se
+  // detecte con el status ya promovido -- mismo mecanismo de Bloque AH,
+  // sin duplicar lógica.
+  const promotedByRating = base.status === 'watchlist' && ratingTouched && !!rating;
+  const status = promotedByRating ? 'watched' : $id('det-status').value;
 
   // watch_date (Bloque AH): dispara solo en una transición real hacia "watched"
   // (estado anterior distinto, nuevo = watched) y solo si nunca se preguntó
@@ -3400,7 +3495,7 @@ async function saveDetail(isEdit) {
   try {
     await saveItem(data);
     closeModal('modal-detail');
-    showToast(isEdit?'Actualizado':'Agregado a tu archivo','success');
+    showToast(promotedByRating ? 'Marcado como Visto' : (isEdit?'Actualizado':'Agregado a tu archivo'), 'success');
     const savedItem = findSavedItem(data);
     const reactionShown = (ratingTouched && rating) ? maybeShowReactionPrompt(savedItem) : false;
     if (!reactionShown && offerWatchDatePrompt) maybeShowWatchDatePrompt(savedItem);
