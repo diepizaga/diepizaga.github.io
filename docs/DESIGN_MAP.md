@@ -14,6 +14,50 @@ Estados posibles: **Pendiente** / **En diseño** / **Implementando** / **Validan
 
 ---
 
+## Estado actual de Archivo (actualizado 17-ago-2026)
+
+Esta sección es el resumen — si volvés a este documento dentro de 6 meses, empezá acá, no por el historial de bloques de abajo. Se reescribe cada vez que el estado cambia, no se acumula.
+
+### En producción hoy — qué sabe y qué hace Archivo
+
+- **Catálogo:** 2185 ítems (películas/series/libros), búsqueda con filtros por estado/género/década/orden, importación CSV, exportación JSON. Buscar y agregar entiende personas (actor/director) además de títulos — tocar una persona muestra su filmografía separada por rol (Bloque AJ).
+- **Conocimiento propio:** ADN calcula insights rankeados por fuerza real (no estadísticas sueltas), presentado como espejo narrativo con jerarquía dinámica, no dashboard (Bloque T, AG). Descubrí tiene ranking propio para película/serie (afinidad de género/director/reparto/duración, Bloque X) y para libros (afinidad de autor/género/extensión, umbrales propios del dominio, Bloque AI) — ninguno de los dos copia TMDB, cada uno interpreta lo que ya sabe de vos.
+- **Memoria de la experiencia (no confundir con "Memoria" el capítulo futuro, ver abajo):** rating, reacción, nota y fecha conviven en la ficha como una sola unidad ("Tu experiencia", Bloque AK) — reacción con presencia permanente en vez de un toast de 9 segundos, fecha en lenguaje humano según qué tan segura es. Calificar algo que estaba "Ver después" promueve el estado a "Visto" solo, sin pedirte confirmarlo (Bloque AJ).
+- **Mobile/PWA:** un solo chrome fijo (bottom nav contextual, header no-sticky), buscador sin el bug de perder el teclado, inputs a 16px+ (sin el zoom automático de iOS). Auditado como PWA real en iPhone, no solo en el entorno de pruebas — pinch-zoom mejorado pero sigue siendo una limitación real de iOS, no resuelta del todo.
+- **Grupos:** funcionalmente sano (bug de `role` corregido, Bloque AB) pero con 0 uso real confirmado repetidas veces — ver "pendiente por decisión de producto" abajo.
+
+### Pausado por falta de datos
+
+- **Memoria (reconstruir tu historia en el tiempo):** 0 ítems con `watch_date` real acumulado al 17-ago. La infraestructura ya existe (`watch_date`/`watch_date_precision`, Bloque AH) y captura hacia adelante sin fricción — lo que falta es tiempo de uso real, no código. **Criterio de reapertura explícito, no por calendario:** ~15-20 ítems con fecha real acumulada, idealmente distribuidos en el tiempo. Hasta entonces, prohibido usar `created_at`/fecha de estreno/carga masiva como sustituto (ya evaluados y descartados).
+
+### Pendiente por decisión de producto
+
+- **Diálogos nativos** (`confirm()`/`prompt()` en eliminar/reemplazar/cambiar nombre) rompen la identidad visual — en auditoría ahora mismo.
+- **Viendo/Pendiente con más peso estructural que uso real** — "Seguís con" en Inicio y "Pendientes" en métricas dimensionados para un estado que en el archivo real está permanentemente en 0.
+- **Grupos con la misma prominencia de navegación que Exportar/Importar** pese a 0 uso real — no es "construir más Grupos", es si merece el mismo lugar visual que lo que sí se usa.
+- **Vocabulario de confianza inconsistente en Descubrí** — "match"/"apuesta" (película/serie, Bloque X) vs. "alta"/"inicial"/"exploración" (libros, Bloque AI); cada uno correcto por separado.
+- **Grupos como "inteligencia colectiva de gustos"** (comparar gustos entre personas, más allá de "biblioteca compartida") — dirección de producto que Diego quiere explorar algún día, pero explícitamente sin auditar/diseñar hasta que Grupos tenga señal real de uso.
+
+### Deuda técnica conocida
+
+- **`import_movies.py` expone la `service_role` key de Supabase** (EP-7, detectada 30-jul-2026) — bypassea RLS por completo. Es el pendiente más antiguo y más crítico del proyecto; sin confirmación de que Diego la haya rotado. Nada de lo construido después la reemplaza ni la mitiga.
+- **Bypass `user_id IS NULL` en `watchlist`** (Bloque C) — diseñado, nunca implementado. Riesgo confirmado bajo el 30-jul (0 filas huérfanas), no revalidado desde entonces.
+- **`group_members` sin validación server-side de invitación** (Bloque D) — cualquiera con el flujo correcto podría insertarse sin pasar por `resolve_invitation`. Prioridad baja mientras Grupos no tenga uso real.
+- **`groups` sin política DELETE** (EP-10) — ni Diego puede borrar un grupo desde la app, solo por SQL directo en Supabase.
+- **`tmdb_rating` con semántica doble** (Bloque H) — deuda planificada, fuera del roadmap activo, se retoma solo si aparece una razón concreta.
+- **La fórmula "efecto × confianza" está calculada 3 veces por separado** (`computeADNInsights()`, `computeAffinityMaps()` para película/serie, `computeBookAffinityMaps()` para libros) — misma idea, tres implementaciones con parámetros propios de cada dominio. Funciona bien en los tres lados; cada bloque nuevo que toque afinidad es una cuarta implementación candidata si no se unifica antes.
+
+### Descartado por falta de evidencia (decisiones activas, no cosas que se nos pasaron)
+
+- **Década como señal de afinidad** — spread prácticamente plano en película/serie (Bloque T) y sin variación real en libros (Bloque AI, 16/28 ≥8).
+- **"Directores favoritos" para película/serie** (Bloque E) — dato nunca capturado, se removió en vez de poblarlo artificialmente.
+- **Combinaciones director+actor como insight de ADN** (Bloque V) — el top estaba confundido por elencos ensemble (Avengers), no era una señal nueva real.
+- **"Parecido a tus libros mejor calificados" como señal de ranking** (Bloque AI) — 16 de 28 libros ya calificados ≥8, un corte alto no aísla nada distinto de la afinidad normal.
+- **`created_at`/fecha de estreno como sustituto de `watch_date`** — evaluado y rechazado explícitamente al diseñar Memoria (48% del catálogo comparte fecha de carga masiva, no dice nada real).
+- **Indicadores de reacción/nota en Biblioteca** (Bloque AK) — mismo criterio que la pausa de Memoria: no construir chrome para una señal que hoy es prácticamente cero.
+
+---
+
 ## Bloque 0 — Visión de producto a 12 meses
 
 - **Objetivo:** responder qué querés que sea Archivo en un horizonte de 12 meses.
