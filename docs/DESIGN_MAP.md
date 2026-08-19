@@ -1495,6 +1495,57 @@ Dos líneas independientes, mismo cierre porque llegaron juntas en la misma sesi
 
 ---
 
+## Auditoría transversal de producto (17-ago-2026) — sin implementar, solo diagnóstico
+
+Diego pidió dejar de auditar bloque por bloque y mirar Archivo como producto completo, cruzando Inicio/Biblioteca/Buscar y agregar/Descubrí/ADN/Perfil/Grupos/modales/estados/rating/reacciones/watch_date contra 8 preguntas (duplicación, ruido, funciones escondidas, pasos innecesarios, inconsistencia película/serie/libro, sensación herramienta-vs-producto, cosas construidas porque se podía, oportunidades de simplificar). Método: código real + `DESIGN_MAP.md`/`PRODUCT_VISION.md` para no repetir decisiones ya tomadas, criterio de `ui-ux-pro-max` como lente de evaluación.
+
+**Resuelto, ya no compite por atención:** toda la etapa de auditoría mobile/PWA (chrome, teclado, personas, libros) — confirmado sin pendientes.
+
+**5 hallazgos priorizados, Diego eligió el primero para trabajar ahora (ver Bloque AK abajo):**
+1. **Reacciones y notas mudas después de capturarlas** — una reacción marcada en el chip de 9s nunca se vuelve a mostrar en ningún lado; notas tiene el mismo problema desde antes. Dos mecanismos paralelos de "qué pensaste", ninguno visible después del momento — lo opuesto a "espejo, no dashboard".
+2. **3 diálogos nativos** (`confirm()`/`prompt()` en eliminar, reemplazar, cambiar nombre) rompen la identidad visual — únicos lugares de toda la app sin ningún estilo propio.
+3. **Viendo/Pendiente con más peso estructural que uso real** — "Seguís con" en Inicio y "Pendientes" en métricas dimensionados para un estado que en el archivo real de Diego está permanentemente en 0.
+4. **Grupos con la misma prominencia de navegación que Exportar/Importar** pese a 0 uso real confirmado repetidas veces — no es "construir más Grupos" (ya descartado), es "¿debería ocupar el mismo lugar visual?".
+5. **Vocabulario de confianza distinto entre Descubrí película/serie** ("match"/"apuesta", Bloque X) **y libros** ("alta"/"inicial"/"exploración", Bloque AI) — cada uno correcto por separado, inconsistente entre sí.
+
+Hallazgos 2-5 quedan anotados, sin abrir — mismo criterio de esta etapa: no proponer 15 bloques nuevos de una vez.
+
+---
+
+## Bloque AK — "Tu experiencia": reacción + fecha + nota como memoria del ítem
+
+- **Objetivo:** hallazgo #1 de la auditoría transversal, elegido por Diego como el más importante — toca directamente "espejo, no dashboard". Pregunta guía: *"cuando vuelva dentro de seis meses a una película que vi, ¿qué debería poder recordar de lo que pensé aquel día?"*. Mandato explícito: no agregar mecanismos de expresión nuevos — rating, reacción y nota ya existen; el trabajo es darles presencia y memoria, no inventar una cuarta forma de opinar.
+- **Estado:** Finalizado en el entorno de pruebas. Los 8 casos que pidió Diego validados — 6 por render/lógica directa con datos reales de la app, 2 (toggle de reacción, red de guardado) por simulación porque no había sesión de Supabase activa en el entorno de pruebas al momento de validar.
+
+### Diseño
+
+Consolidación, no una pantalla nueva: nuevo bloque **"TU EXPERIENCIA"** en la ficha, pegado debajo de "MI CALIFICACIÓN" — antes reacción no tenía ningún lugar permanente (solo el toast de 9s), fecha era un `<input type="date">` crudo sin contexto, y nota vivía como form-group suelto al final, sin relación visual con lo demás.
+
+- **Reacción:** los mismos chips de siempre (`reactionChips()`, `toggleReaction()`) — ahora permanentes en la ficha en vez de solo en el prompt transitorio, y ya no gateados por `isNotableReaction()` (ese gate seguía siendo válido para decidir cuándo *interrumpir* con el toast; no tiene sentido como gate de si podés reaccionar en la ficha, donde entraste vos). Solo se muestran si `item.status==='watched'` — reaccionar antes de terminarlo no tiene sentido, mismo criterio que ya aplica Bloque AJ al rating. Un chip ya guardado se renderiza con `.rp-chip.active` (relleno) — el mismo lenguaje visual que ya distingue marcado/sin marcar en el resto de la app — sin inventar un estado visual nuevo para "esto ya es tu registro" vs. "esto es para elegir".
+- **Fecha:** `watchDateDisplay(item, isBook)` nueva — frase legible según precisión real, nunca el ISO crudo: `exact` → *"Lo viste el 17 de agosto de 2026"*; `approx` → *"Por esta época, agosto de 2026"* (nunca un día que no se sabe); `declined`/`null` → no muestra nada, no hay nada honesto que decir. El `<input type="date">` de corrección sigue existiendo pero pasa a secundario, más chico, etiquetado "Corregir fecha".
+- **Nota:** mismo textarea de siempre, ahora dentro del bloque en vez de aislado.
+- **Estado** queda fuera del bloque a propósito — es gestión, no reflexión (confirmado por Diego).
+- **Estado, Biblioteca, ADN:** sin cambios — no se agregan indicadores a las cards/lista (con reacciones/fechas reales en ~0 hoy sería el mismo error que se evitó con Memoria: construir chrome para una señal que casi no existe), notas no pasa a alimentar ningún cálculo (texto libre, no hay forma honesta de derivar señal sin NLP nuevo, fuera de alcance).
+
+### Bug encontrado y corregido de paso (punto 4 de la auditoría de Diego: "editar/eliminar")
+
+Vaciar el campo "Fecha" a mano **no borraba nada** — `watchDate = watchDateInput || base.watch_date || null` caía siempre al valor viejo si el input quedaba vacío, sin forma de eliminar una fecha ya puesta. Corregido: `dateWasCleared = !!base.watch_date && !watchDateInput` detecta el caso, `watch_date`/`watch_date_precision` pasan a `null` (no a `declined` — vaciar una fecha puesta es una corrección tuya, no una respuesta consciente al chip de Bloque AH).
+
+### Implementación
+
+- `watchDateDisplay(item, isBook)` — nueva, pura, sin red.
+- `toggleReactionInDetail(itemId, chip, btnEl)` — nueva, pero **reusa `toggleReaction()` sin duplicar su lógica**; solo agrega la resincronización de `editingItem` que faltaba (sin esto, guardar el resto del formulario después de tocar un chip habría pisado la reacción con el valor viejo, porque `editingItem` es una copia tomada al abrir la ficha y `saveItem()` solo actualiza el array global `items`).
+- `saveDetail()`: agregado `dateWasCleared`, sin tocar el resto de la lógica de Bloque AH/AJ (transición real, no repreguntar, edición manual → exact) — confirmado por regresión que las 4 reglas siguen intactas.
+- HTML: bloque `.experience-block` nuevo reemplaza el `form-row` de Estado+Fecha y el `form-group` de Notas sueltos; Estado queda solo en su propio `form-row`.
+
+### Validación
+
+- **8 escenarios pedidos por Diego**, todos confirmados con `openDetailModal()` real sobre ítems construidos con datos reales de la app (título/género/tipo): sin reacción/nota/fecha (bloque de reacciones presente, 0 chips activos, sin línea de fecha, notas vacías); con reacción (2 de 5 chips correctamente `.active`, los otros 3 sin marcar); con nota (texto presente en el textarea); fecha exacta (*"Lo viste el 10 de agosto de 2026"*); fecha aproximada (*"Por esta época, agosto de 2026"*); borrar fecha (`watchDate`/`precision` → `null`/`null`, sin repreguntar); editar reacción (toggle visual síncrono confirmado — `classList` pasa de activo a inactivo antes de que la escritura a red se resuelva); borrar nota (trivial, sin lógica que lo bloquee).
+- **Regresión de Bloque AH/AJ** confirmada con la misma función de lógica: transición real `watchlist→watched` sigue dando `approx`+chip elegible; edición manual del campo sigue dando `exact`; un ítem con `precision` ya seteada (`declined`) no se repregunta al transicionar de nuevo.
+- **Limitación de la validación, no del código:** sin sesión de Supabase activa en el entorno de pruebas en el momento de validar, el guardado real contra la base (tanto el toggle de reacción como un `saveDetail()` completo) no se pudo confirmar end-to-end — la lógica se validó por cálculo directo y por render real, no por un round-trip de red. Vale la pena que Diego confirme los 8 casos una vez más en uso real, mismo patrón que el resto de esta etapa.
+
+---
+
 ## Hoja de ruta confirmada después de Bloque S (15-ago-2026, sin bloques abiertos todavía)
 
 Diego cerró la sesión de Bloque S con una lectura de conjunto del roadmap: primero la base técnica (Bloque M), después la UX de uso diario (Bloques N-Q), y ahora el arranque de la inteligencia propia de Archivo (Bloques R-S). Definió la secuencia de las próximas cuatro apuestas, en este orden — **ninguna diseñada todavía**, esto es la hoja de ruta, no un bloque en curso:
